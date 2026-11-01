@@ -139,3 +139,4 @@ export function AvailableRidesWidget({ rides = [] }) {
 }
 
 export default AvailableRidesWidget;
+

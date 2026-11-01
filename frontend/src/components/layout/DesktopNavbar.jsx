@@ -231,3 +231,4 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
 }
 
 export default DesktopNavbar;
+

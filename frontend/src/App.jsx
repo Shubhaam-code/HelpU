@@ -7,6 +7,7 @@ import { setTokenGetter } from './lib/api';
 
 // Pages
 import OnboardingPage from './pages/OnboardingPage';
+import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import RidesPage from './pages/RidesPage';
 import OfferRidePage from './pages/OfferRidePage';
@@ -49,7 +50,7 @@ function ProtectedRoute({ children }) {
     );
   }
   if (!isSignedIn) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/auth" replace />;
   }
   return children;
 }
@@ -59,8 +60,13 @@ export default function App() {
     <>
       <TokenInjector />
       <Routes>
-        {/* Public */}
+        {/* Public Landing & Authentication */}
         <Route path="/" element={<OnboardingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/login" element={<AuthPage initialMode="signIn" />} />
+        <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
+        <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
+        <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
 
         {/* Protected */}
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />

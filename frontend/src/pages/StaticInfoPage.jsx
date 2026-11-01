@@ -35,3 +35,4 @@ export function StaticInfoPage({ title, subtitle, icon, actionText = 'Explore Ri
 }
 
 export default StaticInfoPage;
+

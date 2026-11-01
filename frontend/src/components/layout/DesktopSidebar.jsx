@@ -124,3 +124,4 @@ export function DesktopSidebar({ onCloseMobile }) {
 }
 
 export default DesktopSidebar;
+
