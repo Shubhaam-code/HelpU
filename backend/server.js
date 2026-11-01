@@ -6,11 +6,15 @@ import connectDB from './src/config/db.js';
 
 import mongoose from 'mongoose';
 import { closeNotificationQueue } from './src/queues/notification.queue.js';
+import { startOutboxProcessor, stopOutboxProcessor } from './src/services/outbox.service.js';
 
 const PORT = process.env.PORT || 5000;
 
 // Connect to Database
-connectDB();
+connectDB().then(() => {
+  // Start periodic outbox processor after DB is connected
+  startOutboxProcessor({ intervalMs: 5000 });
+});
 
 // Start Server
 const server = app.listen(PORT, () => {
@@ -23,6 +27,7 @@ async function handleServerShutdown(signal) {
   server.close(async () => {
     console.log('[Server] HTTP server closed.');
     try {
+      stopOutboxProcessor();
       await closeNotificationQueue();
       await mongoose.disconnect();
       console.log('[Server] Database connections closed.');
