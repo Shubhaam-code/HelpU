@@ -67,6 +67,11 @@ const travelSchema = new mongoose.Schema(
       required: [true, 'Seats count is required'],
       min: [1, 'Seats must be at least 1']
     },
+    bookedSeats: {
+      type: Number,
+      default: 0,
+      min: [0, 'Booked seats cannot be negative']
+    },
     status: {
       type: String,
       enum: {

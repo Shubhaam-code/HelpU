@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { requireAuth } from '../middlewares/auth.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
+import { findMatchesForTravel } from '../services/matching.service.js';
 
 const router = express.Router();
 
@@ -235,6 +236,58 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error while updating travel status',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/travels/:id/matches
+ * @desc    Find compatible travel matches for a given post (owner only)
+ * @access  Protected
+ */
+router.get('/:id/matches', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Validate MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid travel ID format'
+      });
+    }
+
+    // 2. Find target travel post
+    const travel = await Travel.findById(id);
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Travel post not found'
+      });
+    }
+
+    // 3. Ownership verification
+    if (travel.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You are not authorized to view matches for this travel post'
+      });
+    }
+
+    // 4. Run matching engine
+    const matches = await findMatchesForTravel(travel);
+
+    return res.status(200).json({
+      success: true,
+      count: matches.length,
+      data: matches
+    });
+  } catch (error) {
+    console.error('Error finding travel matches:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while finding travel matches',
       error: error.message
     });
   }
