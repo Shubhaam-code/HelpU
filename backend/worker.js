@@ -4,17 +4,23 @@ dotenv.config();
 import { startNotificationWorker, closeNotificationWorker } from './src/workers/notification.worker.js';
 import { hasRedisConfigured } from './src/config/redis.js';
 
+import connectDB from './src/config/db.js';
+import mongoose from 'mongoose';
+
 if (!hasRedisConfigured()) {
   console.warn('[Worker] Warning: Redis configuration (REDIS_URL or REDIS_HOST) is not set. Worker will not start.');
 } else {
-  console.log('[Worker] Initializing CampusPool BullMQ background worker...');
-  startNotificationWorker();
+  console.log('[Worker] Connecting to MongoDB and initializing CampusPool BullMQ background worker...');
+  connectDB().then(() => {
+    startNotificationWorker();
+  });
 }
 
 async function handleShutdown(signal) {
   console.log(`\n[Worker] Received ${signal}. Initiating graceful shutdown...`);
   try {
     await closeNotificationWorker();
+    await mongoose.disconnect();
     console.log('[Worker] Graceful shutdown completed successfully.');
     process.exit(0);
   } catch (err) {
