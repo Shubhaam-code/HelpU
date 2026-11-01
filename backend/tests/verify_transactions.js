@@ -304,6 +304,11 @@ async function runTransactionTests() {
   } finally {
     server.close();
     await mongoose.connection.close();
+    try {
+      const { closeNotificationQueue } = await import('../src/queues/notification.queue.js');
+      await closeNotificationQueue();
+    } catch {}
+    process.exit(0);
   }
 }
 

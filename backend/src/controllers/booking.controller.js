@@ -2,6 +2,9 @@ import mongoose from 'mongoose';
 import Booking from '../models/Booking.js';
 import Travel from '../models/Travel.js';
 import Student from '../models/Student.js';
+import { createOutboxEvent, triggerOutboxSweep } from '../services/outbox.service.js';
+import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
+import { cancelBookingReminders } from '../services/reminder.service.js';
 
 /**
  * @route   POST /api/bookings
@@ -106,21 +109,56 @@ export async function createBookingRequest(req, res) {
       });
     }
 
-    // 8. Create booking document with status: 'pending'
+    // 8. Create booking document with status: 'pending' inside transaction with Outbox event
     // Do NOT reserve or subtract seats at this stage (seats are deducted only upon final owner confirmation)
-    const booking = await Booking.create({
-      travelId: travel._id,
-      ownerId: travel.userId,
-      passengerId,
-      requestedSeats: numSeats,
-      status: 'pending'
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    return res.status(201).json({
-      success: true,
-      message: 'Booking request created successfully',
-      data: booking
-    });
+    try {
+      const [booking] = await Booking.create(
+        [
+          {
+            travelId: travel._id,
+            ownerId: travel.userId,
+            passengerId,
+            requestedSeats: numSeats,
+            status: 'pending'
+          }
+        ],
+        { session }
+      );
+
+      // Save Transactional Outbox event to notify travel owner
+      await createOutboxEvent(
+        {
+          eventType: NOTIFICATION_JOB_TYPES.BOOKING_REQUESTED,
+          recipientId: travel.userId,
+          relatedBookingId: booking._id,
+          relatedTravelId: travel._id,
+          payload: {
+            source: travel.source,
+            destination: travel.destination,
+            travelDate: travel.travelDate,
+            requestedSeats: numSeats
+          }
+        },
+        session
+      );
+
+      await session.commitTransaction();
+      triggerOutboxSweep();
+
+      return res.status(201).json({
+        success: true,
+        message: 'Booking request created successfully',
+        data: booking
+      });
+    } catch (txErr) {
+      await session.abortTransaction();
+      throw txErr;
+    } finally {
+      await session.endSession().catch(() => {});
+    }
   } catch (error) {
     console.error('Error in createBookingRequest:', error);
     return res.status(500).json({
@@ -277,16 +315,52 @@ export async function respondToBookingRequest(req, res) {
       });
     }
 
-    // 6. Update status based on action
+    // 6. Update status based on action inside transaction with Outbox event
     // Note: Accepting changes status to 'accepted'. Do NOT change seat counts or mark as confirmed yet.
-    booking.status = action === 'accept' ? 'accepted' : 'rejected';
-    await booking.save();
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    return res.status(200).json({
-      success: true,
-      message: `Booking request ${booking.status} successfully`,
-      data: booking
-    });
+    try {
+      booking.status = action === 'accept' ? 'accepted' : 'rejected';
+      await booking.save({ session });
+
+      const eventType =
+        action === 'accept'
+          ? NOTIFICATION_JOB_TYPES.BOOKING_ACCEPTED
+          : NOTIFICATION_JOB_TYPES.BOOKING_REJECTED;
+
+      const travel = await Travel.findById(booking.travelId).session(session);
+
+      await createOutboxEvent(
+        {
+          eventType,
+          recipientId: booking.passengerId,
+          relatedBookingId: booking._id,
+          relatedTravelId: booking.travelId,
+          payload: {
+            source: travel?.source || 'Source',
+            destination: travel?.destination || 'Destination',
+            travelDate: travel?.travelDate,
+            requestedSeats: booking.requestedSeats
+          }
+        },
+        session
+      );
+
+      await session.commitTransaction();
+      triggerOutboxSweep();
+
+      return res.status(200).json({
+        success: true,
+        message: `Booking request ${booking.status} successfully`,
+        data: booking
+      });
+    } catch (txErr) {
+      await session.abortTransaction();
+      throw txErr;
+    } finally {
+      await session.endSession().catch(() => {});
+    }
   } catch (error) {
     console.error('Error in respondToBookingRequest:', error);
     return res.status(500).json({
@@ -565,8 +639,28 @@ export async function confirmBooking(req, res) {
         });
       }
 
-      // Commit both operations atomically
+      // 10. Create Outbox event for booking confirmation inside transaction
+      await createOutboxEvent(
+        {
+          eventType: NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED,
+          recipientId: booking.passengerId,
+          relatedBookingId: booking._id,
+          relatedTravelId: travel._id,
+          payload: {
+            source: reservedTravel.source,
+            destination: reservedTravel.destination,
+            travelDate: reservedTravel.travelDate,
+            requestedSeats: booking.requestedSeats
+          }
+        },
+        session
+      );
+
+      // Commit operations atomically
       await session.commitTransaction();
+
+      // Trigger immediate outbox dispatch (reminders are reliably scheduled by the worker upon processing BOOKING_CONFIRMED)
+      triggerOutboxSweep();
 
       const updatedAvailableSeats = reservedTravel.seats - reservedTravel.bookedSeats;
 
@@ -712,8 +806,36 @@ export async function cancelBooking(req, res) {
         });
       }
 
-      // Commit both operations atomically
+      // 8. Create Outbox event for cancellation inside transaction
+      const eventType = isOwner
+        ? NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER
+        : NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_PASSENGER;
+      const recipientId = isOwner ? booking.passengerId : booking.ownerId;
+
+      await createOutboxEvent(
+        {
+          eventType,
+          recipientId,
+          relatedBookingId: booking._id,
+          relatedTravelId: travel._id,
+          payload: {
+            source: travel.source,
+            destination: travel.destination,
+            travelDate: travel.travelDate,
+            cancelledBy: isOwner ? 'owner' : 'passenger'
+          }
+        },
+        session
+      );
+
+      // Commit operations atomically
       await session.commitTransaction();
+
+      // Trigger immediate outbox dispatch and cancel pending reminders
+      triggerOutboxSweep();
+      await cancelBookingReminders(booking._id).catch((err) => {
+        console.error('[Reminders] Error removing reminders:', err.message);
+      });
 
       const availableSeats = updatedTravel.seats - updatedTravel.bookedSeats;
 
