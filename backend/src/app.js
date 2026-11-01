@@ -1,0 +1,30 @@
+import express from 'express';
+import cors from 'cors';
+import { clerkMiddleware } from '@clerk/express';
+import authRoutes from './routes/auth.routes.js';
+import studentRoutes from './routes/student.routes.js';
+import travelRoutes from './routes/travel.routes.js';
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(clerkMiddleware());
+
+// Root Route
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'CampusPool API is running'
+  });
+});
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/travels', travelRoutes);
+
+export default app;
+
+
