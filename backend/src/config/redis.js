@@ -74,6 +74,24 @@ export function getRedisConfig() {
 let redisClientInstance = null;
 
 /**
+ * Safely inspect Redis memory eviction policy on startup and issue non-blocking warning if needed
+ */
+export async function checkRedisEvictionPolicy(client) {
+  try {
+    const memoryInfo = await client.info('memory');
+    const match = memoryInfo.match(/maxmemory_policy:(\S+)/);
+    const policy = match ? match[1] : null;
+    if (policy && policy !== 'noeviction') {
+      console.warn(`[Redis Policy Notice] Detected maxmemory_policy: "${policy}". For BullMQ queue reliability, "noeviction" is recommended to prevent job eviction under memory pressure.`);
+    }
+    return policy;
+  } catch {
+    // Non-blocking fallback; never crash or expose credentials
+    return null;
+  }
+}
+
+/**
  * Create or reuse an ioredis client instance for BullMQ / general operations
  */
 export function createRedisConnection() {
@@ -86,6 +104,7 @@ export function createRedisConnection() {
 
   client.on('ready', () => {
     console.log('[Redis] Connection ready.');
+    checkRedisEvictionPolicy(client);
   });
 
   client.on('error', (err) => {
