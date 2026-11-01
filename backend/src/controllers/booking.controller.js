@@ -434,151 +434,177 @@ export async function getWhatsAppDetails(req, res) {
  * @access  Protected (Travel Owner only)
  */
 export async function confirmBooking(req, res) {
-  try {
-    const { id } = req.params;
-    const ownerId = req.userId;
+  const { id } = req.params;
+  const ownerId = req.userId;
 
-    // 1. Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking ID format'
-      });
-    }
-
-    // 2. Find booking document
-    const booking = await Booking.findById(id);
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking request not found'
-      });
-    }
-
-    // 3. Authorization check: Only the travel owner can confirm
-    if (booking.ownerId !== ownerId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: Only the travel owner can confirm this booking'
-      });
-    }
-
-    // 4. Status check: Booking must have status "accepted"
-    if (booking.status !== 'accepted') {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot confirm booking with status "${booking.status}". Only accepted bookings can be confirmed.`
-      });
-    }
-
-    // 5. Find associated Travel post
-    const travel = await Travel.findById(booking.travelId);
-    if (!travel) {
-      return res.status(404).json({
-        success: false,
-        message: 'Travel post not found'
-      });
-    }
-
-    // 6. Travel status and expiry checks
-    if (travel.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot confirm booking for an inactive travel post'
-      });
-    }
-
-    const now = new Date();
-    if (travel.expiresAt <= now) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot confirm booking for an expired travel post'
-      });
-    }
-
-    // 7. Immediate available seats pre-check
-    const currentBookedSeats = travel.bookedSeats || 0;
-    const availableSeats = travel.seats - currentBookedSeats;
-    if (booking.requestedSeats > availableSeats) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient seats available. Requested: ${booking.requestedSeats}, Available: ${Math.max(0, availableSeats)}`
-      });
-    }
-
-    // 8. Atomic conditional update on Travel to reserve seats
-    // Guarantees no overbooking even under high concurrency
-    const reservedTravel = await Travel.findOneAndUpdate(
-      {
-        _id: travel._id,
-        status: 'active',
-        expiresAt: { $gt: now },
-        $expr: {
-          $lte: [
-            { $add: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] },
-            '$seats'
-          ]
-        }
-      },
-      {
-        $inc: { bookedSeats: booking.requestedSeats }
-      },
-      { returnDocument: 'after' }
-    );
-
-    if (!reservedTravel) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to reserve seats: insufficient seats or travel post has expired/become inactive'
-      });
-    }
-
-    // 9. Atomically update booking status from 'accepted' to 'confirmed'
-    const updatedBooking = await Booking.findOneAndUpdate(
-      {
-        _id: booking._id,
-        status: 'accepted'
-      },
-      {
-        $set: { status: 'confirmed' }
-      },
-      { returnDocument: 'after' }
-    );
-
-    // Rollback reserved seats if booking was concurrently updated or cancelled
-    if (!updatedBooking) {
-      await Travel.updateOne(
-        { _id: travel._id },
-        { $inc: { bookedSeats: -booking.requestedSeats } }
-      );
-      return res.status(400).json({
-        success: false,
-        message: 'Booking could not be confirmed because it is no longer in accepted status'
-      });
-    }
-
-    const updatedAvailableSeats = reservedTravel.seats - reservedTravel.bookedSeats;
-
-    return res.status(200).json({
-      success: true,
-      message: 'Booking confirmed and seats reserved successfully',
-      data: {
-        booking: updatedBooking,
-        travel: {
-          id: reservedTravel._id,
-          totalSeats: reservedTravel.seats,
-          bookedSeats: reservedTravel.bookedSeats,
-          availableSeats: updatedAvailableSeats
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Error in confirmBooking:', error);
-    return res.status(500).json({
+  // 1. Validate MongoDB ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
       success: false,
-      message: 'Internal server error while confirming booking',
-      error: error.message
+      message: 'Invalid booking ID format'
     });
+  }
+
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // 2. Find booking document with session
+      const booking = await Booking.findById(id).session(session);
+      if (!booking) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: 'Booking request not found'
+        });
+      }
+
+      // 3. Authorization check: Only the travel owner can confirm
+      if (booking.ownerId !== ownerId) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: Only the travel owner can confirm this booking'
+        });
+      }
+
+      // 4. Status check: Booking must have status "accepted"
+      if (booking.status !== 'accepted') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Cannot confirm booking with status "${booking.status}". Only accepted bookings can be confirmed.`
+        });
+      }
+
+      // 5. Find associated Travel post with session
+      const travel = await Travel.findById(booking.travelId).session(session);
+      if (!travel) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: 'Travel post not found'
+        });
+      }
+
+      // 6. Travel status and expiry checks
+      if (travel.status !== 'active') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot confirm booking for an inactive travel post'
+        });
+      }
+
+      const now = new Date();
+      if (travel.expiresAt <= now) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot confirm booking for an expired travel post'
+        });
+      }
+
+      // 7. Immediate available seats pre-check
+      const currentBookedSeats = travel.bookedSeats || 0;
+      const availableSeats = travel.seats - currentBookedSeats;
+      if (booking.requestedSeats > availableSeats) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient seats available. Requested: ${booking.requestedSeats}, Available: ${Math.max(0, availableSeats)}`
+        });
+      }
+
+      // 8. Atomically reserve seats on Travel within the transaction
+      const reservedTravel = await Travel.findOneAndUpdate(
+        {
+          _id: travel._id,
+          status: 'active',
+          expiresAt: { $gt: now },
+          $expr: {
+            $lte: [
+              { $add: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] },
+              '$seats'
+            ]
+          }
+        },
+        {
+          $inc: { bookedSeats: booking.requestedSeats }
+        },
+        { returnDocument: 'after', session }
+      );
+
+      if (!reservedTravel) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to reserve seats: insufficient seats or travel post has expired/become inactive'
+        });
+      }
+
+      // 9. Atomically update booking status from 'accepted' to 'confirmed' within the transaction
+      const updatedBooking = await Booking.findOneAndUpdate(
+        {
+          _id: booking._id,
+          status: 'accepted'
+        },
+        {
+          $set: { status: 'confirmed' }
+        },
+        { returnDocument: 'after', session }
+      );
+
+      if (!updatedBooking) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Booking could not be confirmed because it is no longer in accepted status'
+        });
+      }
+
+      // Commit both operations atomically
+      await session.commitTransaction();
+
+      const updatedAvailableSeats = reservedTravel.seats - reservedTravel.bookedSeats;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Booking confirmed and seats reserved successfully',
+        data: {
+          booking: updatedBooking,
+          travel: {
+            id: reservedTravel._id,
+            totalSeats: reservedTravel.seats,
+            bookedSeats: reservedTravel.bookedSeats,
+            availableSeats: updatedAvailableSeats
+          }
+        }
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      const isTransient =
+        (error.errorLabels && error.errorLabels.includes('TransientTransactionError')) ||
+        (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) ||
+        error.code === 112;
+
+      if (isTransient && attempt < maxRetries) {
+        await session.endSession().catch(() => {});
+        await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+        continue;
+      }
+
+      console.error('Error in confirmBooking transaction:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error while confirming booking',
+        error: error.message
+      });
+    } finally {
+      await session.endSession().catch(() => {});
+    }
   }
 }
 
@@ -588,79 +614,86 @@ export async function confirmBooking(req, res) {
  * @access  Protected (Booking Owner or Passenger only)
  */
 export async function cancelBooking(req, res) {
-  try {
-    const { id } = req.params;
-    const userId = req.userId;
+  const { id } = req.params;
+  const userId = req.userId;
 
-    // 1. Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking ID format'
-      });
-    }
+  // 1. Validate MongoDB ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid booking ID format'
+    });
+  }
 
-    // 2. Find booking document
-    const booking = await Booking.findById(id);
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking request not found'
-      });
-    }
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // 3. Authorization check: Only booking owner or passenger can cancel
-    const isOwner = booking.ownerId === userId;
-    const isPassenger = booking.passengerId === userId;
-
-    if (!isOwner && !isPassenger) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: You are not authorized to cancel this booking'
-      });
-    }
-
-    // 4. Status check: Only confirmed bookings can be cancelled
-    if (booking.status !== 'confirmed') {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot cancel a booking with status "${booking.status}". Only confirmed bookings can be cancelled.`
-      });
-    }
-
-    // 5. Verify associated Travel post exists
-    const travel = await Travel.findById(booking.travelId);
-    if (!travel) {
-      return res.status(404).json({
-        success: false,
-        message: 'Associated travel post not found'
-      });
-    }
-
-    // 6. Atomically transition booking status from 'confirmed' to 'cancelled'
-    // This atomic check-and-set prevents concurrent double cancellation or double seat release
-    const cancelledBooking = await Booking.findOneAndUpdate(
-      {
-        _id: booking._id,
-        status: 'confirmed'
-      },
-      {
-        $set: { status: 'cancelled' }
-      },
-      { returnDocument: 'after' }
-    );
-
-    if (!cancelledBooking) {
-      return res.status(400).json({
-        success: false,
-        message: 'Booking is no longer in confirmed status or was already cancelled'
-      });
-    }
-
-    // 7. Atomically decrement bookedSeats on Travel without dropping below 0
-    let updatedTravel;
     try {
-      updatedTravel = await Travel.findOneAndUpdate(
+      // 2. Find booking document with session
+      const booking = await Booking.findById(id).session(session);
+      if (!booking) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: 'Booking request not found'
+        });
+      }
+
+      // 3. Authorization check: Only booking owner or passenger can cancel
+      const isOwner = booking.ownerId === userId;
+      const isPassenger = booking.passengerId === userId;
+
+      if (!isOwner && !isPassenger) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: You are not authorized to cancel this booking'
+        });
+      }
+
+      // 4. Status check: Only confirmed bookings can be cancelled
+      if (booking.status !== 'confirmed') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Cannot cancel a booking with status "${booking.status}". Only confirmed bookings can be cancelled.`
+        });
+      }
+
+      // 5. Verify associated Travel post exists with session
+      const travel = await Travel.findById(booking.travelId).session(session);
+      if (!travel) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: 'Associated travel post not found'
+        });
+      }
+
+      // 6. Atomically transition booking status from 'confirmed' to 'cancelled' within the transaction
+      const cancelledBooking = await Booking.findOneAndUpdate(
+        {
+          _id: booking._id,
+          status: 'confirmed'
+        },
+        {
+          $set: { status: 'cancelled' }
+        },
+        { returnDocument: 'after', session }
+      );
+
+      if (!cancelledBooking) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Booking is no longer in confirmed status or was already cancelled'
+        });
+      }
+
+      // 7. Atomically decrement bookedSeats on Travel within the transaction
+      const updatedTravel = await Travel.findOneAndUpdate(
         {
           _id: travel._id,
           bookedSeats: { $gte: booking.requestedSeats }
@@ -668,59 +701,62 @@ export async function cancelBooking(req, res) {
         {
           $inc: { bookedSeats: -booking.requestedSeats }
         },
-        { returnDocument: 'after' }
+        { returnDocument: 'after', session }
       );
 
-      // If bookedSeats was somehow less than requestedSeats, safely clamp to 0
       if (!updatedTravel) {
-        updatedTravel = await Travel.findOneAndUpdate(
-          { _id: travel._id },
-          [
-            {
-              $set: {
-                bookedSeats: {
-                  $max: [0, { $subtract: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] }]
-                }
-              }
-            }
-          ],
-          { returnDocument: 'after' }
-        );
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot release seats: Travel bookedSeats is less than requested seats'
+        });
       }
-    } catch (decrementErr) {
-      // Compensating recovery: revert booking back to 'confirmed' if travel update completely failed
-      await Booking.updateOne(
-        { _id: booking._id, status: 'cancelled' },
-        { $set: { status: 'confirmed' } }
-      );
-      throw decrementErr;
-    }
 
-    const availableSeats = updatedTravel.seats - updatedTravel.bookedSeats;
+      // Commit both operations atomically
+      await session.commitTransaction();
 
-    return res.status(200).json({
-      success: true,
-      message: 'Booking cancelled and seats released successfully',
-      data: {
-        booking: cancelledBooking,
-        cancelledBy: isOwner ? 'owner' : 'passenger',
-        travel: {
-          id: updatedTravel._id,
-          totalSeats: updatedTravel.seats,
-          bookedSeats: updatedTravel.bookedSeats,
-          availableSeats
+      const availableSeats = updatedTravel.seats - updatedTravel.bookedSeats;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Booking cancelled and seats released successfully',
+        data: {
+          booking: cancelledBooking,
+          cancelledBy: isOwner ? 'owner' : 'passenger',
+          travel: {
+            id: updatedTravel._id,
+            totalSeats: updatedTravel.seats,
+            bookedSeats: updatedTravel.bookedSeats,
+            availableSeats
+          }
         }
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      const isTransient =
+        (error.errorLabels && error.errorLabels.includes('TransientTransactionError')) ||
+        (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) ||
+        error.code === 112;
+
+      if (isTransient && attempt < maxRetries) {
+        await session.endSession().catch(() => {});
+        await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+        continue;
       }
-    });
-  } catch (error) {
-    console.error('Error in cancelBooking:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error while cancelling booking',
-      error: error.message
-    });
+
+      console.error('Error in cancelBooking transaction:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error while cancelling booking',
+        error: error.message
+      });
+    } finally {
+      await session.endSession().catch(() => {});
+    }
   }
 }
+
+
 
 
 
