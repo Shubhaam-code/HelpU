@@ -24,3 +24,4 @@ export function Avatar({ avatarId, size = 'md', className = '', ring = false }) 
 }
 
 export default Avatar;
+

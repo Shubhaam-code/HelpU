@@ -10,3 +10,4 @@ export function EmptyState({ icon = '🌿', title, subtitle, action }) {
 }
 
 export default EmptyState;
+

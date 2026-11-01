@@ -1,8 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Star, MapPin, Calendar, Users } from 'lucide-react';
+import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
-import { BottomNavigation } from '../components/layout/BottomNavigation';
 import { Avatar } from '../components/ui/Avatar';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { formatDate } from '../lib/utils';
@@ -28,10 +28,10 @@ export default function MatchDetailsPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-cream pb-28">
-      <AppHeader title="Match" backTo={-1} />
-
-      <div className="px-5 space-y-4">
+    <ResponsiveShell
+      customMobileHeader={<AppHeader title="Match Details" backTo={-1} />}
+    >
+      <div className="max-w-xl mx-auto px-4 sm:px-6 py-4 lg:py-8 space-y-5">
         {/* Hero avatar with cloud background */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -126,8 +126,7 @@ export default function MatchDetailsPage() {
           </PrimaryButton>
         </div>
       </div>
-
-      <BottomNavigation />
-    </div>
+    </ResponsiveShell>
   );
 }
+

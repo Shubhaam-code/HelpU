@@ -21,3 +21,4 @@ export function SearchBar({ placeholder = 'Search rides, people, or places...', 
 }
 
 export default SearchBar;
+

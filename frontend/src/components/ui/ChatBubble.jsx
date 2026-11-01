@@ -43,3 +43,4 @@ export function ChatBubble({ message, isMe, timestamp, type = 'text' }) {
 }
 
 export default ChatBubble;
+

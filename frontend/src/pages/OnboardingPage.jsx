@@ -98,68 +98,85 @@ export default function OnboardingPage() {
   if (isSignedIn) return null;
 
   return (
-    <div className="min-h-dvh bg-white flex flex-col">
-      {/* Top logo */}
-      <div className="flex items-center gap-3 px-6 pt-12 pb-4">
-        <div className="w-12 h-12 bg-navy rounded-2xl flex items-center justify-center shadow-lg">
-          <span className="text-white font-black text-2xl leading-none">H</span>
+    <div className="min-h-dvh bg-white flex flex-col lg:flex-row">
+      {/* Left side on Desktop: Hero Branding & Illustration */}
+      <div className="lg:w-1/2 bg-cream/70 flex flex-col justify-between p-6 sm:p-10 lg:p-16 border-r border-gray-100">
+        {/* Top logo */}
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-navy rounded-2xl flex items-center justify-center shadow-lg">
+            <span className="text-white font-black text-2xl leading-none">H</span>
+          </div>
+          <div>
+            <span className="font-black text-navy text-2xl tracking-tight">HelpU</span>
+            <div className="text-text-secondary text-xs">Rides • Help • Campus Connect</div>
+          </div>
         </div>
-        <div>
-          <span className="font-black text-navy text-2xl tracking-tight">HelpU</span>
-          <div className="text-text-secondary text-xs">Rides • Help • Campus Connect</div>
+
+        {/* Illustration */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.5 }}
+          className="my-auto py-8 flex items-center justify-center"
+        >
+          <CampusBoyIllustration />
+        </motion.div>
+
+        {/* Tagline */}
+        <div className="hidden lg:block text-left">
+          <h2 className="font-black text-navy text-3xl leading-snug">
+            Find rides, share seats,<br />get help – within your campus.
+          </h2>
+          <p className="text-text-secondary text-sm mt-2 max-w-md">
+            Safe, peer-verified campus ride sharing and assistance for verified students.
+          </p>
         </div>
       </div>
 
-      {/* Illustration */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.5 }}
-        className="flex-1 flex items-center justify-center px-6"
-      >
-        <CampusBoyIllustration />
-      </motion.div>
+      {/* Right side: Auth Form & Mobile Welcome */}
+      <div className="lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-10 lg:p-16">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="w-full max-w-md text-center"
+        >
+          <div className="lg:hidden mb-6">
+            <h1 className="font-black text-navy text-2xl sm:text-3xl mb-2 leading-tight">
+              Find rides, share seats,<br />get help – within your campus.
+            </h1>
+            <p className="text-text-secondary text-xs sm:text-sm">
+              Connect with students going your way. Safe, affordable, campus-verified.
+            </p>
+          </div>
 
-      {/* Bottom content */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
-        className="px-6 pb-12 text-center"
-      >
-        <h1 className="font-black text-navy text-3xl mb-3 leading-tight">
-          Find rides, share seats,<br />get help – within your<br />campus.
-        </h1>
-        <p className="text-text-secondary text-sm mb-8">Connect with students going your way. Safe, affordable, campus-verified.</p>
+          <div className="hidden lg:block text-left mb-6">
+            <h2 className="font-black text-navy text-2xl">Welcome to HelpU</h2>
+            <p className="text-text-secondary text-sm mt-1">Sign in with your campus account to get started.</p>
+          </div>
 
-        {/* Dots */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-6 h-2 bg-navy rounded-full" />
-          <div className="w-2 h-2 bg-gray-200 rounded-full" />
-          <div className="w-2 h-2 bg-gray-200 rounded-full" />
-        </div>
+          {/* Sign in modal */}
+          <SignIn
+            routing="hash"
+            appearance={{
+              elements: {
+                rootBox: 'w-full',
+                card: 'shadow-none border border-gray-100 rounded-3xl',
+                headerTitle: 'font-black text-navy',
+                headerSubtitle: 'text-text-secondary',
+                formButtonPrimary: 'bg-navy hover:bg-navy/90 rounded-xl font-semibold',
+                socialButtonsBlockButton: 'border border-gray-200 rounded-xl font-medium text-navy',
+                footer: 'hidden',
+              },
+            }}
+          />
 
-        {/* Sign in modal trigger */}
-        <SignIn
-          routing="hash"
-          appearance={{
-            elements: {
-              rootBox: 'w-full',
-              card: 'shadow-none border border-gray-100 rounded-3xl',
-              headerTitle: 'font-black text-navy',
-              headerSubtitle: 'text-text-secondary',
-              formButtonPrimary: 'bg-navy hover:bg-navy/90 rounded-xl font-semibold',
-              socialButtonsBlockButton: 'border border-gray-200 rounded-xl font-medium text-navy',
-              footer: 'hidden',
-            },
-          }}
-        />
-
-        {/* Fallback button */}
-        <div className="mt-4 text-xs text-text-secondary">
-          By continuing, you agree to our <span className="text-coral font-medium">Terms of Service</span>
-        </div>
-      </motion.div>
+          <div className="mt-6 text-xs text-text-secondary">
+            By continuing, you agree to our <span className="text-coral font-medium">Terms of Service</span> and <span className="text-coral font-medium">Privacy Policy</span>.
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
+

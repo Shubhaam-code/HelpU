@@ -72,3 +72,4 @@ export const markRead = (id) => apiClient.patch(`/api/notifications/${id}/read`)
 export const markAllRead = () => apiClient.patch('/api/notifications/read-all');
 
 export default apiClient;
+

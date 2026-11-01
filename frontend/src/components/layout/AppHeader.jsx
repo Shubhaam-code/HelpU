@@ -59,3 +59,4 @@ export function AppHeader({ title, backTo, avatarId, onBell, unreadCount = 0, sh
 }
 
 export default AppHeader;
+

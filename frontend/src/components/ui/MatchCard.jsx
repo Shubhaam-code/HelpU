@@ -44,3 +44,4 @@ export function MatchCard({ match, onPress, onChat }) {
 }
 
 export default MatchCard;
+

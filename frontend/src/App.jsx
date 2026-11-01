@@ -22,6 +22,7 @@ import ChatConversationPage from './pages/ChatConversationPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import CreatePage from './pages/CreatePage';
+import StaticInfoPage from './pages/StaticInfoPage';
 
 // Token injector component
 function TokenInjector() {
@@ -74,10 +75,19 @@ export default function App() {
         <Route path="/match/preferences" element={<ProtectedRoute><MatchPreferencesPage /></ProtectedRoute>} />
         <Route path="/match/success" element={<ProtectedRoute><MatchSuccessPage /></ProtectedRoute>} />
         <Route path="/match/:id" element={<ProtectedRoute><MatchDetailsPage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
         <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
+
+        {/* Informational & Community Routes */}
+        <Route path="/community" element={<ProtectedRoute><StaticInfoPage title="Campus Community" subtitle="Connect with student clubs, batch groups, and hostel forums." icon="👥" /></ProtectedRoute>} />
+        <Route path="/help" element={<ProtectedRoute><StaticInfoPage title="Campus Help & Services" subtitle="Need assistance with assignments, campus errands, or peer tutoring? Connect here." icon="🔧" /></ProtectedRoute>} />
+        <Route path="/about" element={<ProtectedRoute><StaticInfoPage title="About HelpU" subtitle="HelpU is the premier student carpooling, assistance, and peer connection platform for college campuses." icon="ℹ️" /></ProtectedRoute>} />
+        <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><StaticInfoPage title="Account Settings" subtitle="Manage notification preferences, privacy, verified student IDs, and security." icon="⚙️" /></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

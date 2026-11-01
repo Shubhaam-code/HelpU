@@ -20,7 +20,7 @@ export function BottomNavigation() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-100 z-40 safe-area-pb">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-100 z-40 safe-area-pb">
       <div className="flex items-center justify-around px-2 py-2">
         {NAV_ITEMS.map((item) => {
           if (item.isCreate) {
@@ -68,3 +68,4 @@ export function BottomNavigation() {
 }
 
 export default BottomNavigation;
+

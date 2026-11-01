@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Calendar, Clock, Users, ChevronDown } from 'lucide-react';
+
+import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
-import { BottomNavigation } from '../components/layout/BottomNavigation';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 
 const TRANSPORT_MODES = ['Car', 'Bike', 'Any'];
@@ -41,10 +42,10 @@ export default function MatchPreferencesPage() {
   );
 
   return (
-    <div className="min-h-dvh bg-cream pb-28">
-      <AppHeader title="Match Preferences" backTo={-1} />
-
-      <div className="px-5 space-y-4">
+    <ResponsiveShell
+      customMobileHeader={<AppHeader title="Match Preferences" backTo={-1} />}
+    >
+      <div className="max-w-xl mx-auto px-4 sm:px-6 py-4 lg:py-8 space-y-5">
         <p className="text-text-secondary text-sm">Set your travel preferences to get better matches.</p>
 
         {/* From */}
@@ -146,8 +147,7 @@ export default function MatchPreferencesPage() {
           Find Matches
         </PrimaryButton>
       </div>
-
-      <BottomNavigation />
-    </div>
+    </ResponsiveShell>
   );
 }
+

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Calendar, Clock, Users, DollarSign } from 'lucide-react';
+import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
-import { BottomNavigation } from '../components/layout/BottomNavigation';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { createTravel } from '../lib/api';
 
@@ -48,10 +48,22 @@ export default function OfferRidePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-cream pb-28">
-      <AppHeader title={mode === 'offer' ? 'Offer a Ride' : 'Request a Ride'} backTo={-1} />
-
-      <div className="px-5 space-y-5">
+    <ResponsiveShell
+      customMobileHeader={
+        <AppHeader title={mode === 'offer' ? 'Offer a Ride' : 'Request a Ride'} backTo={-1} />
+      }
+    >
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-8 space-y-5">
+        <div className="hidden sm:block">
+          <h2 className="font-black text-navy text-2xl lg:text-3xl">
+            {mode === 'offer' ? 'Offer a Campus Ride' : 'Request a Ride'}
+          </h2>
+          <p className="text-text-secondary text-sm mt-1">
+            {mode === 'offer' 
+              ? 'Share empty seats in your car or bike and split travel costs.' 
+              : 'Post your destination and get picked up by verified peers.'}
+          </p>
+        </div>
         {/* Toggle */}
         <div className="flex bg-white rounded-2xl p-1 shadow-sm border border-gray-100">
           {['offer', 'request'].map((m) => (
@@ -182,8 +194,7 @@ export default function OfferRidePage() {
           {loading ? 'Posting...' : mode === 'offer' ? 'Post Ride →' : 'Post Request →'}
         </PrimaryButton>
       </div>
-
-      <BottomNavigation />
-    </div>
+    </ResponsiveShell>
   );
 }
+

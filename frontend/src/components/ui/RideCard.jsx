@@ -69,3 +69,4 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
 }
 
 export default RideCard;
+

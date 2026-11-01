@@ -44,3 +44,4 @@ export const timeAgo = (dateStr) => {
 export const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 export const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+

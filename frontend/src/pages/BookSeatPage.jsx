@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Star, Car, Minus, Plus } from 'lucide-react';
+
+import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -35,10 +37,10 @@ export default function BookSeatPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-cream pb-10">
-      <AppHeader title="Book Seat" backTo={-1} />
-
-      <div className="px-5 space-y-4">
+    <ResponsiveShell
+      customMobileHeader={<AppHeader title="Book Seat" backTo={-1} />}
+    >
+      <div className="max-w-xl mx-auto px-4 sm:px-6 py-4 lg:py-8 space-y-5">
         {/* Route header */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -124,6 +126,7 @@ export default function BookSeatPage() {
           {loading ? 'Confirming...' : 'Confirm Booking'}
         </PrimaryButton>
       </div>
-    </div>
+    </ResponsiveShell>
   );
 }
+
