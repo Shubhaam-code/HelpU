@@ -68,19 +68,19 @@ export default function AuthPage({ initialMode = 'signIn' }) {
 
 
       {/* ========================================================================= */}
-      {/* MAIN TWO-COLUMN CONTENT (COMPACT & BALANCED ~100VH)                       */}
+      {/* MAIN TWO-COLUMN CONTENT                                                   */}
       {/* ========================================================================= */}
-      <main className="relative z-10 flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-2 flex items-center justify-center min-h-0">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-center w-full my-auto">
+      <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-2 flex items-center justify-center min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 xl:gap-10 items-center w-full my-auto">
           
           {/* --------------------------------------------------------------------- */}
-          {/* LEFT COLUMN: BRANDING, VALUE PROPS & ILLUSTRATION CLOSE TO FORM       */}
+          {/* LEFT COLUMN: BRANDING, VALUE PROPS & ILLUSTRATION                     */}
           {/* --------------------------------------------------------------------- */}
           <motion.div 
             initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            className="lg:col-span-7 flex flex-col justify-center space-y-2 lg:pr-2"
+            className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center space-y-2.5 lg:pr-2"
           >
             {/* Top Text & Value Points */}
             <div className="space-y-1.5 sm:space-y-2">
@@ -92,7 +92,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
               </div>
 
               {/* Main Heading */}
-              <h1 className="font-black text-[#17213D] text-2xl sm:text-3xl lg:text-[32px] leading-[1.12] tracking-tight">
+              <h1 className="font-black text-[#17213D] text-2xl sm:text-3xl lg:text-[34px] leading-[1.12] tracking-tight">
                 {mode === 'signIn' ? (
                   <>
                     <span>Welcome back to </span>
@@ -107,7 +107,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
               </h1>
 
               {/* Subtitle */}
-              <p className="text-[#596277] text-xs sm:text-sm font-medium leading-relaxed max-w-md">
+              <p className="text-[#596277] text-xs sm:text-sm lg:text-[15px] font-medium leading-relaxed max-w-md">
                 Connect with verified college peers, share daily rides, split fuel costs, and get quick campus assistance safely.
               </p>
 
@@ -135,7 +135,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
               <img 
                 src="/auth.png" 
                 alt="HelpU Campus Community Illustration" 
-                className="w-auto max-w-full h-auto max-h-[190px] sm:max-h-[240px] lg:max-h-[290px] xl:max-h-[320px] object-contain object-left-bottom select-none pointer-events-none drop-shadow-sm"
+                className="w-auto max-w-full h-auto max-h-[190px] sm:max-h-[250px] lg:max-h-[300px] xl:max-h-[330px] object-contain object-left-bottom select-none pointer-events-none drop-shadow-sm"
               />
             </div>
 
@@ -143,32 +143,32 @@ export default function AuthPage({ initialMode = 'signIn' }) {
 
 
           {/* --------------------------------------------------------------------- */}
-          {/* RIGHT COLUMN: COMPACT CENTERED CLERK AUTHENTICATION CARD              */}
+          {/* RIGHT COLUMN: COMFORTABLY SIZED CLERK AUTHENTICATION CARD             */}
           {/* --------------------------------------------------------------------- */}
           <motion.div 
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="lg:col-span-5 flex justify-center lg:justify-start w-full"
+            className="lg:col-span-6 xl:col-span-6 flex justify-center lg:justify-start w-full"
           >
-            <div className="w-full max-w-[370px] sm:max-w-[380px] bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl shadow-[#17213D]/5 border border-[#F4E3D8] relative">
+            <div className="w-full max-w-[430px] sm:max-w-[460px] lg:max-w-[475px] bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-6 sm:p-7 lg:p-8 shadow-xl shadow-[#17213D]/5 border border-[#F4E3D8] relative">
               
               {/* Header Title inside card */}
-              <div className="mb-2.5">
-                <h2 className="font-black text-[#17213D] text-lg sm:text-xl tracking-tight">
+              <div className="mb-3.5">
+                <h2 className="font-black text-[#17213D] text-xl sm:text-2xl tracking-tight">
                   {mode === 'signIn' ? 'Sign In to HelpU' : 'Create an Account'}
                 </h2>
-                <p className="text-[#6E7587] text-[11px] sm:text-xs font-medium mt-0.5">
+                <p className="text-[#6E7587] text-xs sm:text-sm font-medium mt-1">
                   {mode === 'signIn' ? 'Continue with your college credentials' : 'Get started in under a minute'}
                 </p>
               </div>
 
               {/* Mode Switcher Tabs (Sign In / Sign Up) */}
-              <div className="flex bg-[#FFF7F2] rounded-xl p-0.5 mb-2.5 border border-[#F4E3D8]">
+              <div className="flex bg-[#FFF7F2] rounded-xl p-0.5 mb-4 border border-[#F4E3D8]">
                 <button
                   type="button"
                   onClick={() => switchMode('signIn')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  className={`flex-1 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
                     mode === 'signIn'
                       ? 'bg-white text-[#17213D] shadow-xs'
                       : 'text-[#6E7587] hover:text-[#17213D]'
@@ -179,7 +179,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                 <button
                   type="button"
                   onClick={() => switchMode('signUp')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  className={`flex-1 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
                     mode === 'signUp'
                       ? 'bg-white text-[#17213D] shadow-xs'
                       : 'text-[#6E7587] hover:text-[#17213D]'
@@ -189,7 +189,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                 </button>
               </div>
 
-              {/* Clerk Auth Integration (Compact & Seamless) */}
+              {/* Clerk Auth Integration (Comfortable & Seamless) */}
               <div className="w-full">
                 <AnimatePresence mode="wait">
                   {mode === 'signIn' ? (
@@ -214,7 +214,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                             colorPrimary: '#FF572E',
                             colorText: '#17213D',
                             colorBackground: 'transparent',
-                            borderRadius: '0.75rem',
+                            borderRadius: '0.875rem',
                           },
                           elements: {
                             rootBox: '!w-full',
@@ -225,11 +225,11 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                             headerSubtitle: '!hidden',
                             footer: '!hidden',
                             footerAction: '!hidden',
-                            formButtonPrimary: '!bg-[#FF572E] hover:!bg-[#E64A22] !text-white !rounded-xl !font-bold !py-2.5 !text-xs sm:!text-sm !shadow-md !shadow-[#FF572E]/25 transition-all cursor-pointer',
-                            socialButtonsBlockButton: '!border !border-gray-200 !rounded-xl !font-bold !text-[#17213D] hover:!bg-[#FFF7F2] transition-colors !py-2 !text-xs sm:!text-sm',
-                            socialButtonsBlockButtonText: '!font-bold !text-[#17213D] !text-xs',
-                            formFieldLabel: '!font-bold !text-[#17213D] !text-[11px] !mb-1',
-                            formFieldInput: '!rounded-xl !border-gray-200 focus:!border-[#FF572E] focus:!ring-2 focus:!ring-[#FF572E]/20 !text-[#17213D] !text-xs sm:!text-sm !py-2 !px-3 transition-all',
+                            formButtonPrimary: '!bg-[#FF572E] hover:!bg-[#E64A22] !text-white !rounded-xl !font-extrabold !py-3 !text-sm sm:!text-[15px] !shadow-md !shadow-[#FF572E]/25 transition-all cursor-pointer',
+                            socialButtonsBlockButton: '!border !border-gray-200 !rounded-xl !font-bold !text-[#17213D] hover:!bg-[#FFF7F2] transition-colors !py-2.5 sm:!py-3 !text-xs sm:!text-sm',
+                            socialButtonsBlockButtonText: '!font-bold !text-[#17213D] !text-xs sm:!text-sm',
+                            formFieldLabel: '!font-bold !text-[#17213D] !text-xs !mb-1.5',
+                            formFieldInput: '!rounded-xl !border-gray-200 focus:!border-[#FF572E] focus:!ring-2 focus:!ring-[#FF572E]/20 !text-[#17213D] !text-sm !py-2.5 !px-3.5 transition-all',
                             footerActionLink: '!text-[#FF572E] hover:!text-[#E64A22] !font-black',
                           },
                         }}
@@ -257,7 +257,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                             colorPrimary: '#FF572E',
                             colorText: '#17213D',
                             colorBackground: 'transparent',
-                            borderRadius: '0.75rem',
+                            borderRadius: '0.875rem',
                           },
                           elements: {
                             rootBox: '!w-full',
@@ -268,11 +268,11 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                             headerSubtitle: '!hidden',
                             footer: '!hidden',
                             footerAction: '!hidden',
-                            formButtonPrimary: '!bg-[#FF572E] hover:!bg-[#E64A22] !text-white !rounded-xl !font-bold !py-2.5 !text-xs sm:!text-sm !shadow-md !shadow-[#FF572E]/25 transition-all cursor-pointer',
-                            socialButtonsBlockButton: '!border !border-gray-200 !rounded-xl !font-bold !text-[#17213D] hover:!bg-[#FFF7F2] transition-colors !py-2 !text-xs sm:!text-sm',
-                            socialButtonsBlockButtonText: '!font-bold !text-[#17213D] !text-xs',
-                            formFieldLabel: '!font-bold !text-[#17213D] !text-[11px] !mb-1',
-                            formFieldInput: '!rounded-xl !border-gray-200 focus:!border-[#FF572E] focus:!ring-2 focus:!ring-[#FF572E]/20 !text-[#17213D] !text-xs sm:!text-sm !py-2 !px-3 transition-all',
+                            formButtonPrimary: '!bg-[#FF572E] hover:!bg-[#E64A22] !text-white !rounded-xl !font-extrabold !py-3 !text-sm sm:!text-[15px] !shadow-md !shadow-[#FF572E]/25 transition-all cursor-pointer',
+                            socialButtonsBlockButton: '!border !border-gray-200 !rounded-xl !font-bold !text-[#17213D] hover:!bg-[#FFF7F2] transition-colors !py-2.5 sm:!py-3 !text-xs sm:!text-sm',
+                            socialButtonsBlockButtonText: '!font-bold !text-[#17213D] !text-xs sm:!text-sm',
+                            formFieldLabel: '!font-bold !text-[#17213D] !text-xs !mb-1.5',
+                            formFieldInput: '!rounded-xl !border-gray-200 focus:!border-[#FF572E] focus:!ring-2 focus:!ring-[#FF572E]/20 !text-[#17213D] !text-sm !py-2.5 !px-3.5 transition-all',
                             footerActionLink: '!text-[#FF572E] hover:!text-[#E64A22] !font-black',
                           },
                         }}

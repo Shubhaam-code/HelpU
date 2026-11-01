@@ -92,53 +92,56 @@ html, body {
   display: none !important;
 }
 
-/* Tighten form gaps for compact, visual connection */
+/* Tighten form gaps for compact, visual connection with comfortable sizing */
 .cl-main {
-  gap: 0.35rem !important;
+  gap: 0.5rem !important;
 }
 
 .cl-form {
-  gap: 0.4rem !important;
+  gap: 0.55rem !important;
 }
 
 .cl-formFieldRow {
-  margin-bottom: 0.2rem !important;
+  margin-bottom: 0.35rem !important;
 }
 
 .cl-formFieldLabel {
-  margin-bottom: 0.15rem !important;
-  font-size: 0.75rem !important;
+  margin-bottom: 0.25rem !important;
+  font-size: 0.8rem !important;
   font-weight: 700 !important;
 }
 
 .cl-socialButtons {
-  margin-bottom: 0.3rem !important;
-  gap: 0.35rem !important;
+  margin-bottom: 0.45rem !important;
+  gap: 0.45rem !important;
 }
 
 .cl-socialButtonsBlockButton {
-  border-radius: 0.75rem !important;
+  border-radius: 0.875rem !important;
   border-color: #e5e7eb !important;
-  padding-top: 0.4rem !important;
-  padding-bottom: 0.4rem !important;
-  min-height: 2.25rem !important;
+  padding-top: 0.65rem !important;
+  padding-bottom: 0.65rem !important;
+  min-height: 2.85rem !important;
+  font-size: 0.925rem !important;
 }
 
 .cl-dividerRow {
-  margin-top: 0.25rem !important;
-  margin-bottom: 0.25rem !important;
+  margin-top: 0.55rem !important;
+  margin-bottom: 0.55rem !important;
 }
 
 .cl-formButtonPrimary {
   background-color: #FF572E !important;
   color: #ffffff !important;
-  border-radius: 0.75rem !important;
+  border-radius: 0.875rem !important;
   font-weight: 800 !important;
-  padding-top: 0.5rem !important;
-  padding-bottom: 0.5rem !important;
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  min-height: 2.9rem !important;
+  font-size: 0.95rem !important;
   box-shadow: 0 4px 14px rgba(255, 87, 46, 0.28) !important;
   transition: all 0.2s ease !important;
-  margin-top: 0.25rem !important;
+  margin-top: 0.45rem !important;
 }
 
 .cl-formButtonPrimary:hover {
@@ -147,10 +150,12 @@ html, body {
 }
 
 .cl-formFieldInput {
-  border-radius: 0.75rem !important;
+  border-radius: 0.875rem !important;
   border-color: #e5e7eb !important;
-  padding-top: 0.45rem !important;
-  padding-bottom: 0.45rem !important;
+  padding-top: 0.65rem !important;
+  padding-bottom: 0.65rem !important;
+  min-height: 2.85rem !important;
+  font-size: 0.925rem !important;
 }
 
 .cl-formFieldInput:focus {
