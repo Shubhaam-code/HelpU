@@ -30,6 +30,15 @@ const studentSchema = new mongoose.Schema(
     isVerified: {
       type: Boolean,
       default: false
+    },
+    avatarId: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    course: {
+      type: String,
+      trim: true
     }
   },
   {

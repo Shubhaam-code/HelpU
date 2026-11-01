@@ -1,11 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #17233C;
+  --color-coral: #FF654F;
+  --color-cream: #FFF9F2;
+  --color-mint: #C9F2DE;
+  --color-sky: #BBDFFF;
+  --color-peach: #FFE6CB;
+  --color-lavender: #E9E0FF;
+  --color-text-primary: #17233C;
+  --color-text-secondary: #737782;
+
+  --font-family-sans: 'Inter', 'Nunito', system-ui, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f8fafc;
+html, body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-cream);
+  color: var(--color-navy);
   -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
 }
+
+/* Mobile viewport clamp */
+#root {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  background-color: var(--color-cream);
+  overflow-x: hidden;
+}
+
+/* Hide scrollbar but keep scroll */
+::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+/* Custom animations */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* Clerk modal z-index fix */
+.cl-rootBox { z-index: 9999 !important; }
