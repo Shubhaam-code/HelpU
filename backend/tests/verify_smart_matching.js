@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
@@ -44,7 +46,8 @@ const tokenReqB = generateTestToken(userReqB);
 const tokenOther = generateTestToken(userOther);
 
 async function runTestSuite() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/campuspool');
+  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/campuspool';
+  await mongoose.connect(mongoUri);
 
   // Clean test records
   const allTestUsers = [userOfferA, userReqB, userOfferC, userReqD, userOther];

@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
@@ -45,7 +47,8 @@ const tokenStranger = generateTestToken(strangerId);
 const tokenNoPhone = generateTestToken(noPhoneUserId);
 
 async function runPart4Tests() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/campuspool');
+  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/campuspool';
+  await mongoose.connect(mongoUri);
 
   const allUsers = [ownerId, passengerId, strangerId, noPhoneUserId];
   await Travel.deleteMany({ userId: { $in: allUsers } });
