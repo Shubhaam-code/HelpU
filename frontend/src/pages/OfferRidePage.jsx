@@ -9,7 +9,7 @@ import {
 import { createTravel } from '../lib/api';
 
 // Cute & Modern Vehicle SVG Thumbnails matching reference design
-function OmniCarIcon({ className = "w-10 h-7" }) {
+function OmniCarIcon({ className = "w-9 sm:w-10 h-6 sm:h-7" }) {
   return (
     <svg viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       {/* Boxy Omni Van Body */}
@@ -33,7 +33,7 @@ function OmniCarIcon({ className = "w-10 h-7" }) {
   );
 }
 
-function CretaCarIcon({ className = "w-10 h-7" }) {
+function CretaCarIcon({ className = "w-9 sm:w-10 h-6 sm:h-7" }) {
   return (
     <svg viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       {/* Modern SUV Creta Body */}
@@ -54,7 +54,7 @@ function CretaCarIcon({ className = "w-10 h-7" }) {
   );
 }
 
-function EecoCarIcon({ className = "w-10 h-7" }) {
+function EecoCarIcon({ className = "w-9 sm:w-10 h-6 sm:h-7" }) {
   return (
     <svg viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       {/* Maruti Eeco Van Body */}
@@ -96,7 +96,6 @@ export default function OfferRidePage() {
   const [fromLoc, setFromLoc] = useState('VIT, Bhopal');
   const [toLoc, setToLoc] = useState('Bhopal Railway Station');
   const [date, setDate] = useState(() => {
-    // Default to tomorrow's date formatted as YYYY-MM-DD
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
@@ -119,7 +118,7 @@ export default function OfferRidePage() {
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!fromLoc.trim() || !toLoc.trim()) {
-      setError('Please specify both departure and destination campus locations.');
+      setError('Please specify departure and destination locations.');
       return;
     }
     if (!date) {
@@ -146,11 +145,9 @@ export default function OfferRidePage() {
         timeFlexibility: 30,
       });
 
-      // Redirect to rides or match screen
       navigate('/rides', { replace: true });
     } catch (err) {
       console.error('Ride post error:', err);
-      // If error occurred (e.g. mock backend in tests), smoothly redirect to rides with query
       navigate(`/rides?from=${encodeURIComponent(fromLoc)}&to=${encodeURIComponent(toLoc)}`);
     } finally {
       setLoading(false);
@@ -158,107 +155,78 @@ export default function OfferRidePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF7F2] text-[#17213D] flex flex-col justify-between selection:bg-[#FF572E]/20 relative overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen lg:max-h-screen lg:overflow-hidden bg-[#FFF7F2] text-[#17213D] flex flex-col justify-between selection:bg-[#FF572E]/20 relative">
       
       {/* Decorative ambient background glows */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-br from-[#FFE7DA] via-[#FFF0E7] to-transparent rounded-full blur-3xl opacity-70 transform translate-x-1/3 -translate-y-1/4" />
-        <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-gradient-to-tr from-[#FFE2D4] via-[#FFF3EB] to-transparent rounded-full blur-3xl opacity-60 transform -translate-x-1/4 translate-y-1/4" />
+        <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-gradient-to-br from-[#FFE7DA] via-[#FFF0E7] to-transparent rounded-full blur-3xl opacity-60 transform translate-x-1/3 -translate-y-1/4" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-[#FFE2D4] via-[#FFF3EB] to-transparent rounded-full blur-3xl opacity-50 transform -translate-x-1/4 translate-y-1/4" />
       </div>
 
       {/* ========================================================================= */}
-      {/* TOP NAVBAR                                                                */}
+      {/* TOP NAVBAR (Clean, No duplicate black HelpU text)                         */}
       {/* ========================================================================= */}
-      <header className="relative z-10 w-full px-4 sm:px-8 lg:px-12 py-3.5 sm:py-4 flex items-center justify-between border-b border-[#F4E3D8]/80 bg-[#FFF7F2]/80 backdrop-blur-md">
+      <header className="relative z-10 w-full px-4 sm:px-8 lg:px-10 py-2.5 sm:py-3 flex items-center justify-between border-b border-[#F4E3D8]/80 bg-[#FFF7F2]/90 backdrop-blur-md shrink-0">
         
-        {/* HelpU Brand Logo */}
+        {/* HelpU Brand Logo (Image only, without duplicated black text) */}
         <div 
           onClick={() => navigate('/home')} 
-          className="flex items-center gap-2.5 cursor-pointer group select-none"
+          className="flex items-center cursor-pointer group select-none"
         >
           <img 
             src="/logo.png" 
             alt="HelpU" 
-            className="h-8 sm:h-9 w-auto object-contain group-hover:scale-105 transition-transform drop-shadow-2xs" 
+            className="h-7 sm:h-8 w-auto object-contain group-hover:scale-105 transition-transform drop-shadow-2xs" 
           />
-          <span className="font-black text-[#17213D] text-xl sm:text-2xl tracking-tight">HelpU</span>
         </div>
 
         {/* Back to Home Button */}
         <button
           onClick={() => navigate('/home')}
-          className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-full border border-[#F2DDD2] text-[#17213D] hover:text-[#FF572E] text-xs sm:text-sm font-bold shadow-xs hover:bg-[#FFF7F2] transition-all cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white rounded-full border border-[#F2DDD2] text-[#17213D] hover:text-[#FF572E] text-xs font-bold shadow-xs hover:bg-[#FFF7F2] transition-all cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Home</span>
         </button>
       </header>
 
 
       {/* ========================================================================= */}
-      {/* MAIN TWO-COLUMN CONTENT                                                   */}
+      {/* MAIN TWO-COLUMN CONTENT (Fit in 1 screen ~100vh)                          */}
       {/* ========================================================================= */}
-      <main className="relative z-10 flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-6 sm:py-8 lg:py-10 flex items-center justify-center min-h-0">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full">
+      <main className="relative z-10 flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-2 sm:py-3 lg:py-2 flex items-center justify-center min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center w-full my-auto">
           
           {/* --------------------------------------------------------------------- */}
           {/* LEFT COLUMN: BRANDING, VALUE PROPS & CAR.PNG ILLUSTRATION             */}
           {/* --------------------------------------------------------------------- */}
           <motion.div 
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="lg:col-span-5 flex flex-col justify-center space-y-4 lg:pr-2 select-none"
+            transition={{ duration: 0.4 }}
+            className="lg:col-span-5 flex flex-col justify-center space-y-2.5 sm:space-y-3 lg:pr-2 select-none"
           >
-            {/* Mode Toggle (Offer / Request) & Badge */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE3CF] border border-[#FFD1B5] text-[#FF572E] text-xs font-black shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
-                <span>Travel Preferences</span>
-              </div>
-
-              {/* Offer vs Request Switcher */}
-              <div className="inline-flex bg-white/90 p-0.5 rounded-full border border-[#F4E3D8] shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setMode('offer')}
-                  className={`px-3 py-1 rounded-full text-xs font-extrabold transition-all cursor-pointer ${
-                    mode === 'offer'
-                      ? 'bg-[#FF572E] text-white shadow-xs'
-                      : 'text-[#6E7587] hover:text-[#17213D]'
-                  }`}
-                >
-                  Offer Ride
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('request')}
-                  className={`px-3 py-1 rounded-full text-xs font-extrabold transition-all cursor-pointer ${
-                    mode === 'request'
-                      ? 'bg-[#FF572E] text-white shadow-xs'
-                      : 'text-[#6E7587] hover:text-[#17213D]'
-                  }`}
-                >
-                  Find / Request
-                </button>
-              </div>
+            {/* Travel Preferences Badge */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE3CF] border border-[#FFD1B5] text-[#FF572E] text-[11px] sm:text-xs font-black shadow-2xs w-fit">
+              <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
+              <span>Travel Preferences</span>
             </div>
 
             {/* Main Heading matching the screenshot */}
             <div className="space-y-1">
-              <h1 className="font-black text-[#17213D] text-3xl sm:text-4xl lg:text-[42px] leading-[1.12] tracking-tight">
+              <h1 className="font-black text-[#17213D] text-2xl sm:text-3xl lg:text-[36px] leading-[1.12] tracking-tight">
                 <span>Set Your Ride </span>
                 <span className="text-[#FF572E] relative inline-block">
                   Preferences
-                  {/* Decorative orange rays / exclamation marks */}
-                  <span className="absolute -top-3 -right-6 text-[#FF572E] text-xl font-black select-none pointer-events-none">
+                  {/* Decorative orange rays \ / */}
+                  <span className="absolute -top-2.5 -right-5 text-[#FF572E] text-lg font-black select-none pointer-events-none">
                     \ /
                   </span>
                 </span>
               </h1>
 
               {/* Subtitle */}
-              <p className="text-[#596277] text-sm sm:text-base font-medium leading-relaxed max-w-md pt-2">
+              <p className="text-[#596277] text-xs sm:text-sm font-medium leading-relaxed max-w-sm pt-0.5">
                 {mode === 'offer'
                   ? 'Share your empty seats, split travel costs, and journey with verified college peers!'
                   : 'Help us find the best matches for your travel needs!'}
@@ -267,15 +235,14 @@ export default function OfferRidePage() {
 
             {/*
               ===================================================================
-              CAR.PNG ILLUSTRATION
-              Using user's provided public/car.png with smooth natural scaling
+              CAR.PNG ILLUSTRATION (Compact height so entire page fits ~100vh)
               ===================================================================
             */}
-            <div className="relative w-full pt-2 flex justify-center lg:justify-start items-end">
+            <div className="relative w-full pt-1 flex justify-center lg:justify-start items-end overflow-hidden">
               <img 
                 src="/car.png" 
                 alt="HelpU Ride Travel Illustration" 
-                className="w-full max-w-[380px] sm:max-w-[440px] lg:max-w-[460px] h-auto object-contain select-none pointer-events-none drop-shadow-md"
+                className="w-auto max-w-full h-auto max-h-[170px] sm:max-h-[210px] lg:max-h-[230px] xl:max-h-[260px] object-contain select-none pointer-events-none drop-shadow-sm"
               />
             </div>
 
@@ -286,49 +253,77 @@ export default function OfferRidePage() {
           {/* RIGHT COLUMN: "YOUR TRAVEL DETAILS" PREFERENCES CARD                  */}
           {/* --------------------------------------------------------------------- */}
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
             className="lg:col-span-7 flex justify-center lg:justify-end w-full"
           >
-            <div className="w-full max-w-[560px] bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-[#17213D]/5 border border-[#F4E3D8] relative">
+            <div className="w-full max-w-[530px] bg-white rounded-3xl p-4 sm:p-5 lg:p-5.5 shadow-xl shadow-[#17213D]/5 border border-[#F4E3D8] relative">
               
-              {/* Header Title inside card */}
-              <div className="flex items-start gap-3.5 mb-6">
-                <div className="w-10 h-10 rounded-full bg-[#FFEAE3] text-[#FF572E] flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                  <MapPin className="w-5 h-5 text-[#FF572E]" />
+              {/* Header Title & Mode Switcher on the Right */}
+              <div className="flex items-center justify-between gap-2.5 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFEAE3] text-[#FF572E] flex items-center justify-center shrink-0 shadow-xs">
+                    <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E]" />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-[#17213D] text-base sm:text-lg tracking-tight leading-tight">
+                      Your Travel Details
+                    </h2>
+                    <p className="text-[#6E7587] text-[10px] sm:text-[11px] font-medium leading-none mt-0.5">
+                      Choose your route, date and preferences
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-black text-[#17213D] text-xl sm:text-2xl tracking-tight">
-                    Your Travel Details
-                  </h2>
-                  <p className="text-[#6E7587] text-xs sm:text-sm font-medium mt-0.5">
-                    Choose your route, date and preferences
-                  </p>
+
+                {/* Offer Ride / Find Request Toggle Switcher on Right side */}
+                <div className="inline-flex bg-[#FFF7F2] p-0.5 rounded-full border border-[#F4E3D8] shadow-2xs shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMode('offer')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] font-extrabold transition-all cursor-pointer ${
+                      mode === 'offer'
+                        ? 'bg-[#FF572E] text-white shadow-xs'
+                        : 'text-[#6E7587] hover:text-[#17213D]'
+                    }`}
+                  >
+                    Offer Ride
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('request')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] font-extrabold transition-all cursor-pointer ${
+                      mode === 'request'
+                        ? 'bg-[#FF572E] text-white shadow-xs'
+                        : 'text-[#6E7587] hover:text-[#17213D]'
+                    }`}
+                  >
+                    Find / Request
+                  </button>
                 </div>
               </div>
 
               {/* Form Body */}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-2.5">
                 
                 {/* Route Section (From & To with Interchange button) */}
-                <div className="relative space-y-3">
+                <div className="relative space-y-2">
                   
                   {/* From Field */}
-                  <div className="bg-[#FFFBF8] rounded-2xl p-3.5 sm:p-4 border border-[#F5E2D6] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#6E7587] uppercase tracking-wider mb-1">
-                      <span className="w-2 h-2 rounded-full bg-[#FF572E]" />
+                  <div className="bg-[#FFFBF8] rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-[#F5E2D6] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#6E7587] uppercase tracking-wider mb-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF572E]" />
                       <span>From</span>
                     </div>
-                    <div className="flex items-center gap-2.5">
-                      <MapPin className="w-4 h-4 text-[#FF572E] shrink-0" />
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
                       <input
                         type="text"
                         list="from-locations"
                         value={fromLoc}
                         onChange={(e) => setFromLoc(e.target.value)}
                         placeholder="e.g. VIT, Bhopal"
-                        className="w-full bg-transparent text-sm sm:text-base font-bold text-[#17213D] placeholder:text-[#A0A6B5] focus:outline-none"
+                        className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17213D] placeholder:text-[#A0A6B5] focus:outline-none"
                       />
                     </div>
                     <datalist id="from-locations">
@@ -339,32 +334,32 @@ export default function OfferRidePage() {
                   </div>
 
                   {/* Swap / Interchange Button */}
-                  <div className="absolute right-5 top-[50%] -translate-y-1/2 z-10">
+                  <div className="absolute right-4 top-[50%] -translate-y-1/2 z-10">
                     <button
                       type="button"
                       onClick={handleSwapLocations}
                       title="Swap Departure and Destination"
-                      className="w-8 h-8 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] hover:bg-[#FFF7F2] hover:scale-110 active:scale-95 transition-all flex items-center justify-center shadow-sm cursor-pointer"
+                      className="w-7 h-7 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] hover:bg-[#FFF7F2] hover:scale-110 active:scale-95 transition-all flex items-center justify-center shadow-xs cursor-pointer"
                     >
-                      <ArrowUpDown className="w-4 h-4 text-[#FF572E]" />
+                      <ArrowUpDown className="w-3.5 h-3.5 text-[#FF572E]" />
                     </button>
                   </div>
 
                   {/* To Field */}
-                  <div className="bg-[#FFFBF8] rounded-2xl p-3.5 sm:p-4 border border-[#F5E2D6] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#6E7587] uppercase tracking-wider mb-1">
-                      <span className="w-2 h-2 rounded-full bg-[#17213D]" />
+                  <div className="bg-[#FFFBF8] rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-[#F5E2D6] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#6E7587] uppercase tracking-wider mb-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#17213D]" />
                       <span>To</span>
                     </div>
-                    <div className="flex items-center gap-2.5">
-                      <MapPin className="w-4 h-4 text-[#17213D] shrink-0" />
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-[#17213D] shrink-0" />
                       <input
                         type="text"
                         list="to-locations"
                         value={toLoc}
                         onChange={(e) => setToLoc(e.target.value)}
                         placeholder="e.g. Bhopal Railway Station"
-                        className="w-full bg-transparent text-sm sm:text-base font-bold text-[#17213D] placeholder:text-[#A0A6B5] focus:outline-none"
+                        className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17213D] placeholder:text-[#A0A6B5] focus:outline-none"
                       />
                     </div>
                     <datalist id="to-locations">
@@ -378,33 +373,33 @@ export default function OfferRidePage() {
 
 
                 {/* Date & Time Row (Two Columns) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-2 gap-2.5">
                   
                   {/* Date Input */}
-                  <div className="bg-[#FFFBF8] rounded-2xl p-3.5 border border-[#F5E2D6] focus-within:border-[#FF572E] transition-all">
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#6E7587] uppercase tracking-wider mb-1">
-                      <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <div className="bg-[#FFFBF8] rounded-xl sm:rounded-2xl p-2.5 border border-[#F5E2D6] focus-within:border-[#FF572E] transition-all">
+                    <label className="flex items-center gap-1 text-[10px] font-bold text-[#6E7587] uppercase tracking-wider mb-0.5">
+                      <Calendar className="w-3 h-3 text-[#FF572E]" />
                       <span>Date</span>
                     </label>
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17213D] focus:outline-none cursor-pointer"
+                      className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17213D] focus:outline-none cursor-pointer py-0.5"
                     />
                   </div>
 
                   {/* Time Input */}
-                  <div className="bg-[#FFFBF8] rounded-2xl p-3.5 border border-[#F5E2D6] focus-within:border-[#FF572E] transition-all">
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#6E7587] uppercase tracking-wider mb-1">
-                      <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <div className="bg-[#FFFBF8] rounded-xl sm:rounded-2xl p-2.5 border border-[#F5E2D6] focus-within:border-[#FF572E] transition-all">
+                    <label className="flex items-center gap-1 text-[10px] font-bold text-[#6E7587] uppercase tracking-wider mb-0.5">
+                      <Clock className="w-3 h-3 text-[#FF572E]" />
                       <span>Time (Optional)</span>
                     </label>
                     <input
                       type="time"
                       value={time}
                       onChange={(e) => setTime(e.target.value)}
-                      className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17213D] focus:outline-none cursor-pointer"
+                      className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17213D] focus:outline-none cursor-pointer py-0.5"
                     />
                   </div>
 
@@ -412,180 +407,171 @@ export default function OfferRidePage() {
 
 
                 {/* Preferred Car Selection Section */}
-                <div className="pt-2">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <div className="w-6 h-6 rounded-full bg-[#FFEAE3] flex items-center justify-center text-[#FF572E]">
-                      <CarIcon className="w-3.5 h-3.5" />
+                <div className="pt-0.5">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full bg-[#FFEAE3] flex items-center justify-center text-[#FF572E]">
+                        <CarIcon className="w-3 h-3" />
+                      </div>
+                      <span className="font-extrabold text-[#17213D] text-xs">Preferred Car</span>
                     </div>
-                    <div>
-                      <h4 className="font-extrabold text-[#17213D] text-xs sm:text-sm">Preferred Car</h4>
-                      <p className="text-[11px] text-[#6E7587]">Choose your preferred car type</p>
-                    </div>
+                    <span className="text-[10px] text-[#6E7587]">Choose your vehicle type</span>
                   </div>
 
                   {/* 4 Car Tiles Grid */}
-                  <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
+                  <div className="grid grid-cols-4 gap-2">
                     
                     {/* 1. Omni */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Omni')}
-                      className={`relative flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
                         preferredCar === 'Omni'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-sm'
+                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F5E2D6] bg-[#FFFBF8] hover:bg-white'
                       }`}
                     >
                       {preferredCar === 'Omni' && (
-                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-2xs">
+                          <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <OmniCarIcon className="w-10 sm:w-12 h-7 sm:h-8 mb-1" />
-                      <span className="text-xs font-black text-[#17213D]">Omni</span>
+                      <OmniCarIcon className="w-8 sm:w-10 h-5.5 sm:h-6 mb-0.5" />
+                      <span className="text-[11px] font-black text-[#17213D]">Omni</span>
                     </button>
 
                     {/* 2. Creta */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Creta')}
-                      className={`relative flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
                         preferredCar === 'Creta'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-sm'
+                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F5E2D6] bg-[#FFFBF8] hover:bg-white'
                       }`}
                     >
                       {preferredCar === 'Creta' && (
-                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-2xs">
+                          <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <CretaCarIcon className="w-10 sm:w-12 h-7 sm:h-8 mb-1" />
-                      <span className="text-xs font-black text-[#17213D]">Creta</span>
+                      <CretaCarIcon className="w-8 sm:w-10 h-5.5 sm:h-6 mb-0.5" />
+                      <span className="text-[11px] font-black text-[#17213D]">Creta</span>
                     </button>
 
                     {/* 3. Eeco */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Eeco')}
-                      className={`relative flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
                         preferredCar === 'Eeco'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-sm'
+                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F5E2D6] bg-[#FFFBF8] hover:bg-white'
                       }`}
                     >
                       {preferredCar === 'Eeco' && (
-                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-2xs">
+                          <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <EecoCarIcon className="w-10 sm:w-12 h-7 sm:h-8 mb-1" />
-                      <span className="text-xs font-black text-[#17213D]">Eeco</span>
+                      <EecoCarIcon className="w-8 sm:w-10 h-5.5 sm:h-6 mb-0.5" />
+                      <span className="text-[11px] font-black text-[#17213D]">Eeco</span>
                     </button>
 
                     {/* 4. Other */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Other')}
-                      className={`relative flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
                         preferredCar === 'Other'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-sm'
+                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F5E2D6] bg-[#FFFBF8] hover:bg-white'
                       }`}
                     >
                       {preferredCar === 'Other' && (
-                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-2xs">
+                          <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <div className="w-10 sm:w-12 h-7 sm:h-8 flex items-center justify-center text-[#6E7587] mb-1">
-                        <MoreHorizontal className="w-6 h-6" />
+                      <div className="w-8 sm:w-10 h-5.5 sm:h-6 flex items-center justify-center text-[#6E7587] mb-0.5">
+                        <MoreHorizontal className="w-5 h-5" />
                       </div>
-                      <span className="text-xs font-black text-[#17213D]">Other</span>
+                      <span className="text-[11px] font-black text-[#17213D]">Other</span>
                     </button>
 
                   </div>
                 </div>
 
 
-                {/* Max. Co-travellers & Price Section */}
-                <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FFFBF8] rounded-2xl p-3.5 sm:p-4 border border-[#F5E2D6]">
+                {/* Max. Co-travellers & Optional Price */}
+                <div className="flex items-center justify-between gap-3 bg-[#FFFBF8] rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-[#F5E2D6]">
                   
                   {/* Travellers Info */}
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-[#FFEAE3] text-[#FF572E] flex items-center justify-center shrink-0">
-                      <Users className="w-4 h-4" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-[#FFEAE3] text-[#FF572E] flex items-center justify-center shrink-0">
+                      <Users className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <h4 className="font-extrabold text-[#17213D] text-xs sm:text-sm">Max. Co-travellers</h4>
-                      <p className="text-[11px] text-[#6E7587]">How many people can join?</p>
+                      <h4 className="font-extrabold text-[#17213D] text-xs leading-none">Max. Co-travellers</h4>
+                      <p className="text-[10px] text-[#6E7587] mt-0.5">How many seats needed?</p>
                     </div>
                   </div>
 
-                  {/* Counter [- 1 +] */}
-                  <div className="flex items-center justify-between sm:justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
-                      className="w-8 h-8 rounded-full bg-white border border-[#E5E7EB] text-[#17213D] hover:bg-[#FFF7F2] font-black text-sm flex items-center justify-center cursor-pointer shadow-2xs"
-                    >
-                      −
-                    </button>
-                    <span className="font-black text-[#17213D] text-base min-w-[20px] text-center">
-                      {travellers}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setTravellers((prev) => Math.min(8, prev + 1))}
-                      className="w-8 h-8 rounded-full bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-sm flex items-center justify-center cursor-pointer shadow-xs"
-                    >
-                      +
-                    </button>
+                  {/* Counter [- 1 +] and optional Price input */}
+                  <div className="flex items-center gap-3">
+                    {mode === 'offer' && (
+                      <div className="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-[#E5E7EB]">
+                        <span className="font-bold text-[#FF572E] text-xs">₹</span>
+                        <input
+                          type="number"
+                          value={pricePerSeat}
+                          onChange={(e) => setPricePerSeat(e.target.value)}
+                          placeholder="350"
+                          title="Price per seat"
+                          className="w-14 text-xs font-black text-[#17213D] focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
+                        className="w-7 h-7 rounded-full bg-white border border-[#E5E7EB] text-[#17213D] hover:bg-[#FFF7F2] font-black text-xs flex items-center justify-center cursor-pointer shadow-2xs"
+                      >
+                        −
+                      </button>
+                      <span className="font-black text-[#17213D] text-sm min-w-[16px] text-center">
+                        {travellers}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setTravellers((prev) => Math.min(8, prev + 1))}
+                        className="w-7 h-7 rounded-full bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-xs flex items-center justify-center cursor-pointer shadow-xs"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-
-                {/* Optional Price Per Seat (If offering ride) */}
-                {mode === 'offer' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="bg-[#FFFBF8] rounded-2xl p-3.5 border border-[#F5E2D6] flex items-center justify-between"
-                  >
-                    <div>
-                      <label className="block text-xs font-extrabold text-[#17213D]">Price per Seat (Fuel Split)</label>
-                      <span className="text-[11px] text-[#6E7587]">Suggested: ₹250 – ₹450</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 w-28 bg-white rounded-xl px-3 py-1.5 border border-[#E5E7EB]">
-                      <span className="font-bold text-[#FF572E] text-sm">₹</span>
-                      <input
-                        type="number"
-                        value={pricePerSeat}
-                        onChange={(e) => setPricePerSeat(e.target.value)}
-                        placeholder="350"
-                        className="w-full text-sm font-black text-[#17213D] focus:outline-none"
-                      />
-                    </div>
-                  </motion.div>
-                )}
 
 
                 {/* Error Banner */}
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl text-center">
+                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-xl text-center">
                     {error}
                   </div>
                 )}
 
 
-                {/* Big Orange Primary Action Button matching reference */}
-                <div className="pt-2">
+                {/* Big Orange Primary Action Button */}
+                <div className="pt-1">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-4 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-2xl font-black text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg shadow-[#FF572E]/28 transition-all cursor-pointer disabled:opacity-60"
+                    className="w-full py-3 sm:py-3.5 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-xl sm:rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer disabled:opacity-60"
                   >
-                    <Search className="w-5 h-5 stroke-[2.5]" />
+                    <Search className="w-4 h-4 stroke-[2.5]" />
                     <span>{loading ? 'Processing...' : mode === 'offer' ? 'Offer Ride >' : 'Find Rides >'}</span>
                   </button>
                 </div>
@@ -593,7 +579,7 @@ export default function OfferRidePage() {
               </form>
 
               {/* Bottom Trust Badge */}
-              <div className="mt-4 pt-3 border-t border-[#F5E5DC] flex items-center justify-center gap-1.5 text-[11px] text-[#6E7587] font-semibold text-center">
+              <div className="mt-2.5 pt-2 border-t border-[#F5E5DC] flex items-center justify-center gap-1.5 text-[10px] text-[#6E7587] font-semibold text-center">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
                 <span>Protected by verified college student network</span>
               </div>
@@ -605,8 +591,8 @@ export default function OfferRidePage() {
       </main>
 
 
-      {/* Minimal Footer */}
-      <footer className="relative z-10 px-4 sm:px-8 py-3 text-center text-[11px] text-[#8C93A4] font-medium border-t border-[#F4E3D8]/60 bg-[#FFF7F2]/50">
+      {/* Compact Minimal Footer */}
+      <footer className="relative z-10 px-4 sm:px-8 py-2 text-center text-[10px] text-[#8C93A4] font-medium border-t border-[#F4E3D8]/60 bg-[#FFF7F2]/60 shrink-0">
         HelpU • Campus Ride & Community Network • © {new Date().getFullYear()}
       </footer>
 
