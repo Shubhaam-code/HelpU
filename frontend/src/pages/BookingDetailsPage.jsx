@@ -47,7 +47,7 @@ export default function BookingDetailsPage() {
     );
   }
 
-  const travel = booking?.travel;
+  const travel = booking?.travelId || booking?.travel;
   const isConfirmed = booking?.status === 'confirmed';
   const isCancelled = booking?.status === 'cancelled';
 
@@ -82,14 +82,18 @@ export default function BookingDetailsPage() {
             </div>
             <div className="flex flex-col justify-between py-0.5 flex-1">
               <div>
-                <div className="font-bold text-navy text-base">{travel?.from || 'Campus Origin'}</div>
+                <div className="font-bold text-navy text-base">{travel?.source || travel?.from || 'Campus Origin'}</div>
               </div>
               <div className="flex items-center gap-1 text-xs text-text-secondary my-2">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDate(travel?.departureTime)}</span>
+                <span>
+                  {travel?.travelDate 
+                    ? new Date(travel.travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + (typeof travel.departureTime === 'number' ? ` ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}` : '')
+                    : formatDate(travel?.departureTime)}
+                </span>
               </div>
               <div>
-                <div className="font-bold text-navy text-base">{travel?.to || 'Destination'}</div>
+                <div className="font-bold text-navy text-base">{travel?.destination || travel?.to || 'Destination'}</div>
               </div>
             </div>
           </div>

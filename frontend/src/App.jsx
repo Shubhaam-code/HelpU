@@ -23,6 +23,9 @@ import ChatConversationPage from './pages/ChatConversationPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import CreatePage from './pages/CreatePage';
+import CommunityPage from './pages/CommunityPage';
+import GetHelpPage from './pages/GetHelpPage';
+import AboutPage from './pages/AboutPage';
 import StaticInfoPage from './pages/StaticInfoPage';
 
 // Token injector component
@@ -87,10 +90,10 @@ export default function App() {
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
 
-        {/* Informational & Community Routes */}
-        <Route path="/community" element={<ProtectedRoute><StaticInfoPage title="Campus Community" subtitle="Connect with student clubs, batch groups, and hostel forums." icon="👥" /></ProtectedRoute>} />
-        <Route path="/help" element={<ProtectedRoute><StaticInfoPage title="Campus Help & Services" subtitle="Need assistance with assignments, campus errands, or peer tutoring? Connect here." icon="🔧" /></ProtectedRoute>} />
-        <Route path="/about" element={<ProtectedRoute><StaticInfoPage title="About HelpU" subtitle="HelpU is the premier student carpooling, assistance, and peer connection platform for college campuses." icon="ℹ️" /></ProtectedRoute>} />
+        {/* Community, Help & About dedicated pages */}
+        <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
+        <Route path="/help" element={<ProtectedRoute><GetHelpPage /></ProtectedRoute>} />
+        <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
         <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><StaticInfoPage title="Account Settings" subtitle="Manage notification preferences, privacy, verified student IDs, and security." icon="⚙️" /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />

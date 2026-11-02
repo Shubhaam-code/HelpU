@@ -27,8 +27,8 @@ export function BookingCard({ booking, onPress }) {
           <div className="w-2 h-2 rounded-full bg-navy" />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-navy">{booking?.travel?.from || booking?.from || 'Campus'}</span>
-          <span className="text-sm text-text-secondary">{booking?.travel?.to || booking?.to || 'Destination'}</span>
+          <span className="text-sm font-medium text-navy">{booking?.travelId?.source || booking?.travel?.source || booking?.travel?.from || booking?.from || 'Campus'}</span>
+          <span className="text-sm text-text-secondary">{booking?.travelId?.destination || booking?.travel?.destination || booking?.travel?.to || booking?.to || 'Destination'}</span>
         </div>
       </div>
 

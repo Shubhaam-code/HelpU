@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { requireAuth } from '../middlewares/auth.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
+import Student from '../models/Student.js';
 import { findMatchesForTravel } from '../services/matching.service.js';
 
 const router = express.Router();
@@ -72,7 +73,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     // 5. Validation for time flexibility
     const allowedFlexibility = [30, 60, 180, 300];
-    const numFlexibility = Number(timeFlexibility);
+    const numFlexibility = Number(timeFlexibility) || 30;
     if (!allowedFlexibility.includes(numFlexibility)) {
       return res.status(400).json({
         success: false,
@@ -123,22 +124,55 @@ router.post('/', requireAuth, async (req, res) => {
 
 /**
  * @route   GET /api/travels
- * @desc    Get all active travel posts (excluding posts by the logged-in user and expired posts)
+ * @desc    Get all active travel posts (with filters & student profile enrichment)
  * @access  Protected
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
     const now = new Date();
-    const travels = await Travel.find({
+    const query = {
       status: 'active',
       userId: { $ne: req.userId },
       expiresAt: { $gt: now }
-    }).sort({ createdAt: -1 });
+    };
+
+    if (req.query.type && ['offer', 'request'].includes(req.query.type)) {
+      query.type = req.query.type;
+    }
+
+    if (req.query.source) {
+      query.source = { $regex: req.query.source.trim(), $options: 'i' };
+    }
+
+    if (req.query.destination) {
+      query.destination = { $regex: req.query.destination.trim(), $options: 'i' };
+    }
+
+    if (req.query.search) {
+      const term = req.query.search.trim();
+      query.$or = [
+        { source: { $regex: term, $options: 'i' } },
+        { destination: { $regex: term, $options: 'i' } }
+      ];
+    }
+
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const travels = await Travel.find(query).sort({ createdAt: -1 }).limit(limit).lean();
+
+    // Enrich with creator student profile
+    const userIds = [...new Set(travels.map((t) => t.userId))];
+    const students = await Student.find({ clerkId: { $in: userIds } }).lean();
+    const studentMap = new Map(students.map((s) => [s.clerkId, s]));
+
+    const enriched = travels.map((t) => ({
+      ...t,
+      student: studentMap.get(t.userId) || { name: 'Campus Student', avatarId: 'm1' }
+    }));
 
     return res.status(200).json({
       success: true,
-      count: travels.length,
-      data: travels
+      count: enriched.length,
+      data: enriched
     });
   } catch (error) {
     console.error('Error fetching travel posts:', error);
@@ -161,7 +195,7 @@ router.get('/my', requireAuth, async (req, res) => {
     const travels = await Travel.find({
       userId: req.userId,
       expiresAt: { $gt: now }
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 }).lean();
 
     return res.status(200).json({
       success: true,
@@ -173,6 +207,49 @@ router.get('/my', requireAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error while fetching your travel posts',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/travels/:id
+ * @desc    Get single travel post by ID with student profile
+ * @access  Protected
+ */
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid travel ID format'
+      });
+    }
+
+    const travel = await Travel.findById(id).lean();
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Travel post not found'
+      });
+    }
+
+    const student = await Student.findOne({ clerkId: travel.userId }).lean();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...travel,
+        student: student || { name: 'Campus Student', avatarId: 'm1' }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching travel post details:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching travel post details',
       error: error.message
     });
   }

@@ -9,19 +9,28 @@ const sizes = {
   '2xl': 128,
 };
 
-export function Avatar({ avatarId, size = 'md', className = '', ring = false }) {
+export function Avatar({ avatarId, src, size = 'md', className = '', ring = false }) {
   const px = typeof size === 'number' ? size : sizes[size] || 48;
-  const avatar = getAvatar(avatarId);
 
   return (
     <div
-      className={`relative inline-block flex-shrink-0 rounded-full overflow-hidden ${ring ? 'ring-2 ring-coral' : ''} ${className}`}
+      className={`relative inline-block flex-shrink-0 rounded-full overflow-hidden ${ring ? 'ring-2 ring-[#FF572E]' : ''} ${className}`}
       style={{ width: px, height: px }}
     >
-      <AvatarSVG avatarId={avatarId || 'm1'} size={px} />
+      {src ? (
+        <img 
+          src={src} 
+          alt="Avatar" 
+          className="w-full h-full object-cover rounded-full" 
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      ) : (
+        <AvatarSVG avatarId={avatarId || 'm1'} size={px} />
+      )}
     </div>
   );
 }
 
 export default Avatar;
-

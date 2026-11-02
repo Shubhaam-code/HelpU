@@ -46,12 +46,12 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
           <div className="w-2 h-2 rounded-full bg-navy" />
         </div>
         <div className="flex flex-col gap-1 flex-1">
-          <span className="text-sm font-medium text-navy">{travel?.from || 'Campus'}</span>
-          <span className="text-sm text-text-secondary">{travel?.to || 'Destination'}</span>
+          <span className="text-sm font-medium text-navy">{travel?.source || travel?.from || 'Campus'}</span>
+          <span className="text-sm text-text-secondary">{travel?.destination || travel?.to || 'Destination'}</span>
         </div>
-        {travel?.availableSeats != null && (
+        {(travel?.seats != null || travel?.availableSeats != null) && (
           <span className="bg-navy text-white text-xs px-2.5 py-1 rounded-full font-semibold">
-            {travel.availableSeats} seat{travel.availableSeats !== 1 ? 's' : ''}
+            {typeof travel?.seats === 'number' ? Math.max(0, travel.seats - (travel.bookedSeats || 0)) : travel.availableSeats} seat{((travel?.seats || travel?.availableSeats) !== 1) ? 's' : ''}
           </span>
         )}
       </div>
@@ -60,9 +60,13 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
       <div className="flex items-center justify-between pt-2 border-t border-gray-50">
         <div className="flex items-center gap-1 text-xs text-text-secondary">
           <Calendar className="w-3.5 h-3.5" />
-          <span>{formatDate(travel?.departureTime)}</span>
+          <span>
+            {travel?.travelDate 
+              ? new Date(travel.travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + (typeof travel.departureTime === 'number' ? ` ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}` : '')
+              : formatDate(travel?.departureTime)}
+          </span>
         </div>
-        <span className="font-bold text-coral text-sm">{formatCurrency(travel?.pricePerSeat)}</span>
+        <span className="font-bold text-coral text-sm">{formatCurrency(travel?.pricePerSeat || 350)}</span>
       </div>
     </motion.div>
   );

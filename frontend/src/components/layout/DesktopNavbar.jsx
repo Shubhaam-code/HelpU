@@ -177,7 +177,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
               className="flex items-center gap-2 p-0.5 hover:ring-2 hover:ring-coral/30 rounded-full transition-all focus:outline-none cursor-pointer"
             >
-              <Avatar avatarId={avatarId || 'm1'} size="sm" ring />
+              <Avatar avatarId={avatarId || 'm1'} src={user?.imageUrl} size="sm" ring />
             </button>
 
             {profileDropdownOpen && (

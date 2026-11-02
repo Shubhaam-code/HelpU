@@ -86,12 +86,12 @@ export default function RideDetailsPage() {
             </div>
             <div className="flex flex-col justify-between py-0.5 flex-1">
               <div>
-                <div className="font-semibold text-navy">{travel.from}</div>
+                <div className="font-semibold text-navy">{travel.source || travel.from || 'Campus Gate'}</div>
                 <div className="text-text-secondary text-xs">Departure</div>
               </div>
               <div className="my-3" />
               <div>
-                <div className="font-semibold text-navy">{travel.to}</div>
+                <div className="font-semibold text-navy">{travel.destination || travel.to || 'Destination'}</div>
                 <div className="text-text-secondary text-xs">Destination</div>
               </div>
             </div>
@@ -100,18 +100,24 @@ export default function RideDetailsPage() {
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="bg-cream rounded-xl p-3 text-center">
               <Calendar className="w-4 h-4 text-coral mx-auto mb-1" />
-              <div className="text-xs text-text-secondary">Date & Time</div>
-              <div className="text-xs font-semibold text-navy mt-1">{formatDate(travel.departureTime)}</div>
+              <div className="text-xs text-text-secondary">Date &amp; Time</div>
+              <div className="text-xs font-semibold text-navy mt-1">
+                {travel.travelDate 
+                  ? new Date(travel.travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + (typeof travel.departureTime === 'number' ? ` ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}` : '')
+                  : formatDate(travel.departureTime)}
+              </div>
             </div>
             <div className="bg-cream rounded-xl p-3 text-center">
               <Users className="w-4 h-4 text-coral mx-auto mb-1" />
               <div className="text-xs text-text-secondary">Seats</div>
-              <div className="text-xs font-semibold text-navy mt-1">{travel.availableSeats} available</div>
+              <div className="text-xs font-semibold text-navy mt-1">
+                {typeof travel.seats === 'number' ? (travel.seats - (travel.bookedSeats || 0)) : (travel.availableSeats || 1)} available
+              </div>
             </div>
             <div className="bg-cream rounded-xl p-3 text-center">
               <Car className="w-4 h-4 text-coral mx-auto mb-1" />
               <div className="text-xs text-text-secondary">Price</div>
-              <div className="text-xs font-semibold text-navy mt-1">{formatCurrency(travel.pricePerSeat)}/seat</div>
+              <div className="text-xs font-semibold text-navy mt-1">{formatCurrency(travel.pricePerSeat || 350)}/seat</div>
             </div>
           </div>
         </motion.div>

@@ -75,5 +75,18 @@ export const getUnreadCount = () => apiClient.get('/api/notifications/unread-cou
 export const markRead = (id) => apiClient.patch(`/api/notifications/${id}/read`);
 export const markAllRead = () => apiClient.patch('/api/notifications/read-all');
 
+// ── Community ─────────────────────────────────────────────────────────────────
+export const getCommunityPosts = (params) => apiClient.get('/api/community/posts', { params });
+export const createCommunityPost = (data) => apiClient.post('/api/community/posts', data);
+export const toggleLikePost = (id) => apiClient.patch(`/api/community/posts/${id}/like`);
+export const addComment = (id, data) => apiClient.post(`/api/community/posts/${id}/comments`, data);
+export const deleteCommunityPost = (id) => apiClient.delete(`/api/community/posts/${id}`);
+
+// ── Help ──────────────────────────────────────────────────────────────────────
+export const getHelpRequests = (params) => apiClient.get('/api/help/requests', { params });
+export const createHelpRequest = (data) => apiClient.post('/api/help/requests', data);
+export const getMyHelpRequests = () => apiClient.get('/api/help/requests/my');
+export const updateHelpStatus = (id, status) => apiClient.patch(`/api/help/requests/${id}/status`, { status });
+
 export default apiClient;
 

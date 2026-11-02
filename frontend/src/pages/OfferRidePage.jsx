@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  MapPin, Calendar, Clock, Users, ArrowUpDown, 
-  Search, Check, Sparkles, Car as CarIcon, 
+import {
+  MapPin, Calendar, Clock, Users, ArrowUpDown,
+  Search, Check, Sparkles, Car as CarIcon,
   MoreHorizontal, ShieldCheck, ArrowRight, IndianRupee
 } from 'lucide-react';
 
@@ -119,25 +119,41 @@ export default function OfferRidePage() {
     setError('');
 
     try {
-      const departureTime = time 
-        ? new Date(`${date}T${time}`).toISOString() 
-        : new Date(`${date}T08:00:00`).toISOString();
+      // Convert HH:MM time string to minutes from midnight (backend format)
+      let departureMinutes = 480; // default 8:00 AM
+      if (time) {
+        const [hh, mm] = time.split(':').map(Number);
+        departureMinutes = hh * 60 + (mm || 0);
+      }
 
-      await createTravel({
-        from: fromLoc.trim(),
-        to: toLoc.trim(),
-        departureTime,
-        availableSeats: travellers,
-        pricePerSeat: mode === 'offer' ? (Number(pricePerSeat) || 0) : 0,
-        type: mode,
-        carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
-        timeFlexibility: 30,
-      });
-
-      navigate('/rides', { replace: true });
+      if (mode === 'offer') {
+        // POST to backend — use correct field names matching Travel schema
+        await createTravel({
+          source: fromLoc.trim(),
+          destination: toLoc.trim(),
+          travelDate: date,
+          departureTime: departureMinutes,
+          timeFlexibility: 30,
+          seats: travellers,
+          type: 'offer',
+        });
+        navigate('/rides', { replace: true });
+      } else {
+        // For "request" mode — post a travel request
+        await createTravel({
+          source: fromLoc.trim(),
+          destination: toLoc.trim(),
+          travelDate: date,
+          departureTime: departureMinutes,
+          timeFlexibility: 30,
+          seats: travellers,
+          type: 'request',
+        });
+        navigate('/rides', { replace: true });
+      }
     } catch (err) {
       console.error('Ride post error:', err);
-      navigate(`/rides?from=${encodeURIComponent(fromLoc)}&to=${encodeURIComponent(toLoc)}`);
+      setError(err.message || 'Failed to post ride. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -149,22 +165,21 @@ export default function OfferRidePage() {
       customMobileHeader={<AppHeader title="Offer a Ride" backTo="/rides" />}
     >
       <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        
+
         {/* ========================================================================= */}
         {/* SUB-HEADER TOOLBAR (Matching Match Page sub-bar)                          */}
         {/* ========================================================================= */}
         <div className="flex items-center justify-between mb-4 sm:mb-5">
-          
+
           {/* Mode Switcher Pill */}
           <div className="inline-flex bg-white/90 p-1 rounded-full border border-[#F4E3D8]/90 shadow-xs backdrop-blur-sm">
             <button
               type="button"
               onClick={() => setMode('offer')}
-              className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                mode === 'offer'
+              className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${mode === 'offer'
                   ? 'bg-[#FF572E] text-white shadow-sm'
                   : 'text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2]'
-              }`}
+                }`}
             >
               <CarIcon className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>Offer a Ride</span>
@@ -173,11 +188,10 @@ export default function OfferRidePage() {
             <button
               type="button"
               onClick={() => setMode('request')}
-              className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                mode === 'request'
+              className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${mode === 'request'
                   ? 'bg-[#FF572E] text-white shadow-sm'
                   : 'text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2]'
-              }`}
+                }`}
             >
               <Search className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>Find / Request</span>
@@ -209,12 +223,12 @@ export default function OfferRidePage() {
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-[#FFF0E7]/50 via-[#FFF5EE]/30 to-transparent pointer-events-none rounded-r-[28px]" />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative z-10">
-            
+
             {/* ------------------------------------------------------------------- */}
             {/* LEFT COLUMN: HEADING, VALUE PROPS & COMPACT CAR ILLUSTRATION         */}
             {/* ------------------------------------------------------------------- */}
             <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-4">
-              
+
               <div>
                 {/* Small Badge */}
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFEBE0] text-[#FF572E] font-bold text-xs mb-2.5">
@@ -269,16 +283,16 @@ export default function OfferRidePage() {
               </div>
 
               {/* Compact Transparent Student-and-Car Illustration */}
-              <div className="relative w-full flex items-center justify-center pt-2 select-none pointer-events-none">
-                <img
-                  src="/car.png"
-                  alt="Student campus ride illustration"
-                  className="w-auto max-h-[140px] sm:max-h-[170px] lg:max-h-[190px] object-contain drop-shadow-sm transition-transform"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
+            <div className="w-full flex justify-center items-center -mt-14">
+  <img
+    src="/car.png"
+    alt="Student campus ride illustration"
+    className="w-auto max-h-[220px] sm:max-h-[260px] lg:max-h-[320px] xl:max-h-[360px] object-contain drop-shadow-sm transition-transform"
+    onError={(e) => {
+      e.currentTarget.style.display = 'none';
+    }}
+  />
+</div>
 
               {/* Verified Trust Strip */}
               <div className="bg-[#FFFBF8] rounded-2xl p-3 border border-[#F4E3D8] flex items-center gap-2.5 text-xs text-[#555E70]">
@@ -298,7 +312,7 @@ export default function OfferRidePage() {
             {/* RIGHT COLUMN: TRAVEL DETAILS FORM                                   */}
             {/* ------------------------------------------------------------------- */}
             <div className="lg:col-span-7 bg-[#FFFBF8] rounded-[24px] p-4 sm:p-6 border border-[#F4E3D8] shadow-xs">
-              
+
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#F4E3D8]">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center">
@@ -318,10 +332,10 @@ export default function OfferRidePage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                
+
                 {/* Route Section: From & To */}
                 <div className="relative space-y-2">
-                  
+
                   {/* From Field */}
                   <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-[#F4E3D8] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
                     <div className="flex items-center gap-1.5 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-0.5">
@@ -387,7 +401,7 @@ export default function OfferRidePage() {
 
                 {/* Date & Time Grid */}
                 <div className="grid grid-cols-2 gap-2.5">
-                  
+
                   {/* Date */}
                   <div className="bg-white rounded-xl p-2.5 border border-[#F4E3D8] focus-within:border-[#FF572E] transition-all">
                     <label className="flex items-center gap-1 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-0.5">
@@ -430,16 +444,15 @@ export default function OfferRidePage() {
                   </div>
 
                   <div className="grid grid-cols-4 gap-2">
-                    
+
                     {/* Omni */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Omni')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
-                        preferredCar === 'Omni'
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Omni'
                           ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
+                        }`}
                     >
                       {preferredCar === 'Omni' && (
                         <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
@@ -454,11 +467,10 @@ export default function OfferRidePage() {
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Creta')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
-                        preferredCar === 'Creta'
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Creta'
                           ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
+                        }`}
                     >
                       {preferredCar === 'Creta' && (
                         <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
@@ -473,11 +485,10 @@ export default function OfferRidePage() {
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Eeco')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
-                        preferredCar === 'Eeco'
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Eeco'
                           ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
+                        }`}
                     >
                       {preferredCar === 'Eeco' && (
                         <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
@@ -492,11 +503,10 @@ export default function OfferRidePage() {
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Other')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
-                        preferredCar === 'Other'
+                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Other'
                           ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
+                        }`}
                     >
                       {preferredCar === 'Other' && (
                         <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
@@ -515,7 +525,7 @@ export default function OfferRidePage() {
 
                 {/* Co-travellers Counter & Fuel Split Price */}
                 <div className="flex items-center justify-between gap-3 bg-white rounded-xl p-2.5 sm:p-3 border border-[#F4E3D8]">
-                  
+
                   {/* Travellers Info */}
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
@@ -531,7 +541,7 @@ export default function OfferRidePage() {
 
                   {/* Counter [- 1 +] & Price Input */}
                   <div className="flex items-center gap-2.5">
-                    
+
                     {mode === 'offer' && (
                       <div className="flex items-center gap-1 bg-[#FFFBF8] rounded-lg px-2 py-1 border border-[#F4E3D8]">
                         <span className="font-bold text-[#FF572E] text-xs">₹</span>
@@ -587,11 +597,11 @@ export default function OfferRidePage() {
                   >
                     <Search className="w-4 h-4 stroke-[2.5]" />
                     <span>
-                      {loading 
-                        ? 'Processing...' 
-                        : mode === 'offer' 
-                        ? 'Offer Ride →' 
-                        : 'Find Rides →'}
+                      {loading
+                        ? 'Processing...'
+                        : mode === 'offer'
+                          ? 'Offer Ride →'
+                          : 'Find Rides →'}
                     </span>
                   </button>
                 </div>

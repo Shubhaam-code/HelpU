@@ -26,7 +26,11 @@ export default function BookSeatPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await createBooking({ travelId: id || travel?._id, seatsBooked: seats });
+      const res = await createBooking({ 
+        travelId: id || travel?._id, 
+        requestedSeats: seats,
+        seatsBooked: seats 
+      });
       const booking = res.data?.data || res.data;
       navigate(`/bookings/${booking._id}`, { replace: true });
     } catch (err) {
@@ -49,7 +53,7 @@ export default function BookSeatPage() {
         >
           <div className="flex items-center gap-2 text-white/80 text-sm mb-2">
             <Car className="w-4 h-4" />
-            <span>{travel?.from || 'VIT, Bhopal'} → {travel?.to || 'Bhopal Railway Station'}</span>
+            <span>{(travel?.source || travel?.from) || 'VIT, Bhopal'} → {(travel?.destination || travel?.to) || 'Bhopal Railway Station'}</span>
           </div>
           <div className="text-sm text-white/80">{formatDate(travel?.departureTime)}</div>
         </motion.div>

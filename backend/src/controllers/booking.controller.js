@@ -13,7 +13,9 @@ import { cancelBookingReminders } from '../services/reminder.service.js';
  */
 export async function createBookingRequest(req, res) {
   try {
-    const { travelId, requestedSeats } = req.body;
+    const rawSeats = req.body.requestedSeats ?? req.body.seatsBooked ?? req.body.seats;
+    const { travelId } = req.body;
+    const requestedSeats = rawSeats;
     const passengerId = req.userId;
 
     // 1. Validate requestedSeats (must be a positive integer)
@@ -877,6 +879,51 @@ export async function cancelBooking(req, res) {
     }
   }
 }
+
+/**
+ * @route   GET /api/bookings/:id
+ * @desc    Get booking details by ID
+ * @access  Protected (Owner or Passenger)
+ */
+export async function getBookingById(req, res) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid booking ID format' });
+    }
+
+    const booking = await Booking.findById(id).populate('travelId').lean();
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.ownerId !== req.userId && booking.passengerId !== req.userId) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Not authorized to view this booking' });
+    }
+
+    const [ownerStudent, passengerStudent] = await Promise.all([
+      Student.findOne({ clerkId: booking.ownerId }).lean(),
+      Student.findOne({ clerkId: booking.passengerId }).lean()
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...booking,
+        ownerStudent,
+        passengerStudent
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching booking by ID:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching booking',
+      error: error.message
+    });
+  }
+}
+
 
 
 

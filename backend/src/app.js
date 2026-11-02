@@ -6,6 +6,8 @@ import studentRoutes from './routes/student.routes.js';
 import travelRoutes from './routes/travel.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import communityRoutes from './routes/community.routes.js';
+import helpRoutes from './routes/help.routes.js';
 
 const app = express();
 
@@ -28,6 +30,8 @@ app.use('/api/students', studentRoutes);
 app.use('/api/travels', travelRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/help', helpRoutes);
 
 export default app;
 

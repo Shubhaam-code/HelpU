@@ -4,6 +4,7 @@ import {
   createBookingRequest,
   getReceivedBookings,
   getMyBookings,
+  getBookingById,
   respondToBookingRequest,
   getWhatsAppDetails,
   confirmBooking,
@@ -32,6 +33,13 @@ router.get('/received', requireAuth, getReceivedBookings);
  * @access  Protected
  */
 router.get('/my', requireAuth, getMyBookings);
+
+/**
+ * @route   GET /api/bookings/:id
+ * @desc    Get booking details by ID
+ * @access  Protected (Owner or Passenger only)
+ */
+router.get('/:id', requireAuth, getBookingById);
 
 /**
  * @route   GET /api/bookings/:id/whatsapp-details
