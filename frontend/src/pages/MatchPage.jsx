@@ -81,48 +81,50 @@ export default function MatchPage() {
     };
   }, [allTravels, myBookings, receivedBookings]);
 
-  // Dynamic Popular Routes based on real data or campus defaults
+  // Dynamic Popular Routes: purely aggregated from real database entries (zero hardcoded routes)
   const popularRoutes = useMemo(() => {
-    const baseRoutes = [
-      {
-        from: 'VIT, Bhopal',
-        to: 'Bhopal Railway Station',
-        schedule: 'Every Weekend',
-        filterKey: 'railway'
-      },
-      {
-        from: 'VIT, Bhopal',
-        to: 'Raja Bhoj Airport',
-        schedule: 'Friday & Sunday',
-        filterKey: 'airport'
-      },
-      {
-        from: 'VIT, Bhopal',
-        to: 'Indore City',
-        schedule: 'Long Weekends',
-        filterKey: 'indore'
-      },
-      {
-        from: 'VIT, Bhopal',
-        to: 'DB City Mall',
-        schedule: 'Saturdays',
-        filterKey: 'mall'
+    if (!Array.isArray(allTravels) || allTravels.length === 0) {
+      return [];
+    }
+
+    const routeMap = new Map();
+
+    allTravels.forEach((t) => {
+      const from = (t.source || t.from || '').trim();
+      const to = (t.destination || t.to || '').trim();
+      if (!from || !to) return;
+
+      const key = `${from.toLowerCase()}___${to.toLowerCase()}`;
+      
+      let scheduleText = 'Active Ride';
+      if (t.travelDate) {
+        const d = new Date(t.travelDate);
+        if (!isNaN(d.getTime())) {
+          scheduleText = d.toLocaleDateString('en-IN', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          });
+        }
       }
-    ];
 
-    return baseRoutes.map((route) => {
-      // Count matches from real database
-      const liveCount = allTravels.filter((t) => {
-        const dest = (t.destination || t.to || '').toLowerCase();
-        const src = (t.source || t.from || '').toLowerCase();
-        return dest.includes(route.filterKey) || src.includes(route.filterKey);
-      }).length;
-
-      return {
-        ...route,
-        activeCount: liveCount > 0 ? liveCount : (allTravels.length > 0 ? Math.max(1, Math.round(allTravels.length / 4)) : 0)
-      };
+      if (!routeMap.has(key)) {
+        routeMap.set(key, {
+          from,
+          to,
+          activeCount: 1,
+          schedule: scheduleText,
+        });
+      } else {
+        const existing = routeMap.get(key);
+        existing.activeCount += 1;
+      }
     });
+
+    return Array.from(routeMap.values())
+      .filter((r) => r.activeCount > 0)
+      .sort((a, b) => b.activeCount - a.activeCount)
+      .slice(0, 6);
   }, [allTravels]);
 
   // Handle route click -> navigate to rides with filters
@@ -381,38 +383,40 @@ export default function MatchPage() {
 
 
               {/* ------------------------------------------------------------------- */}
-              {/* BOTTOM SECTION: POPULAR TRAVEL MATCH ROUTES                         */}
+              {/* BOTTOM SECTION: POPULAR TRAVEL MATCH ROUTES (Rendered only on real entries) */}
               {/* ------------------------------------------------------------------- */}
-              <div className="bg-white rounded-[28px] p-6 sm:p-7 border border-[#F4E3D8]/90 shadow-xs">
-                <h2 className="text-lg sm:text-xl font-black text-[#17233C] mb-4 tracking-tight">
-                  Popular Travel Match Routes
-                </h2>
+              {popularRoutes.length > 0 && (
+                <div className="bg-white rounded-[28px] p-6 sm:p-7 border border-[#F4E3D8]/90 shadow-xs">
+                  <h2 className="text-lg sm:text-xl font-black text-[#17233C] mb-4 tracking-tight">
+                    Popular Travel Match Routes
+                  </h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-                  {popularRoutes.map((route, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => handleRouteClick(route)}
-                      className="bg-[#FFFBF8] hover:bg-white rounded-2xl p-4 border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
-                    >
-                      <div>
-                        <div className="font-extrabold text-[#17233C] text-sm sm:text-base group-hover:text-[#FF572E] transition-colors flex items-center gap-1.5">
-                          <span>{route.from}</span>
-                          <span className="text-[#FF572E]">→</span>
-                          <span>{route.to}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                    {popularRoutes.map((route, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleRouteClick(route)}
+                        className="bg-[#FFFBF8] hover:bg-white rounded-2xl p-4 border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
+                      >
+                        <div>
+                          <div className="font-extrabold text-[#17233C] text-sm sm:text-base group-hover:text-[#FF572E] transition-colors flex items-center gap-1.5">
+                            <span>{route.from}</span>
+                            <span className="text-[#FF572E]">→</span>
+                            <span>{route.to}</span>
+                          </div>
+                          <div className="text-xs text-[#6E7587] mt-0.5 font-medium">
+                            {route.schedule}
+                          </div>
                         </div>
-                        <div className="text-xs text-[#6E7587] mt-0.5 font-medium">
-                          {route.schedule}
+
+                        <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#EAF8F0] border border-[#BCECD4] text-[#16A34A] text-xs font-black shrink-0">
+                          {route.activeCount} Active
                         </div>
                       </div>
-
-                      <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#EAF8F0] border border-[#BCECD4] text-[#16A34A] text-xs font-black shrink-0">
-                        {route.activeCount} Active
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
             </motion.div>
           ) : (
