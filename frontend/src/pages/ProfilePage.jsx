@@ -1,69 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import {
-  Calendar, Car, Heart, HelpCircle, Settings, ChevronRight, LogOut
+  Calendar, Car, Heart, HelpCircle, Settings, ChevronRight, LogOut,
+  ShieldCheck, Mail, Phone, GraduationCap, BookOpen, Edit3, CheckCircle2,
+  ArrowRight, Sparkles, X, User as UserIcon
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { AVATARS } from '../lib/avatars';
 import { getProfile, saveProfile, getMyBookings, getMyTravels } from '../lib/api';
-
-function AvatarPicker({ current, onSelect }) {
-  return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs" 
-      onClick={(e) => e.target === e.currentTarget && onSelect(null)}
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
-      >
-        <h3 className="font-extrabold text-navy text-lg mb-4 text-center">
-          Choose Your Campus Avatar
-        </h3>
-        <div className="grid grid-cols-5 gap-3 mb-6">
-          {AVATARS.map((av) => (
-            <motion.button
-              key={av.id}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => onSelect(av.id)}
-              className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all cursor-pointer ${
-                current === av.id ? 'bg-coral/10 ring-2 ring-coral' : 'hover:bg-cream'
-              }`}
-            >
-              <Avatar avatarId={av.id} size="sm" />
-              <span className="text-[10px] font-bold text-navy">{av.label}</span>
-            </motion.button>
-          ))}
-        </div>
-        <button
-          onClick={() => onSelect(null)}
-          className="w-full py-2.5 text-center text-text-secondary font-bold text-xs hover:text-navy cursor-pointer"
-        >
-          Cancel
-        </button>
-      </motion.div>
-    </div>
-  );
-}
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useClerk();
+
+  // Data states
   const [profile, setProfile] = useState(null);
   const [ridesCount, setRidesCount] = useState(0);
   const [bookingsCount, setBookingsCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
+  // Edit profile modal state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCollege, setEditCollege] = useState('');
+  const [editCourse, setEditCourse] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const fetchProfile = useCallback(async () => {
     try {
+      setLoading(true);
       const [profRes, bookingsRes, travelsRes] = await Promise.allSettled([
         getProfile(),
         getMyBookings(),
@@ -71,139 +44,468 @@ export default function ProfilePage() {
       ]);
 
       if (profRes.status === 'fulfilled') {
-        setProfile(profRes.value.data?.data);
+        const p = profRes.value.data?.data;
+        setProfile(p);
+        setEditName(p?.name || user?.fullName || '');
+        setEditPhone(p?.phone || user?.primaryPhoneNumber?.phoneNumber || '');
+        setEditCollege(p?.college || 'VIT, Bhopal');
+        setEditCourse(p?.course || 'B.Tech Computer Science');
       }
       if (bookingsRes.status === 'fulfilled') {
-        setBookingsCount(bookingsRes.value.data?.data?.length || 0);
+        const bList = bookingsRes.value.data?.data || bookingsRes.value.data?.bookings || [];
+        setBookingsCount(Array.isArray(bList) ? bList.length : 0);
       }
       if (travelsRes.status === 'fulfilled') {
         const list = travelsRes.value.data?.data || travelsRes.value.data?.travels || [];
-        setRidesCount(list.length);
+        setRidesCount(Array.isArray(list) ? list.length : 0);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error loading profile:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
-  useEffect(() => { fetchProfile(); }, [fetchProfile]);
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
-  const handleAvatarSelect = async (avatarId) => {
-    if (!avatarId) { setShowAvatarPicker(false); return; }
+  // Handle Edit Profile Save
+  const handleSaveProfile = async (e) => {
+    e?.preventDefault();
+    setIsSaving(true);
+    setSaveError('');
+    setSaveSuccess(false);
+
     try {
-      await saveProfile({ ...profile, avatarId });
-      setProfile((p) => ({ ...p, avatarId }));
+      const payload = {
+        name: editName.trim() || user?.fullName || 'Campus Student',
+        email: profile?.email || user?.primaryEmailAddress?.emailAddress || '',
+        phone: editPhone.trim(),
+        college: editCollege.trim(),
+        course: editCourse.trim(),
+        imageUrl: user?.imageUrl || profile?.imageUrl || ''
+      };
+
+      const res = await saveProfile(payload);
+      const updated = res.data?.data || payload;
+      setProfile(updated);
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setIsEditing(false);
+        setSaveSuccess(false);
+      }, 1200);
     } catch (err) {
-      console.error(err);
+      console.error('Save profile error:', err);
+      setSaveError(err.response?.data?.message || err.message || 'Failed to update profile.');
+    } finally {
+      setIsSaving(false);
     }
-    setShowAvatarPicker(false);
   };
 
-  const menuItems = [
-    { icon: Calendar, label: 'My Bookings', path: '/bookings' },
-    { icon: Car, label: 'My Offers & Requests', path: '/rides' },
-    { icon: Heart, label: 'Saved Rides', path: '/saved' },
-    { icon: HelpCircle, label: 'Help & Support', path: '/support' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+  const navMenuItems = [
+    { icon: Calendar, label: 'My Bookings', subtitle: 'View upcoming and active ride seats', path: '/bookings' },
+    { icon: Car, label: 'Offers & Requests', subtitle: 'Manage your campus travel posts', path: '/rides' },
+    { icon: Heart, label: 'Saved Rides', subtitle: 'Frequently used routes & bookmarks', path: '/saved' },
+    { icon: HelpCircle, label: 'Campus Help & Support', subtitle: 'Campus assistance and student FAQs', path: '/help' },
+    { icon: Settings, label: 'Account Settings', subtitle: 'Notifications, privacy & security', path: '/settings' },
   ];
 
   return (
     <ResponsiveShell
+      hideSidebarOnDesktop={true}
       avatarId={profile?.avatarId}
-      customMobileHeader={<AppHeader title="Profile" backTo={false} />}
+      customMobileHeader={
+        <AppHeader 
+          title="Student Profile" 
+          backTo={false} 
+          src={profile?.imageUrl || user?.imageUrl}
+        />
+      }
     >
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 lg:py-8">
+      <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         
-        {/* Profile Card Container */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100/80 overflow-hidden">
-          
-          {/* Header Banner Illustration */}
-          <div className="relative h-44 sm:h-52 bg-gradient-to-r from-sky via-lavender to-peach overflow-hidden">
-            <svg viewBox="0 0 430 176" fill="none" className="absolute inset-0 w-full h-full object-cover">
-              <circle cx="350" cy="50" r="35" fill="#FFE6CB" opacity="0.9" />
-              <rect x="150" y="60" width="130" height="116" rx="4" fill="#E9E0FF" />
-              <rect x="180" y="40" width="70" height="36" rx="4" fill="#C9F2DE" />
-              <path d="M145 60 L215 20 L285 60" fill="#BBDFFF" />
-              <circle cx="80" cy="130" r="30" fill="#C9F2DE" />
-              <circle cx="370" cy="120" r="25" fill="#C9F2DE" />
-              <rect x="0" y="155" width="430" height="21" fill="#C9F2DE" />
-            </svg>
+        {/* ========================================================================= */}
+        {/* 1. HERO PROFILE CARD                                                      */}
+        {/* ========================================================================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[32px] border border-[#F4E3D8]/90 shadow-xs overflow-hidden"
+        >
+          {/* Warm decorative cover banner */}
+          <div className="h-32 sm:h-40 bg-gradient-to-r from-[#FFF0E7] via-[#FFE5D8] to-[#FFF5ED] relative overflow-hidden">
+            <div className="absolute right-0 top-0 bottom-0 w-2/3 bg-gradient-to-l from-white/30 to-transparent pointer-events-none" />
+            <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-[#FF572E]/10 blur-xl pointer-events-none" />
+            <div className="absolute top-4 right-5 sm:right-7">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 text-[#FF572E] text-xs font-black shadow-xs backdrop-blur-xs">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Verified Student</span>
+              </span>
+            </div>
           </div>
 
-          {/* Profile Details */}
-          <div className="px-6 pb-8 -mt-16 sm:-mt-20 relative z-10 flex flex-col items-center">
+          {/* Profile Details Container */}
+          <div className="px-6 sm:px-8 pb-7 -mt-16 sm:-mt-20 relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-5">
             
-            {/* Avatar with edit badge */}
-            <button
-              onClick={() => setShowAvatarPicker(true)}
-              className="relative group cursor-pointer"
-            >
-              <Avatar avatarId={profile?.avatarId} size="2xl" ring />
-              <div className="absolute bottom-1 right-1 w-8 h-8 bg-coral rounded-full border-2 border-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                <span className="text-white text-xs">✏️</span>
-              </div>
-            </button>
-
-            <h2 className="font-black text-navy text-2xl sm:text-3xl mt-3">
-              {profile?.name || user?.fullName || 'Campus Student'}
-            </h2>
-            <p className="text-text-secondary text-sm font-medium mt-1">
-              {profile?.college || 'Verified Campus Peer'}
-            </p>
-
-            {/* Stats Row */}
-            <div className="flex w-full max-w-md mt-6 bg-cream/60 rounded-2xl border border-gray-100 overflow-hidden divide-x divide-gray-100">
-              {[
-                { label: 'Rides Offered', value: ridesCount },
-                { label: 'Bookings', value: bookingsCount },
-                { label: 'Status', value: 'Verified ✓' },
-              ].map((s) => (
-                <div key={s.label} className="flex-1 text-center py-3.5">
-                  <div className="font-black text-navy text-lg sm:text-xl">{s.value}</div>
-                  <div className="text-text-secondary text-[11px] font-bold mt-0.5">{s.label}</div>
+            {/* Avatar & Names */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 text-center sm:text-left">
+              <div className="relative">
+                <Avatar 
+                  src={user?.imageUrl || profile?.imageUrl}
+                  name={profile?.name || user?.fullName}
+                  email={profile?.email || user?.primaryEmailAddress?.emailAddress}
+                  size={96}
+                  ring
+                  className="shadow-md border-4 border-white"
+                />
+                <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center text-white text-[10px] shadow-xs">
+                  ✓
                 </div>
-              ))}
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <h1 className="font-black text-[#17233C] text-xl sm:text-2xl tracking-tight">
+                    {profile?.name || user?.fullName || 'Campus Student'}
+                  </h1>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#3B82F6] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full border border-[#DBEAFE]">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>ID Verified</span>
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-[#6E7587]">
+                  <span className="flex items-center gap-1 font-semibold">
+                    <GraduationCap className="w-3.5 h-3.5 text-[#FF572E]" />
+                    <span>{profile?.college || 'VIT, Bhopal'}</span>
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 font-semibold text-[#17233C]">
+                    <Mail className="w-3.5 h-3.5 text-[#8C93A4]" />
+                    <span className="truncate max-w-[200px]">{user?.primaryEmailAddress?.emailAddress || profile?.email}</span>
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Menu Links */}
-            <div className="w-full mt-6 bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => navigate(item.path)}
-                    className="w-full flex items-center gap-4 px-5 py-4 hover:bg-cream/40 transition-colors cursor-pointer text-left"
-                  >
-                    <div className="w-9 h-9 bg-cream rounded-xl flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-coral" />
-                    </div>
-                    <span className="flex-1 font-bold text-navy text-sm">{item.label}</span>
-                    <ChevronRight className="w-4 h-4 text-text-secondary" />
-                  </button>
-                );
-              })}
+            {/* Edit Profile CTA */}
+            <div className="flex items-center justify-center sm:justify-end gap-2.5">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-[#FFF7F2] text-[#17233C] hover:text-[#FF572E] border border-[#F4E3D8] hover:border-[#FF572E]/40 rounded-full text-xs font-bold shadow-2xs transition-all cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-[#FF572E]" />
+                <span>Edit Profile</span>
+              </button>
             </div>
 
-            {/* Sign Out Button */}
-            <button
-              onClick={() => signOut()}
-              className="mt-6 w-full max-w-xs flex items-center justify-center gap-2 py-3.5 text-red-500 font-bold text-sm bg-red-50/70 hover:bg-red-50 rounded-2xl transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
+          </div>
+        </motion.div>
 
+
+        {/* ========================================================================= */}
+        {/* 2. STATS ROW (3 CLEAN CARDS)                                              */}
+        {/* ========================================================================= */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+          
+          <div className="bg-white rounded-[24px] p-5 border border-[#F4E3D8]/90 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center shrink-0">
+              <Car className="w-6 h-6 stroke-[2.2]" />
+            </div>
+            <div>
+              <span className="font-black text-2xl text-[#17233C] block leading-tight">
+                {ridesCount}
+              </span>
+              <span className="text-xs font-bold text-[#6E7587]">
+                Rides Offered
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[24px] p-5 border border-[#F4E3D8]/90 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
+              <Calendar className="w-6 h-6 stroke-[2.2]" />
+            </div>
+            <div>
+              <span className="font-black text-2xl text-[#17233C] block leading-tight">
+                {bookingsCount}
+              </span>
+              <span className="text-xs font-bold text-[#6E7587]">
+                Campus Bookings
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[24px] p-5 border border-[#F4E3D8]/90 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-6 h-6 stroke-[2.2]" />
+            </div>
+            <div>
+              <span className="font-black text-2xl text-[#16A34A] block leading-tight">
+                Active
+              </span>
+              <span className="text-xs font-bold text-[#6E7587]">
+                Student Verification
+              </span>
+            </div>
           </div>
 
         </div>
 
+
+        {/* ========================================================================= */}
+        {/* 3. PROFILE INFORMATION & VERIFIED DETAILS CARD                            */}
+        {/* ========================================================================= */}
+        <div className="bg-white rounded-[28px] p-6 sm:p-7 border border-[#F4E3D8]/90 shadow-xs space-y-5">
+          <div className="flex items-center justify-between border-b border-[#F4E3D8]/70 pb-4">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-[#17233C]">
+                Academic & Contact Details
+              </h2>
+              <p className="text-xs text-[#6E7587] font-medium mt-0.5">
+                Verified campus credentials for carpooling and ridesharing trust.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-xs font-bold text-[#FF572E] hover:underline cursor-pointer"
+            >
+              Edit Details
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            
+            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
+                Full Name
+              </span>
+              <span className="font-extrabold text-[#17233C] text-sm block">
+                {profile?.name || user?.fullName || 'Campus Student'}
+              </span>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
+                College Email Address
+              </span>
+              <span className="font-extrabold text-[#17233C] text-sm block truncate">
+                {user?.primaryEmailAddress?.emailAddress || profile?.email || 'student@vitbhopal.ac.in'}
+              </span>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
+                Contact Phone / WhatsApp
+              </span>
+              <span className="font-extrabold text-[#17233C] text-sm block">
+                {profile?.phone || user?.primaryPhoneNumber?.phoneNumber || 'Not added yet'}
+              </span>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
+                College / Institution
+              </span>
+              <span className="font-extrabold text-[#17233C] text-sm block">
+                {profile?.college || 'VIT, Bhopal'}
+              </span>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8] sm:col-span-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
+                Program & Course
+              </span>
+              <span className="font-extrabold text-[#17233C] text-sm block">
+                {profile?.course || 'B.Tech - Computer Science & Engineering'}
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+
+        {/* ========================================================================= */}
+        {/* 4. QUICK LINKS / MENU                                                     */}
+        {/* ========================================================================= */}
+        <div className="bg-white rounded-[28px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs">
+          <h3 className="font-black text-[#17233C] text-base mb-4 px-2">
+            Quick Navigation
+          </h3>
+
+          <div className="divide-y divide-[#F4E3D8]/60">
+            {navMenuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  onClick={() => navigate(item.path)}
+                  className="flex items-center justify-between p-3.5 hover:bg-[#FFFBF8] rounded-2xl transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-[#FFF4ED] text-[#FF572E] group-hover:bg-[#FF572E] group-hover:text-white flex items-center justify-center shrink-0 transition-all">
+                      <Icon className="w-4.5 h-4.5 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-[#17233C] text-xs sm:text-sm group-hover:text-[#FF572E] transition-colors">
+                        {item.label}
+                      </h4>
+                      <p className="text-[11px] text-[#6E7587]">
+                        {item.subtitle}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="w-7 h-7 rounded-full bg-white border border-[#F4E3D8] flex items-center justify-center text-[#6E7587] group-hover:text-[#FF572E] group-hover:border-[#FF572E]/40 shadow-2xs transition-all">
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+
+        {/* ========================================================================= */}
+        {/* 5. LOGOUT BUTTON                                                          */}
+        {/* ========================================================================= */}
+        <div className="pt-2 flex justify-center">
+          <button
+            onClick={() => signOut()}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs sm:text-sm transition-all cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out of Account</span>
+          </button>
+        </div>
+
       </div>
 
-      {showAvatarPicker && (
-        <AvatarPicker current={profile?.avatarId} onSelect={handleAvatarSelect} />
-      )}
+
+      {/* ========================================================================= */}
+      {/* EDIT PROFILE MODAL                                                        */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {isEditing && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && setIsEditing(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[32px] p-6 sm:p-8 max-w-lg w-full border border-[#F4E3D8] shadow-2xl space-y-5"
+            >
+              <div className="flex items-center justify-between border-b border-[#F4E3D8]/70 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center">
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-black text-[#17233C] text-base sm:text-lg">
+                    Edit Student Profile
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="w-8 h-8 rounded-full bg-[#FFFBF8] hover:bg-[#F4E3D8] text-[#6E7587] flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1.5">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1.5">
+                    WhatsApp / Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1.5">
+                    College / Campus
+                  </label>
+                  <input
+                    type="text"
+                    value={editCollege}
+                    onChange={(e) => setEditCollege(e.target.value)}
+                    placeholder="VIT, Bhopal"
+                    className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1.5">
+                    Program / Course
+                  </label>
+                  <input
+                    type="text"
+                    value={editCourse}
+                    onChange={(e) => setEditCourse(e.target.value)}
+                    placeholder="B.Tech Computer Science"
+                    className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
+                  />
+                </div>
+
+                {saveError && (
+                  <div className="p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold">
+                    {saveError}
+                  </div>
+                )}
+
+                {saveSuccess && (
+                  <div className="p-3 rounded-xl bg-[#EDFAF3] text-[#16A34A] text-xs font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Profile updated successfully!</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 text-xs font-bold text-[#6E7587] hover:text-[#17233C] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-6 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-full shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </ResponsiveShell>
   );
 }

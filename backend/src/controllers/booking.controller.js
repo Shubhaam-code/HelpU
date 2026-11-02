@@ -97,19 +97,23 @@ export async function createBookingRequest(req, res) {
       });
     }
 
-    // 7. Prevent duplicate pending or accepted booking requests by the same passenger
+    // 7. Prevent duplicate pending, accepted, or confirmed booking requests by the same passenger
     const existingBooking = await Booking.findOne({
       travelId: travel._id,
       passengerId,
-      status: { $in: ['pending', 'accepted'] }
+      status: { $in: ['pending', 'accepted', 'confirmed'] }
     });
 
     if (existingBooking) {
       return res.status(400).json({
         success: false,
-        message: `You already have a ${existingBooking.status} booking request for this travel post`
+        message: `You already have an active (${existingBooking.status}) booking for this travel post`
       });
     }
+
+    const { passengerName, passengerEmail, passengerPhone, notes, passengerNotes } = req.body;
+    const pricePerSeat = travel.pricePerSeat || 350;
+    const totalPrice = numSeats * pricePerSeat;
 
     // 8. Create booking document with status: 'pending' inside transaction with Outbox event
     // Do NOT reserve or subtract seats at this stage (seats are deducted only upon final owner confirmation)
@@ -124,6 +128,11 @@ export async function createBookingRequest(req, res) {
             ownerId: travel.userId,
             passengerId,
             requestedSeats: numSeats,
+            passengerName: passengerName ? String(passengerName).trim() : undefined,
+            passengerEmail: passengerEmail ? String(passengerEmail).trim() : undefined,
+            passengerPhone: passengerPhone ? String(passengerPhone).trim() : undefined,
+            passengerNotes: (notes || passengerNotes) ? String(notes || passengerNotes).trim() : undefined,
+            totalPrice,
             status: 'pending'
           }
         ],

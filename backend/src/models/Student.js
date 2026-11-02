@@ -31,6 +31,10 @@ const studentSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    imageUrl: {
+      type: String,
+      trim: true
+    },
     avatarId: {
       type: String,
       default: null,

@@ -48,7 +48,7 @@ async function handleSaveProfile(req, res) {
       });
     }
 
-    const { name, email, phone, college, course, avatarId } = req.body;
+    const { name, email, phone, college, course, avatarId, imageUrl } = req.body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({
@@ -91,6 +91,10 @@ async function handleSaveProfile(req, res) {
 
     if (avatarId !== undefined) {
       updateData.avatarId = typeof avatarId === 'string' ? avatarId.trim() : null;
+    }
+
+    if (imageUrl !== undefined) {
+      updateData.imageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : '';
     }
 
     const student = await Student.findOneAndUpdate(

@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth, useUser, SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
 import { AnimatePresence } from 'framer-motion';
 
-import { setTokenGetter } from './lib/api';
+import { setTokenGetter, getProfile, saveProfile } from './lib/api';
 
 // Pages
 import OnboardingPage from './pages/OnboardingPage';
@@ -77,12 +77,35 @@ class ErrorBoundary extends Component {
   }
 }
 
-// Token injector component
+// Token injector & Profile picture auto-synchronization
 function TokenInjector() {
   const { getToken } = useAuth();
+  const { user, isLoaded, isSignedIn } = useUser();
+
   useEffect(() => {
     setTokenGetter(getToken);
   }, [getToken]);
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      getProfile()
+        .then((res) => {
+          const p = res.data?.data;
+          const currentImg = user.imageUrl;
+          if (!p || !p.imageUrl || (currentImg && p.imageUrl !== currentImg)) {
+            saveProfile({
+              name: p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Campus Student',
+              email: p?.email || user.primaryEmailAddress?.emailAddress || '',
+              phone: p?.phone || user.primaryPhoneNumber?.phoneNumber || '',
+              college: p?.college || 'VIT, Bhopal',
+              imageUrl: currentImg || ''
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isLoaded, isSignedIn, user]);
+
   return null;
 }
 

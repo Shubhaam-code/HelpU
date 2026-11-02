@@ -40,6 +40,22 @@ export default function RidesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Sync activeTab when query param ?tab= changes
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'offers') {
+      setActiveTab('Offers');
+    } else if (tabParam === 'requests') {
+      setActiveTab('Requests');
+    } else if (tabParam === 'all') {
+      setActiveTab('All');
+    }
+    const searchVal = searchParams.get('search') || searchParams.get('to');
+    if (searchVal !== null && searchVal !== undefined) {
+      setSearchQuery(searchVal);
+    }
+  }, [searchParams]);
+
   const fetchRides = useCallback(async () => {
     setLoading(true);
     setError('');

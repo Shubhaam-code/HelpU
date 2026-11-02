@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { requireAuth } from '../middlewares/auth.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
 import Student from '../models/Student.js';
+import Booking from '../models/Booking.js';
 import { findMatchesForTravel } from '../services/matching.service.js';
 
 const router = express.Router();
@@ -14,7 +15,7 @@ const router = express.Router();
  */
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { source, destination, travelDate, departureTime, timeFlexibility, seats, type } = req.body;
+    const { source, destination, travelDate, departureTime, timeFlexibility, seats, type, carModel, pricePerSeat, authorImage, authorName, authorEmail } = req.body;
 
     // 1. Validation for travel type
     if (!type || !['offer', 'request'].includes(type)) {
@@ -103,6 +104,11 @@ router.post('/', requireAuth, async (req, res) => {
       departureTime: numDepartureTime,
       timeFlexibility: numFlexibility,
       seats: numSeats,
+      pricePerSeat: Number(pricePerSeat) || 350,
+      carModel: carModel?.trim() || (type === 'offer' ? 'Campus Ride' : 'Co-traveler'),
+      authorImage: authorImage ? String(authorImage).trim() : null,
+      authorName: authorName ? String(authorName).trim() : null,
+      authorEmail: authorEmail ? String(authorEmail).trim() : null,
       status: 'active',
       expiresAt
     });
@@ -132,9 +138,13 @@ router.get('/', requireAuth, async (req, res) => {
     const now = new Date();
     const query = {
       status: 'active',
-      userId: { $ne: req.userId },
       expiresAt: { $gt: now }
     };
+
+    // If caller specifically requests to exclude their own rides
+    if (req.query.excludeMine === 'true') {
+      query.userId = { $ne: req.userId };
+    }
 
     if (req.query.type && ['offer', 'request'].includes(req.query.type)) {
       query.type = req.query.type;
@@ -164,10 +174,20 @@ router.get('/', requireAuth, async (req, res) => {
     const students = await Student.find({ clerkId: { $in: userIds } }).lean();
     const studentMap = new Map(students.map((s) => [s.clerkId, s]));
 
-    const enriched = travels.map((t) => ({
-      ...t,
-      student: studentMap.get(t.userId) || { name: 'Campus Student', avatarId: 'm1' }
-    }));
+    const enriched = travels.map((t) => {
+      const s = studentMap.get(t.userId);
+      return {
+        ...t,
+        isMine: t.userId === req.userId,
+        student: {
+          name: s?.name || t.authorName || 'Campus Student',
+          email: s?.email || t.authorEmail || '',
+          imageUrl: s?.imageUrl || t.authorImage || null,
+          college: s?.college || 'VIT, Bhopal',
+          phone: s?.phone || ''
+        }
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -238,11 +258,31 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const student = await Student.findOne({ clerkId: travel.userId }).lean();
 
+    // Compute real-time confirmed and available seats
+    const confirmedBookings = await Booking.find({
+      travelId: travel._id,
+      status: 'confirmed'
+    });
+    const confirmedSeats = confirmedBookings.reduce((sum, b) => sum + (b.requestedSeats || 0), 0);
+    const bookedSeats = Math.max(confirmedSeats, travel.bookedSeats || 0);
+    const availableSeats = Math.max(0, (travel.seats || 1) - bookedSeats);
+
     return res.status(200).json({
       success: true,
       data: {
         ...travel,
-        student: student || { name: 'Campus Student', avatarId: 'm1' }
+        bookedSeats,
+        availableSeats,
+        pricePerSeat: travel.pricePerSeat || 350,
+        carModel: travel.carModel || 'Campus Ride',
+        isMine: travel.userId === req.userId,
+        student: {
+          name: student?.name || travel.authorName || 'Campus Student',
+          email: student?.email || travel.authorEmail || '',
+          imageUrl: student?.imageUrl || travel.authorImage || null,
+          college: student?.college || 'VIT, Bhopal',
+          phone: student?.phone || ''
+        }
       }
     });
   } catch (error) {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, SignIn, SignUp } from '@clerk/clerk-react';
 import { 
-  Car, Users, ShieldCheck, Coins, ArrowRight, X, Play, Award
+  Car, Users, ShieldCheck, Coins, ArrowRight, X, Play, Award, Star
 } from 'lucide-react';
 
 // 3 decorative accent sparks \ | / matching reference image
@@ -179,46 +179,7 @@ export default function OnboardingPage() {
               </button>
             </div>
 
-            {/* Student Avatars & Campus Trust Badges */}
-            <div className="flex flex-wrap items-center gap-6 sm:gap-8 pt-2">
-              {/* Avatars */}
-              <div className="flex items-center gap-3">
-                <div className="flex -space-x-2.5 overflow-hidden">
-                  <div className="w-9 h-9 rounded-full border-2 border-[#FEF3EF] bg-[#FFE0D3] flex items-center justify-center text-sm shadow-xs font-bold text-[#17233C]">
-                    👨‍🎓
-                  </div>
-                  <div className="w-9 h-9 rounded-full border-2 border-[#FEF3EF] bg-[#FFD5E5] flex items-center justify-center text-sm shadow-xs font-bold text-[#17233C]">
-                    👩‍🎓
-                  </div>
-                  <div className="w-9 h-9 rounded-full border-2 border-[#FEF3EF] bg-[#D6E6FF] flex items-center justify-center text-sm shadow-xs font-bold text-[#17233C]">
-                    🧑‍💻
-                  </div>
-                </div>
-                <div className="text-left">
-                  <div className="font-black text-[#17233C] text-sm sm:text-[15px] leading-tight">
-                    5,000+ Students
-                  </div>
-                  <div className="text-[#6E7587] text-xs font-semibold">
-                    already connected
-                  </div>
-                </div>
-              </div>
 
-              {/* Campus Communities Badge */}
-              <div className="flex items-center gap-2.5 border-l border-[#EAD8CC] pl-6 sm:pl-8">
-                <div className="w-8 h-8 rounded-full bg-[#FFF0DE] text-[#D97706] flex items-center justify-center shrink-0">
-                  <Award className="w-5 h-5 text-[#D97706]" />
-                </div>
-                <div className="text-left">
-                  <div className="text-[10px] font-black tracking-wider text-[#A16207] uppercase leading-tight">
-                    TRUSTED BY
-                  </div>
-                  <div className="font-extrabold text-[#17233C] text-xs sm:text-sm">
-                    Campus Communities
-                  </div>
-                </div>
-              </div>
-            </div>
           </motion.div>
 
           {/*

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, ArrowLeft } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 
-export function AppHeader({ title, backTo, avatarId, onBell, unreadCount = 0, showLogo = false }) {
+export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 0, showLogo = false }) {
   const navigate = useNavigate();
 
   // Sub-page header (with back button)
@@ -49,9 +49,9 @@ export function AppHeader({ title, backTo, avatarId, onBell, unreadCount = 0, sh
             )}
           </button>
         )}
-        {avatarId !== undefined && (
+        {(avatarId !== undefined || src !== undefined) && (
           <button onClick={() => navigate('/profile')}>
-            <Avatar avatarId={avatarId} size="sm" ring />
+            <Avatar avatarId={avatarId} src={src} size="sm" ring />
           </button>
         )}
       </div>

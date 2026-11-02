@@ -53,6 +53,11 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {travel?.isMine && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EAF8F0] text-[#16A34A] border border-[#BCECD4]">
+                Your Ride
+              </span>
+            )}
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
               isOffer 
                 ? 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]' 

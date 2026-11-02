@@ -37,6 +37,27 @@ const bookingSchema = new mongoose.Schema(
         message: 'requestedSeats must be a positive integer'
       }
     },
+    passengerName: {
+      type: String,
+      trim: true
+    },
+    passengerEmail: {
+      type: String,
+      trim: true
+    },
+    passengerPhone: {
+      type: String,
+      trim: true
+    },
+    passengerNotes: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
+    totalPrice: {
+      type: Number,
+      min: 0
+    },
     status: {
       type: String,
       enum: {

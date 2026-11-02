@@ -426,7 +426,9 @@ export default function HomePage() {
                     {/* Matching Peer Avatar */}
                     <div className="relative">
                       <Avatar 
-                        avatarId={matchPeer?.student?.avatarId || 'f1'} 
+                        src={matchPeer?.student?.imageUrl || matchPeer?.authorImage || ((matchPeer?.userId === user?.id || matchPeer?.isMine) ? user?.imageUrl : null)}
+                        name={matchPeer?.student?.name || matchPeer?.authorName}
+                        email={matchPeer?.student?.email || matchPeer?.authorEmail}
                         size="md" 
                         ring 
                       />
@@ -479,7 +481,9 @@ export default function HomePage() {
                     {/* Driver Avatar & Info */}
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Avatar 
-                        avatarId={featuredRide.student?.avatarId || 'm2'} 
+                        src={featuredRide.student?.imageUrl || featuredRide.authorImage || ((featuredRide.userId === user?.id || featuredRide.isMine) ? user?.imageUrl : null)} 
+                        name={featuredRide.student?.name || featuredRide.authorName}
+                        email={featuredRide.student?.email || featuredRide.authorEmail}
                         size="md" 
                         ring 
                       />
@@ -635,9 +639,13 @@ export default function HomePage() {
                         {upcomingRide.from || upcomingRide.source || 'Bhopal'} → {upcomingRide.to || upcomingRide.destination || 'Station'}
                       </div>
                       <div className="text-[11px] text-[#6E7587] mt-0.5 flex items-center gap-1.5">
-                        <span>Today, 4:30 PM</span>
+                        <span>
+                          {upcomingRide.travelDate 
+                            ? new Date(upcomingRide.travelDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) + (typeof upcomingRide.departureTime === 'number' ? `, ${String(Math.floor(upcomingRide.departureTime / 60)).padStart(2, '0')}:${String(upcomingRide.departureTime % 60).padStart(2, '0')}` : '')
+                            : (upcomingRide.time || 'Upcoming')}
+                        </span>
                         <span>•</span>
-                        <span>{upcomingRide.seats || 2} seats</span>
+                        <span>{upcomingRide.seats || 1} {upcomingRide.seats === 1 ? 'seat' : 'seats'}</span>
                       </div>
                       <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#EDFAF3] border border-[#BCECD4] text-[#16A34A] text-[10px] font-bold">
                         {upcomingRide.status === 'confirmed' ? 'Confirmed' : 'Pending'}
@@ -686,8 +694,8 @@ export default function HomePage() {
                 <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
                   <div className="flex items-center gap-2.5 mb-2">
                     <Avatar 
-                      avatarId={latestPost.authorAvatar || 'm1'} 
-                      src={latestPost.authorImage}
+                      src={latestPost.authorImage || (latestPost.userId === user?.id ? user?.imageUrl : null)}
+                      name={latestPost.authorName}
                       size="sm" 
                     />
                     <div>

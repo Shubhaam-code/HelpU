@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useUser } from '@clerk/clerk-react';
 import {
   MapPin, Calendar, Clock, Users, ArrowUpDown,
   Search, Check, Sparkles, Car as CarIcon,
@@ -78,6 +79,7 @@ const POPULAR_LOCATIONS = [
 
 export default function OfferRidePage() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [searchParams] = useSearchParams();
   const initialMode = searchParams.get('mode') === 'request' ? 'request' : 'offer';
 
@@ -135,9 +137,14 @@ export default function OfferRidePage() {
           departureTime: departureMinutes,
           timeFlexibility: 30,
           seats: travellers,
+          pricePerSeat: Number(pricePerSeat) || 350,
+          carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
           type: 'offer',
+          authorImage: user?.imageUrl || null,
+          authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
+          authorEmail: user?.primaryEmailAddress?.emailAddress || null,
         });
-        navigate('/rides', { replace: true });
+        navigate('/rides?tab=offers', { replace: true });
       } else {
         // For "request" mode — post a travel request
         await createTravel({
@@ -147,9 +154,14 @@ export default function OfferRidePage() {
           departureTime: departureMinutes,
           timeFlexibility: 30,
           seats: travellers,
+          pricePerSeat: 0,
+          carModel: 'Ride Request',
           type: 'request',
+          authorImage: user?.imageUrl || null,
+          authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
+          authorEmail: user?.primaryEmailAddress?.emailAddress || null,
         });
-        navigate('/rides', { replace: true });
+        navigate('/rides?tab=requests', { replace: true });
       }
     } catch (err) {
       console.error('Ride post error:', err);
