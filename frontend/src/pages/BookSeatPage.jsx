@@ -63,12 +63,12 @@ export default function BookSeatPage() {
         >
           <Avatar avatarId={travel?.student?.avatarId || travel?.studentAvatarId || 'm2'} size="md" />
           <div>
-            <div className="font-semibold text-navy">{travel?.student?.name || travel?.studentName || 'Priya Singh'}</div>
+            <div className="font-semibold text-navy">{travel?.student?.name || travel?.studentName || 'Student Driver'}</div>
             <div className="flex items-center gap-1 text-xs text-text-secondary">
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
               <span>{travel?.rating || '4.9'}</span>
               <span className="mx-1">•</span>
-              <span>{travel?.carModel || 'Car • Hyundai i20'}</span>
+              <span>{travel?.carModel || (travel?.type === 'offer' ? 'Campus Carpool' : 'Ride Request')}</span>
             </div>
           </div>
         </motion.div>

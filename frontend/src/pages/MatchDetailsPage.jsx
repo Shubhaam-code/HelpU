@@ -1,31 +1,81 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Star, MapPin, Calendar, Users } from 'lucide-react';
+import { Star, MapPin, Calendar, Users, MessageSquare } from 'lucide-react';
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { EmptyState } from '../components/ui/EmptyState';
 import { formatDate } from '../lib/utils';
+import { openWhatsAppChat } from '../lib/whatsapp';
+import { getTravelById } from '../lib/api';
 
 export default function MatchDetailsPage() {
+  const { id } = useParams();
   const { state } = useLocation();
   const navigate = useNavigate();
-  const match = state?.match || {
-    _id: '1',
-    name: 'Priya Singh',
-    avatarId: 'f1',
-    rating: '4.9',
-    college: 'BTech CSE • VIT',
-    from: 'VIT',
-    to: 'Bhopal',
-    departureTime: new Date().toISOString(),
-    seats: 2,
-    pricePerSeat: 350,
-    about: 'Travelling to Bhopal. Serene and friendly. Let\'s travel together! ✨',
-    rides: 12,
-    mutualRides: 4,
-    responseRate: 98,
-  };
+
+  const [match, setMatch] = useState(state?.match || null);
+  const [loading, setLoading] = useState(!state?.match && Boolean(id));
+
+  useEffect(() => {
+    if (!state?.match && id) {
+      setLoading(true);
+      getTravelById(id)
+        .then((res) => {
+          const t = res.data?.data || res.data;
+          if (t) {
+            setMatch({
+              _id: t._id,
+              name: t.student?.name || t.studentName || 'Campus Peer',
+              avatarId: t.student?.avatarId || t.studentAvatarId || 'm1',
+              rating: t.student?.rating || t.rating || '4.9',
+              college: t.student?.college || 'Verified Campus Peer',
+              from: t.from,
+              to: t.to,
+              departureTime: t.departureTime,
+              seats: t.availableSeats || 2,
+              pricePerSeat: t.pricePerSeat || 0,
+              about: t.carModel ? `Travelling by ${t.carModel}. Connect on WhatsApp!` : 'Campus travel match. Connect on WhatsApp!',
+              phone: t.student?.phone || ''
+            });
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [id, state?.match]);
+
+  if (loading) {
+    return (
+      <ResponsiveShell customMobileHeader={<AppHeader title="Match Details" backTo={-1} />}>
+        <div className="max-w-xl mx-auto px-4 py-8">
+          <LoadingSkeleton count={3} />
+        </div>
+      </ResponsiveShell>
+    );
+  }
+
+  if (!match) {
+    return (
+      <ResponsiveShell customMobileHeader={<AppHeader title="Match Details" backTo={-1} />}>
+        <div className="max-w-xl mx-auto px-4 py-12">
+          <EmptyState
+            icon="🤝"
+            title="Match not found"
+            subtitle="This match may no longer be available. Explore active campus rides."
+            action={
+              <PrimaryButton variant="coral" onClick={() => navigate('/match')} fullWidth={false} className="px-6">
+                Browse Matches
+              </PrimaryButton>
+            }
+          />
+        </div>
+      </ResponsiveShell>
+    );
+  }
 
   return (
     <ResponsiveShell
@@ -52,7 +102,7 @@ export default function MatchDetailsPage() {
           <p className="text-text-secondary text-sm mt-1">{match.college}</p>
         </motion.div>
 
-        {/* Stats */}
+        {/* Status / Reliability */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -61,12 +111,12 @@ export default function MatchDetailsPage() {
         >
           <div className="grid grid-cols-3 divide-x divide-gray-100">
             {[
-              { label: 'Rides', value: match.rides || 12 },
-              { label: 'Mutual Rides', value: match.mutualRides || 4 },
-              { label: 'Response', value: `${match.responseRate || 98}%` },
+              { label: 'Community', value: 'Verified ✓' },
+              { label: 'Rating', value: `${match.rating || '4.9'} ★` },
+              { label: 'Seats', value: `${match.seats || 1} Open` },
             ].map((s) => (
               <div key={s.label} className="text-center px-2">
-                <div className="font-black text-navy text-xl">{s.value}</div>
+                <div className="font-black text-navy text-base sm:text-lg">{s.value}</div>
                 <div className="text-text-secondary text-xs mt-0.5">{s.label}</div>
               </div>
             ))}
@@ -83,8 +133,8 @@ export default function MatchDetailsPage() {
           {[
             { icon: <MapPin className="w-4 h-4 text-coral" />, text: `${match.from} → ${match.to}` },
             { icon: <Calendar className="w-4 h-4 text-coral" />, text: formatDate(match.departureTime) },
-            { icon: <Users className="w-4 h-4 text-coral" />, text: `${match.seats || 2} Seats` },
-            { icon: <span className="text-coral font-bold text-sm">₹</span>, text: `₹${match.pricePerSeat || 350} per seat` },
+            { icon: <Users className="w-4 h-4 text-coral" />, text: `${match.seats || 1} Seats Available` },
+            { icon: <span className="text-coral font-bold text-sm">₹</span>, text: match.pricePerSeat ? `₹${match.pricePerSeat} per seat` : 'Split Travel Cost' },
           ].map((row, i) => (
             <div key={i} className="flex items-center gap-3 text-sm text-navy">
               {row.icon}
@@ -108,14 +158,18 @@ export default function MatchDetailsPage() {
 
         {/* Action buttons */}
         <div className="flex gap-3">
-          <PrimaryButton
-            variant="outline"
-            onClick={() => navigate(`/chat/${match._id}`)}
-            className="flex-1"
-            fullWidth={false}
+          <button
+            type="button"
+            onClick={() => openWhatsAppChat({
+              phone: match.phone,
+              name: match.name,
+              route: `${match.from} → ${match.to}`
+            })}
+            className="flex-1 py-3 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm shadow-[#25D366]/20 transition-all cursor-pointer"
           >
-            💬 Message
-          </PrimaryButton>
+            <MessageSquare className="w-4 h-4" />
+            <span>Chat on WhatsApp</span>
+          </button>
           <PrimaryButton
             variant="coral"
             onClick={() => navigate('/book/match', { state: { travel: match } })}

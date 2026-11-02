@@ -10,7 +10,7 @@ import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AVATARS } from '../lib/avatars';
-import { getProfile, saveProfile } from '../lib/api';
+import { getProfile, saveProfile, getMyBookings, getMyTravels } from '../lib/api';
 
 function AvatarPicker({ current, onSelect }) {
   return (
@@ -57,13 +57,29 @@ export default function ProfilePage() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const [profile, setProfile] = useState(null);
+  const [ridesCount, setRidesCount] = useState(0);
+  const [bookingsCount, setBookingsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
-      const res = await getProfile();
-      setProfile(res.data?.data);
+      const [profRes, bookingsRes, travelsRes] = await Promise.allSettled([
+        getProfile(),
+        getMyBookings(),
+        getMyTravels(),
+      ]);
+
+      if (profRes.status === 'fulfilled') {
+        setProfile(profRes.value.data?.data);
+      }
+      if (bookingsRes.status === 'fulfilled') {
+        setBookingsCount(bookingsRes.value.data?.data?.length || 0);
+      }
+      if (travelsRes.status === 'fulfilled') {
+        const list = travelsRes.value.data?.data || travelsRes.value.data?.travels || [];
+        setRidesCount(list.length);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -130,18 +146,18 @@ export default function ProfilePage() {
             </button>
 
             <h2 className="font-black text-navy text-2xl sm:text-3xl mt-3">
-              {profile?.name || user?.fullName || 'Shubham Narayan'}
+              {profile?.name || user?.fullName || 'Campus Student'}
             </h2>
             <p className="text-text-secondary text-sm font-medium mt-1">
-              {profile?.college ? `${profile.college} • BTech CSE` : 'VIT Bhopal • BTech CSE'}
+              {profile?.college || 'Verified Campus Peer'}
             </p>
 
             {/* Stats Row */}
             <div className="flex w-full max-w-md mt-6 bg-cream/60 rounded-2xl border border-gray-100 overflow-hidden divide-x divide-gray-100">
               {[
-                { label: 'Rides', value: '12' },
-                { label: 'Bookings', value: '8' },
-                { label: 'Rating', value: '4.9 ★' },
+                { label: 'Rides Offered', value: ridesCount },
+                { label: 'Bookings', value: bookingsCount },
+                { label: 'Status', value: 'Verified ✓' },
               ].map((s) => (
                 <div key={s.label} className="flex-1 text-center py-3.5">
                   <div className="font-black text-navy text-lg sm:text-xl">{s.value}</div>

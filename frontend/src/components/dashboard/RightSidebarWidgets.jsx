@@ -1,11 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Users, CheckCircle, Clock, Heart, MessageCircle } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
+import { getMyBookings } from '../../lib/api';
 
 // 1. Your Match Activity
 export function MatchActivityWidget() {
   const navigate = useNavigate();
+  const [counts, setCounts] = useState({ matches: 0, confirmed: 0, pending: 0 });
+
+  useEffect(() => {
+    let isMounted = true;
+    getMyBookings()
+      .then((res) => {
+        if (!isMounted) return;
+        const bookings = res.data?.data || [];
+        const confirmed = bookings.filter((b) => b.status === 'confirmed').length;
+        const pending = bookings.filter((b) => b.status === 'pending').length;
+        setCounts({
+          matches: bookings.length,
+          confirmed,
+          pending,
+        });
+      })
+      .catch(() => {});
+
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
@@ -27,16 +48,16 @@ export function MatchActivityWidget() {
         <div className="bg-peach/40 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
           <div className="flex items-center gap-1 font-extrabold text-navy text-sm">
             <Users className="w-3.5 h-3.5 text-coral" />
-            <span>5</span>
+            <span>{counts.matches}</span>
           </div>
-          <span className="text-[10px] font-semibold text-text-secondary mt-0.5">Matches</span>
+          <span className="text-[10px] font-semibold text-text-secondary mt-0.5">Bookings</span>
         </div>
 
         {/* Confirmed */}
         <div className="bg-mint/50 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
           <div className="flex items-center gap-1 font-extrabold text-navy text-sm">
             <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-            <span>3</span>
+            <span>{counts.confirmed}</span>
           </div>
           <span className="text-[10px] font-semibold text-text-secondary mt-0.5">Confirmed</span>
         </div>
@@ -45,7 +66,7 @@ export function MatchActivityWidget() {
         <div className="bg-yellow-50 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
           <div className="flex items-center gap-1 font-extrabold text-navy text-sm">
             <Clock className="w-3.5 h-3.5 text-amber-500" />
-            <span>2</span>
+            <span>{counts.pending}</span>
           </div>
           <span className="text-[10px] font-semibold text-text-secondary mt-0.5">Pending</span>
         </div>
@@ -73,26 +94,38 @@ export function UpcomingBookingWidget({ booking }) {
         </button>
       </div>
 
-      <div 
-        onClick={() => navigate('/bookings/1')}
-        className="flex items-center justify-between p-3 rounded-2xl hover:bg-cream/50 transition-colors border border-gray-50 cursor-pointer"
-      >
-        <div className="flex items-center gap-3">
-          <Avatar avatarId={booking?.driverAvatarId || 'm3'} size="md" />
-          <div>
-            <div className="font-bold text-navy text-sm">
-              {booking?.route || 'Bhopal → VIT'}
-            </div>
-            <div className="text-xs text-text-secondary mt-0.5">
-              {booking?.time || 'Tomorrow, 8:00 AM'}
+      {booking ? (
+        <div 
+          onClick={() => navigate(`/bookings/${booking._id || '1'}`)}
+          className="flex items-center justify-between p-3 rounded-2xl hover:bg-cream/50 transition-colors border border-gray-50 cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <Avatar avatarId={booking?.driverAvatarId || 'm3'} size="md" />
+            <div>
+              <div className="font-bold text-navy text-sm">
+                {booking?.travel?.from || booking?.from || 'Campus'} → {booking?.travel?.to || booking?.to || 'Destination'}
+              </div>
+              <div className="text-xs text-text-secondary mt-0.5">
+                {booking?.departureTime || 'Upcoming Trip'}
+              </div>
             </div>
           </div>
-        </div>
 
-        <span className="bg-mint text-green-800 text-[11px] font-bold px-3 py-1 rounded-full">
-          Confirmed
-        </span>
-      </div>
+          <span className="bg-mint text-green-800 text-[11px] font-bold px-3 py-1 rounded-full">
+            {booking?.status || 'Confirmed'}
+          </span>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-cream/40 border border-dashed border-[#F4E3D8] text-center">
+          <p className="text-xs text-text-secondary font-medium">No upcoming bookings right now.</p>
+          <button
+            onClick={() => navigate('/rides')}
+            className="mt-2 text-xs font-bold text-coral hover:underline"
+          >
+            Explore available rides →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -128,13 +161,13 @@ export function CommunityActivityWidget() {
         <div className="flex items-center gap-2.5 mb-2">
           <Avatar avatarId="m2" size="sm" />
           <div>
-            <div className="font-bold text-navy text-xs">Ankit Mishra</div>
-            <div className="text-[10px] text-text-secondary">2h ago</div>
+            <div className="font-bold text-navy text-xs">Campus Student</div>
+            <div className="text-[10px] text-text-secondary">Community Update</div>
           </div>
         </div>
 
         <p className="text-xs text-navy font-medium leading-relaxed mb-3">
-          Anyone going to Bhopal this weekend? 2 seats available in my car. 🚗
+          Daily campus carpooling and weekend trips available. Connect on WhatsApp! 🚗
         </p>
 
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
@@ -158,7 +191,7 @@ export function CommunityActivityWidget() {
             onClick={() => navigate('/rides')}
             className="px-3 py-1 bg-coral text-white text-[11px] font-bold rounded-full hover:bg-coral/90 transition-colors shadow-xs cursor-pointer"
           >
-            Join Ride
+            Explore
           </button>
         </div>
       </div>

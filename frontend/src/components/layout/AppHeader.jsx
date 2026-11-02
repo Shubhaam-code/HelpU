@@ -25,13 +25,14 @@ export function AppHeader({ title, backTo, avatarId, onBell, unreadCount = 0, sh
   // Main home header
   return (
     <header className="flex items-center justify-between px-5 py-4 bg-cream sticky top-0 z-30">
-      {/* HelpU Logo */}
-      <div className="flex items-center gap-2">
-        <div className="w-9 h-9 bg-navy rounded-xl flex items-center justify-center shadow-sm">
-          <span className="text-white font-black text-lg leading-none">H</span>
-        </div>
+      {/* HelpU Logo from public folder */}
+      <button 
+        onClick={() => navigate('/home')}
+        className="flex items-center gap-2.5 focus:outline-none cursor-pointer"
+      >
+        <img src="/logo.png" alt="HelpU" className="h-8 w-auto object-contain" />
         <span className="font-black text-navy text-xl tracking-tight">HelpU</span>
-      </div>
+      </button>
 
       {/* Right actions */}
       <div className="flex items-center gap-3">

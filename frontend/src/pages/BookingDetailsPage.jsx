@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, Calendar, MapPin, Star, Users, Hash, XCircle } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Star, Users, Hash, XCircle, MessageSquare } from 'lucide-react';
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -9,6 +9,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { getBookingById, cancelBooking } from '../lib/api';
 import { formatDate, formatCurrency } from '../lib/utils';
+import { openWhatsAppChat } from '../lib/whatsapp';
 
 export default function BookingDetailsPage() {
   const { id } = useParams();
@@ -81,14 +82,14 @@ export default function BookingDetailsPage() {
             </div>
             <div className="flex flex-col justify-between py-0.5 flex-1">
               <div>
-                <div className="font-bold text-navy text-base">{travel?.from || 'VIT, Bhopal'}</div>
+                <div className="font-bold text-navy text-base">{travel?.from || 'Campus Origin'}</div>
               </div>
               <div className="flex items-center gap-1 text-xs text-text-secondary my-2">
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{formatDate(travel?.departureTime)}</span>
               </div>
               <div>
-                <div className="font-bold text-navy text-base">{travel?.to || 'Bhopal'}</div>
+                <div className="font-bold text-navy text-base">{travel?.to || 'Destination'}</div>
               </div>
             </div>
           </div>
@@ -103,16 +104,25 @@ export default function BookingDetailsPage() {
         >
           <Avatar avatarId={booking?.driverAvatarId || 'm1'} size="md" />
           <div className="flex-1">
-            <div className="font-semibold text-navy">{booking?.driverName || travel?.student?.name || 'Aman Verma'}</div>
+            <div className="font-semibold text-navy">{booking?.driverName || travel?.student?.name || 'Student Driver'}</div>
             <div className="flex items-center gap-1 text-xs text-text-secondary">
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
               <span>4.8</span>
               <span className="mx-1">•</span>
-              <span>Car (Hyundai i20)</span>
+              <span>{travel?.carModel || 'Campus Carpool'}</span>
             </div>
           </div>
-          <button className="p-2 hover:bg-gray-50 rounded-xl">
-            <span className="text-lg">💬</span>
+          <button 
+            onClick={() => openWhatsAppChat({
+              phone: booking?.driverPhone || travel?.student?.phone,
+              name: booking?.driverName || travel?.student?.name,
+              route: `${travel?.from || 'Campus'} → ${travel?.to || 'Destination'}`
+            })}
+            title="Chat on WhatsApp"
+            className="p-2.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 rounded-xl text-[#128C7E] flex items-center gap-1.5 font-bold text-xs cursor-pointer transition-colors"
+          >
+            <MessageSquare className="w-4 h-4 text-[#25D366]" />
+            <span className="hidden sm:inline">WhatsApp</span>
           </button>
         </motion.div>
 

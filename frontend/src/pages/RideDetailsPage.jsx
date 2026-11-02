@@ -57,14 +57,14 @@ export default function RideDetailsPage() {
           <div className="flex items-center gap-4">
             <Avatar avatarId={travel.student?.avatarId || travel.studentAvatarId || 'm1'} size="xl" />
             <div className="flex-1">
-              <div className="font-bold text-navy text-lg">{travel.student?.name || travel.studentName || 'Unknown'}</div>
+              <div className="font-bold text-navy text-lg">{travel.student?.name || travel.studentName || 'Campus Student'}</div>
               <div className="flex items-center gap-1 mt-1">
                 <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold text-navy">{travel.rating || '4.8'}</span>
+                <span className="font-semibold text-navy">{travel.rating || '4.9'}</span>
                 <span className="text-text-secondary text-sm ml-1">• {travel.type === 'offer' ? 'Car' : 'Request'}</span>
               </div>
               <div className="text-text-secondary text-sm mt-1">
-                {travel.carModel || 'Hyundai i20'}
+                {travel.carModel || (travel.type === 'offer' ? 'Campus Ride' : 'Ride Request')}
               </div>
             </div>
           </div>

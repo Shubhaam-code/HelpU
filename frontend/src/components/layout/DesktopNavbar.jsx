@@ -24,7 +24,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const navLinks = [
     { label: 'Home', path: '/home', icon: Home },
     { label: 'Rides', path: '/rides', icon: Car, hasDropdown: true },
-    { label: 'Match', path: '/match', icon: Users, badge: 'New' },
+    { label: 'Match', path: '/match', icon: Users },
     { label: 'Community', path: '/community', icon: Users },
     { label: 'Get Help', path: '/help', icon: Wrench },
     { label: 'About', path: '/about', icon: Info },
@@ -56,9 +56,11 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
             onClick={() => navigate('/home')} 
             className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
           >
-            <div className="w-9 h-9 bg-navy rounded-xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-              <span className="text-white font-black text-xl leading-none">H</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="HelpU" 
+              className="h-9 w-auto object-contain group-hover:scale-105 transition-transform" 
+            />
             <span className="font-black text-navy text-2xl tracking-tight">HelpU</span>
           </button>
         </div>

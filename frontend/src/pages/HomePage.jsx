@@ -87,7 +87,7 @@ export default function HomePage() {
     fetchData();
   }, [fetchData]);
 
-  const firstName = profile?.name?.split(' ')[0] || user?.firstName || 'Shubham';
+  const firstName = profile?.name?.split(' ')[0] || user?.firstName || 'Student';
 
   // Mobile action widgets (4 items)
   const mobileActions = [

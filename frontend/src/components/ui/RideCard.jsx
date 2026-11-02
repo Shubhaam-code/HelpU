@@ -18,7 +18,7 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
           <Avatar avatarId={travel?.studentAvatarId || travel?.student?.avatarId || 'm1'} size="md" />
           <div>
             <div className="font-semibold text-navy text-sm">
-              {travel?.studentName || travel?.student?.name || 'Unknown'}
+              {travel?.studentName || travel?.student?.name || 'Campus Student'}
             </div>
             <div className="flex items-center gap-1 text-xs text-text-secondary">
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -46,8 +46,8 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
           <div className="w-2 h-2 rounded-full bg-navy" />
         </div>
         <div className="flex flex-col gap-1 flex-1">
-          <span className="text-sm font-medium text-navy">{travel?.from || 'VIT, Bhopal'}</span>
-          <span className="text-sm text-text-secondary">{travel?.to || 'Bhopal Railway Station'}</span>
+          <span className="text-sm font-medium text-navy">{travel?.from || 'Campus'}</span>
+          <span className="text-sm text-text-secondary">{travel?.to || 'Destination'}</span>
         </div>
         {travel?.availableSeats != null && (
           <span className="bg-navy text-white text-xs px-2.5 py-1 rounded-full font-semibold">

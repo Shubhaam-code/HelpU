@@ -49,9 +49,8 @@ export function CampusHeroIllustration({ className = '' }) {
       {/* Body / Navy Hoodie */}
       <ellipse cx="278" cy="145" rx="26" ry="24" fill="#17233C" />
       <path d="M266 125 L278 140 L290 125" stroke="white" strokeWidth="2" strokeLinecap="round" />
-      {/* "H" logo badge on chest */}
-      <rect x="272" y="142" width="12" height="12" rx="3" fill="#FF654F" />
-      <text x="275" y="151" fontSize="9" fill="white" fontWeight="900">H</text>
+      {/* Minimalist hoodie accent dot */}
+      <circle cx="278" cy="148" r="4" fill="#FF654F" />
 
       {/* Neck & Head */}
       <rect x="273" y="95" width="10" height="12" rx="3" fill="#FDBCB4" />

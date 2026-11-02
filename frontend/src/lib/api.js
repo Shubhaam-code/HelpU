@@ -54,13 +54,17 @@ export const getMe = () => apiClient.get('/api/auth/me');
 
 // ── Travels ───────────────────────────────────────────────────────────────
 export const getTravels = (params) => apiClient.get('/api/travels', { params });
+export const getMyTravels = () => apiClient.get('/api/travels/my');
 export const createTravel = (data) => apiClient.post('/api/travels', data);
 export const getTravelById = (id) => apiClient.get(`/api/travels/${id}`);
+export const getTravelMatches = (id) => apiClient.get(`/api/travels/${id}/matches`);
 
 // ── Bookings ──────────────────────────────────────────────────────────────
 export const createBooking = (data) => apiClient.post('/api/bookings', data);
 export const getMyBookings = () => apiClient.get('/api/bookings/my');
+export const getReceivedBookings = () => apiClient.get('/api/bookings/received');
 export const getBookingById = (id) => apiClient.get(`/api/bookings/${id}`);
+export const getWhatsAppDetails = (id) => apiClient.get(`/api/bookings/${id}/whatsapp-details`);
 export const respondBooking = (id, data) => apiClient.patch(`/api/bookings/${id}/respond`, data);
 export const confirmBooking = (id) => apiClient.patch(`/api/bookings/${id}/confirm`);
 export const cancelBooking = (id) => apiClient.patch(`/api/bookings/${id}/cancel`);

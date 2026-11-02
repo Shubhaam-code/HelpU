@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { Avatar } from '../components/ui/Avatar';
+import { openWhatsAppChat } from '../lib/whatsapp';
 
 // Confetti particles
 const CONFETTI = ['🎊', '🎉', '✨', '⭐', '🎈', '🎊', '✨', '🎉'];
@@ -81,7 +82,7 @@ export default function MatchSuccessPage() {
       >
         <h1 className="font-black text-3xl mb-2">It's a Match! 🎉</h1>
         <p className="text-white/70 text-sm leading-relaxed">
-          You and Priya are going to<br />Bhopal on the same date and time.
+          You and your campus peer are traveling on the same route!
         </p>
       </motion.div>
 
@@ -94,15 +95,15 @@ export default function MatchSuccessPage() {
       >
         <div className="flex items-center gap-2 text-sm text-white/80">
           <span>📍</span>
-          <span>VIT → Bhopal</span>
+          <span>Campus Route Match</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-white/80">
           <span>📅</span>
-          <span>Sun, 2 Nov • 8:00 AM</span>
+          <span>Upcoming Travel</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-white/80">
           <span>💺</span>
-          <span>₹350 per seat</span>
+          <span>Direct Coordination</span>
         </div>
       </motion.div>
 
@@ -116,8 +117,8 @@ export default function MatchSuccessPage() {
         <PrimaryButton variant="coral" onClick={() => navigate('/match')}>
           View Match Details
         </PrimaryButton>
-        <PrimaryButton variant="ghost" onClick={() => navigate('/chat/1')}>
-          💬  Send a Message
+        <PrimaryButton variant="ghost" onClick={() => openWhatsAppChat({ message: "Hi! We matched on HelpU for the upcoming campus travel. Let's coordinate our ride!" })}>
+          💬 Connect on WhatsApp
         </PrimaryButton>
       </motion.div>
     </div>

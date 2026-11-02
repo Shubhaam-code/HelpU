@@ -1,10 +1,24 @@
 import { motion } from 'framer-motion';
-import { Star, MessageCircle, Calendar } from 'lucide-react';
+import { Star, MessageSquare, Calendar } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { StatusBadge } from './StatusBadge';
 import { formatDate } from '../../lib/utils';
+import { openWhatsAppChat } from '../../lib/whatsapp';
 
 export function MatchCard({ match, onPress, onChat }) {
+  const handleChat = (e) => {
+    e.stopPropagation();
+    if (onChat) {
+      onChat();
+    } else {
+      openWhatsAppChat({
+        phone: match?.phone,
+        name: match?.name,
+        route: `${match?.from || 'Campus'} → ${match?.to || 'Destination'}`
+      });
+    }
+  };
+
   return (
     <motion.div
       onClick={onPress}
@@ -16,7 +30,7 @@ export function MatchCard({ match, onPress, onChat }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between">
             <div>
-              <div className="font-semibold text-navy text-sm">{match?.name || 'Priya Singh'}</div>
+              <div className="font-semibold text-navy text-sm">{match?.name || match?.creator?.name || 'Campus Student'}</div>
               <div className="flex items-center gap-1 text-xs text-text-secondary">
                 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                 <span>{match?.rating || '4.9'}</span>
@@ -25,7 +39,7 @@ export function MatchCard({ match, onPress, onChat }) {
             <StatusBadge status={match?.status === 'matched' ? 'matched' : 'pending'} />
           </div>
           <div className="mt-2 flex items-center gap-1.5 text-xs text-text-secondary">
-            <span className="truncate">{match?.from || 'VIT'} → {match?.to || 'Bhopal'}</span>
+            <span className="truncate">{match?.from || 'Campus'} → {match?.to || 'Destination'}</span>
           </div>
           <div className="flex items-center gap-1 text-xs text-text-secondary mt-1">
             <Calendar className="w-3 h-3" />
@@ -33,10 +47,11 @@ export function MatchCard({ match, onPress, onChat }) {
           </div>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); onChat?.(); }}
-          className="text-coral hover:text-coral/80 transition-colors p-1 flex-shrink-0"
+          onClick={handleChat}
+          title="Direct WhatsApp Message"
+          className="p-2 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] transition-colors flex-shrink-0 cursor-pointer"
         >
-          <MessageCircle className="w-5 h-5" />
+          <MessageSquare className="w-4 h-4" />
         </button>
       </div>
     </motion.div>

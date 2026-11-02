@@ -12,8 +12,8 @@ const TRANSPORT_MODES = ['Car', 'Bike', 'Any'];
 export default function MatchPreferencesPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    from: 'VIT, Bhopal',
-    to: 'Bhopal Railway Station',
+    from: '',
+    to: '',
     date: '',
     time: '',
     mode: 'Car',
@@ -21,7 +21,7 @@ export default function MatchPreferencesPage() {
   });
 
   const handleFind = () => {
-    navigate('/match/success');
+    navigate('/match');
   };
 
   const DropdownField = ({ label, icon: Icon, value, onChange, options }) => (
@@ -56,6 +56,7 @@ export default function MatchPreferencesPage() {
             <input
               value={form.from}
               onChange={(e) => setForm(p => ({ ...p, from: e.target.value }))}
+              placeholder="e.g. Campus / Hostel Gate"
               className="flex-1 text-navy font-medium text-sm bg-transparent outline-none"
             />
             <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />
@@ -70,6 +71,7 @@ export default function MatchPreferencesPage() {
             <input
               value={form.to}
               onChange={(e) => setForm(p => ({ ...p, to: e.target.value }))}
+              placeholder="e.g. Railway Station / Airport / City Center"
               className="flex-1 text-navy font-medium text-sm bg-transparent outline-none"
             />
             <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />

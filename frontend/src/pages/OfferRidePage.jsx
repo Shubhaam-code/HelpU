@@ -11,7 +11,7 @@ export default function OfferRidePage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('offer'); // 'offer' | 'request'
   const [form, setForm] = useState({
-    from: 'VIT, Bhopal',
+    from: '',
     to: '',
     date: '',
     time: '',
@@ -22,8 +22,8 @@ export default function OfferRidePage() {
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!form.to || !form.date || !form.time) {
-      setError('Please fill all required fields.');
+    if (!form.from || !form.to || !form.date || !form.time) {
+      setError('Please fill all required fields (from, to, date, and time).');
       return;
     }
     setLoading(true);
@@ -89,7 +89,7 @@ export default function OfferRidePage() {
             <input
               value={form.from}
               onChange={(e) => setForm((p) => ({ ...p, from: e.target.value }))}
-              placeholder="VIT, Bhopal"
+              placeholder="e.g. Campus Main Gate / Hostel"
               className="flex-1 text-navy font-medium text-sm bg-transparent outline-none"
             />
           </div>
