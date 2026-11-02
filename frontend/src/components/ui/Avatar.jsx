@@ -9,7 +9,15 @@ const sizes = {
   '2xl': 128,
 };
 
-export function Avatar({ src, name, email, avatarId, size = 'md', className = '', ring = false }) {
+export function Avatar({ 
+  src, 
+  name, 
+  email, 
+  avatarId, 
+  size = 'md', 
+  className = '', 
+  ring = false 
+}) {
   const [imgError, setImgError] = useState(false);
   const px = typeof size === 'number' ? size : sizes[size] || 48;
 
@@ -17,40 +25,39 @@ export function Avatar({ src, name, email, avatarId, size = 'md', className = ''
     setImgError(false);
   }, [src]);
 
-  const displayName = (name || (email ? email.split('@')[0] : '') || 'Student').trim();
-  const initial = displayName.charAt(0).toUpperCase() || 'S';
-
-  // Email / Name based avatar image from standard UI-Avatars service
-  const emailAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=FF572E&color=ffffff&bold=true&size=256`;
-
-  // Primary image source: user's authenticated email account image (Google/Clerk) or generated email initial PNG
-  const activeSrc = (src && !imgError) ? src : emailAvatarUrl;
+  const hasValidImage = Boolean(src && !imgError);
 
   return (
     <div
-      className={`relative inline-block flex-shrink-0 rounded-full overflow-hidden select-none ${ring ? 'ring-2 ring-[#FF572E]' : ''} ${className}`}
+      className={`relative inline-flex items-center justify-center shrink-0 rounded-full overflow-hidden select-none transition-all ${
+        ring ? 'ring-2 ring-coral/80 ring-offset-1 ring-offset-white' : ''
+      } ${className}`}
       style={{ width: px, height: px }}
     >
-      <img 
-        src={activeSrc} 
-        alt={displayName} 
-        className="w-full h-full object-cover rounded-full" 
-        onError={(e) => {
-          if (!imgError && src) {
-            setImgError(true);
-          } else {
-            // If network fails, display pure CSS letter badge
-            e.currentTarget.style.display = 'none';
-          }
-        }}
-      />
-      {/* Pristine CSS initial letter fallback */}
-      <div 
-        className="w-full h-full rounded-full bg-gradient-to-br from-[#FF572E] to-[#E64A22] text-white font-black flex items-center justify-center uppercase"
-        style={{ fontSize: Math.max(12, Math.round(px * 0.42)) }}
-      >
-        {initial}
-      </div>
+      {hasValidImage ? (
+        <img 
+          src={src} 
+          alt={name || 'User Profile'} 
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
+          className="w-full h-full object-cover rounded-full" 
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        /* Premium Helpu Default User Avatar (Clean silhouette, no ST initials) */
+        <div 
+          className="w-full h-full rounded-full bg-gradient-to-b from-[#FDF3EE] to-[#F5E5DC] flex items-center justify-center text-[#8A786B] border border-coral/10 shadow-inner"
+          aria-label={name || 'Default User Avatar'}
+        >
+          <svg 
+            className="w-[56%] h-[56%] text-[#8A786B]" 
+            viewBox="0 0 24 24" 
+            fill="currentColor"
+          >
+            <path d="M12 12c2.485 0 4.5-2.015 4.5-4.5S14.485 3 12 3 7.5 5.015 7.5 7.5 9.515 12 12 12zm0 2.25c-3.007 0-9 1.51-9 4.5V21h18v-2.25c0-2.99-5.993-4.5-9-4.5z" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }

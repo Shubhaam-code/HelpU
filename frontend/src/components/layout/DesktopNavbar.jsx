@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Home, Car, Users, Wrench, Info, Search, Bell, ChevronDown, Menu, X, LogOut, User, Settings
@@ -15,6 +15,24 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const [ridesDropdownOpen, setRidesDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const profileContainerRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (profileContainerRef.current && !profileContainerRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileDropdownOpen]);
+
+  const userProfileImage = user?.imageUrl || user?.externalAccounts?.[0]?.imageUrl || user?.profileImageUrl;
 
   const isActive = (path) => {
     if (path === '/home') return location.pathname === '/home' || location.pathname === '/';
@@ -38,7 +56,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-cream/90 backdrop-blur-md border-b border-gray-100/80 px-4 lg:px-8 py-3 transition-all">
+    <header className="sticky top-0 z-40 bg-cream/90 backdrop-blur-md border-b border-gray-100/80 px-4 lg:px-8 py-2.5 sm:py-3 transition-all">
       <div className="max-w-[1536px] mx-auto flex items-center justify-between gap-4">
         
         {/* Left: Hamburger (Tablet) + Brand Logo */}
@@ -54,12 +72,14 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
 
           <button 
             onClick={() => navigate('/home')} 
-            className="flex items-center cursor-pointer focus:outline-none"
+            className="flex items-center shrink-0 cursor-pointer focus:outline-none transition-transform duration-200 hover:opacity-95 active:scale-95"
+            aria-label="HelpU Home"
           >
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="h-8 sm:h-9 w-auto object-contain hover:scale-105 transition-transform" 
+              className="h-8 sm:h-9 w-auto object-contain select-none" 
+              draggable="false"
             />
           </button>
         </div>
@@ -146,7 +166,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
         </nav>
 
         {/* Right: Search, Notifications, Profile */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           {/* Search bar */}
           <form onSubmit={handleSearchSubmit} className="hidden xl:block relative w-72">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
@@ -161,58 +181,85 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
 
           {/* Notification bell */}
           <button
+            type="button"
             onClick={() => navigate('/notifications')}
-            className="relative p-2.5 text-navy hover:bg-white rounded-full transition-colors shadow-sm bg-white/70 border border-gray-100"
+            className="relative p-2 sm:p-2.5 text-navy/80 hover:text-navy bg-white/80 hover:bg-white rounded-full transition-all duration-200 border border-gray-100/90 hover:border-gray-200 hover:shadow-xs active:scale-95 focus:outline-none cursor-pointer flex items-center justify-center"
             aria-label="Notifications"
           >
-            <Bell className="w-4 h-4 text-navy" />
+            <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-navy" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-coral rounded-full ring-2 ring-white" />
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-coral rounded-full ring-2 ring-white shadow-xs" />
             )}
           </button>
 
           {/* User profile button & Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={profileContainerRef}>
             <button
-              onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              className="flex items-center gap-2 p-0.5 hover:ring-2 hover:ring-coral/30 rounded-full transition-all focus:outline-none cursor-pointer"
+              type="button"
+              onClick={() => setProfileDropdownOpen((prev) => !prev)}
+              aria-expanded={profileDropdownOpen}
+              aria-haspopup="true"
+              aria-label="User profile menu"
+              className="relative flex items-center p-0.5 rounded-full transition-all duration-200 hover:ring-2 hover:ring-coral/40 focus:outline-none focus:ring-2 focus:ring-coral/50 cursor-pointer group"
             >
-              <Avatar avatarId={avatarId || 'm1'} src={user?.imageUrl} size="sm" ring />
+              <div className="relative rounded-full p-[1.5px] bg-gradient-to-tr from-coral/40 via-transparent to-coral/20 group-hover:from-coral group-hover:to-coral transition-all">
+                <Avatar 
+                  src={userProfileImage} 
+                  name={user?.fullName || 'Student'} 
+                  email={user?.primaryEmailAddress?.emailAddress}
+                  size="sm" 
+                  className="border border-white shadow-xs"
+                />
+              </div>
             </button>
 
             {profileDropdownOpen && (
               <div 
-                onMouseLeave={() => setProfileDropdownOpen(false)}
-                className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in slide-in-from-top-2"
+                className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-2.5 z-50 animate-in fade-in slide-in-from-top-2"
               >
-                <div className="px-4 py-3 border-b border-gray-50">
-                  <div className="font-bold text-navy text-sm truncate">{user?.fullName || 'Student'}</div>
-                  <div className="text-xs text-text-secondary truncate">{user?.primaryEmailAddress?.emailAddress}</div>
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+                  <Avatar 
+                    src={userProfileImage}
+                    name={user?.fullName || 'Student'} 
+                    email={user?.primaryEmailAddress?.emailAddress} 
+                    size={40} 
+                    className="border border-gray-100 shadow-xs shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-navy text-sm truncate leading-snug">
+                      {user?.fullName || 'Campus Student'}
+                    </div>
+                    <div className="text-xs text-text-secondary truncate mt-0.5">
+                      {user?.primaryEmailAddress?.emailAddress || 'student@vitbhopal.ac.in'}
+                    </div>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => { navigate('/profile'); setProfileDropdownOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                >
-                  <User className="w-4 h-4 text-text-secondary" />
-                  My Profile
-                </button>
-                <button
-                  onClick={() => { navigate('/bookings'); setProfileDropdownOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                >
-                  <Car className="w-4 h-4 text-text-secondary" />
-                  My Bookings
-                </button>
-                <button
-                  onClick={() => { navigate('/settings'); setProfileDropdownOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                >
-                  <Settings className="w-4 h-4 text-text-secondary" />
-                  Settings
-                </button>
+                <div className="py-1">
+                  <button
+                    onClick={() => { navigate('/profile'); setProfileDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
+                  >
+                    <User className="w-4 h-4 text-text-secondary" />
+                    My Profile
+                  </button>
+                  <button
+                    onClick={() => { navigate('/bookings'); setProfileDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
+                  >
+                    <Car className="w-4 h-4 text-text-secondary" />
+                    My Bookings
+                  </button>
+                  <button
+                    onClick={() => { navigate('/settings'); setProfileDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
+                  >
+                    <Settings className="w-4 h-4 text-text-secondary" />
+                    Settings
+                  </button>
+                </div>
 
-                <div className="border-t border-gray-50 mt-1 pt-1">
+                <div className="border-t border-gray-100 pt-1">
                   <button
                     onClick={() => signOut()}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors"

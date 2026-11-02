@@ -15,21 +15,28 @@ export function ResponsiveShell({
 
   return (
     <div className="min-h-screen w-full bg-cream flex flex-col font-sans text-navy antialiased">
-      {/* 1. Desktop & Tablet Top Navigation (>= md) */}
-      <div className="hidden md:block">
+      {/* 1. Desktop & Tablet Top Navigation (or Mobile fallback if no custom header) */}
+      {customMobileHeader ? (
+        <>
+          <div className="hidden md:block">
+            <DesktopNavbar 
+              avatarId={avatarId} 
+              unreadCount={unreadCount}
+              onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              isSidebarOpen={isMobileSidebarOpen}
+            />
+          </div>
+          <div className="md:hidden">
+            {customMobileHeader}
+          </div>
+        </>
+      ) : (
         <DesktopNavbar 
           avatarId={avatarId} 
           unreadCount={unreadCount}
           onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           isSidebarOpen={isMobileSidebarOpen}
         />
-      </div>
-
-      {/* 2. Custom Mobile Header (< md) if provided */}
-      {customMobileHeader && (
-        <div className="md:hidden">
-          {customMobileHeader}
-        </div>
       )}
 
       {/* 3. Tablet Drawer Backdrop & Sidebar (< lg) */}
