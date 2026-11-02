@@ -61,6 +61,7 @@ router.patch('/:id/respond', requireAuth, respondToBookingRequest);
  * @access  Protected (Travel Owner only)
  */
 router.post('/:id/confirm', requireAuth, confirmBooking);
+router.patch('/:id/confirm', requireAuth, confirmBooking);
 
 /**
  * @route   PATCH /api/bookings/:id/cancel

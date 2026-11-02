@@ -191,7 +191,7 @@ export async function getReceivedBookings(req, res) {
     const passengerIds = [...new Set(bookings.map((b) => b.passengerId))];
     const passengers = await Student.find(
       { clerkId: { $in: passengerIds } },
-      { name: 1, email: 1, college: 1, isVerified: 1, clerkId: 1, _id: 0 }
+      { name: 1, email: 1, college: 1, isVerified: 1, avatarId: 1, clerkId: 1, _id: 0 }
     );
 
     const passengerMap = new Map();
@@ -238,7 +238,7 @@ export async function getMyBookings(req, res) {
     const ownerIds = [...new Set(bookings.map((b) => b.ownerId))];
     const owners = await Student.find(
       { clerkId: { $in: ownerIds } },
-      { name: 1, email: 1, college: 1, isVerified: 1, clerkId: 1, _id: 0 }
+      { name: 1, email: 1, college: 1, isVerified: 1, avatarId: 1, clerkId: 1, _id: 0 }
     );
 
     const ownerMap = new Map();

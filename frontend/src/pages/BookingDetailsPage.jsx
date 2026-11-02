@@ -99,31 +99,38 @@ export default function BookingDetailsPage() {
           </div>
         </motion.div>
 
-        {/* Driver */}
+        {/* Driver / Partner */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
           className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3"
         >
-          <Avatar avatarId={booking?.driverAvatarId || 'm1'} size="md" />
-          <div className="flex-1">
-            <div className="font-semibold text-navy">{booking?.driverName || travel?.student?.name || 'Student Driver'}</div>
-            <div className="flex items-center gap-1 text-xs text-text-secondary">
+          <Avatar 
+            avatarId={booking?.ownerStudent?.avatarId || booking?.passengerStudent?.avatarId || booking?.driverAvatarId || 'm1'} 
+            src={booking?.ownerStudent?.imageUrl || booking?.passengerStudent?.imageUrl}
+            size="md" 
+            ring
+          />
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-navy truncate">
+              {booking?.ownerStudent?.name || booking?.passengerStudent?.name || booking?.driverName || travel?.student?.name || 'Campus Student'}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-text-secondary mt-0.5">
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-              <span>4.8</span>
+              <span>4.9</span>
               <span className="mx-1">•</span>
               <span>{travel?.carModel || 'Campus Carpool'}</span>
             </div>
           </div>
           <button 
             onClick={() => openWhatsAppChat({
-              phone: booking?.driverPhone || travel?.student?.phone,
-              name: booking?.driverName || travel?.student?.name,
-              route: `${travel?.from || 'Campus'} → ${travel?.to || 'Destination'}`
+              phone: booking?.ownerStudent?.phone || booking?.passengerStudent?.phone || travel?.student?.phone,
+              name: booking?.ownerStudent?.name || booking?.passengerStudent?.name || 'Campus Peer',
+              route: `${travel?.source || travel?.from || 'Campus'} → ${travel?.destination || travel?.to || 'Destination'}`
             })}
             title="Chat on WhatsApp"
-            className="p-2.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 rounded-xl text-[#128C7E] flex items-center gap-1.5 font-bold text-xs cursor-pointer transition-colors"
+            className="p-2.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 rounded-xl text-[#128C7E] flex items-center gap-1.5 font-bold text-xs cursor-pointer transition-colors shrink-0"
           >
             <MessageSquare className="w-4 h-4 text-[#25D366]" />
             <span className="hidden sm:inline">WhatsApp</span>
@@ -138,9 +145,9 @@ export default function BookingDetailsPage() {
           className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3"
         >
           {[
-            { icon: <Users className="w-4 h-4 text-coral" />, label: 'Your Seat', value: booking?.seatsBooked || 1 },
-            { icon: <span className="text-base">₹</span>, label: 'Amount', value: formatCurrency(booking?.totalAmount) },
-            { icon: <Hash className="w-4 h-4 text-coral" />, label: 'Booking ID', value: booking?.bookingId || `HPU${booking?._id?.slice(-5).toUpperCase()}` },
+            { icon: <Users className="w-4 h-4 text-coral" />, label: 'Seats Booked', value: `${booking?.requestedSeats || booking?.seatsBooked || 1} Seat(s)` },
+            { icon: <span className="text-base font-bold text-coral">₹</span>, label: 'Total Fare', value: formatCurrency(booking?.totalAmount || ((booking?.requestedSeats || booking?.seatsBooked || 1) * (travel?.pricePerSeat || 350))) },
+            { icon: <Hash className="w-4 h-4 text-coral" />, label: 'Booking ID', value: `#BK-${booking?._id?.slice(-6).toUpperCase()}` },
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-text-secondary text-sm">
