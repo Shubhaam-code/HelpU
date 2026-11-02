@@ -242,7 +242,7 @@ export default function OfferRidePage() {
               <img 
                 src="/car.png" 
                 alt="HelpU Ride Travel Illustration" 
-                className="w-auto max-w-full h-auto max-h-[170px] sm:max-h-[210px] lg:max-h-[230px] xl:max-h-[260px] object-contain select-none pointer-events-none drop-shadow-sm"
+                className="w-auto max-w-full h-auto max-h-[170px] sm:max-h-[210px] lg:max-h-[350px] xl:max-h-[500px] object-contain -translate-y-14 translate-x-16  select-none pointer-events-none drop-shadow-sm"
               />
             </div>
 

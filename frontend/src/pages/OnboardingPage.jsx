@@ -474,9 +474,8 @@ export default function OnboardingPage() {
                 <img 
                   src="/logo.png" 
                   alt="Helpu" 
-                  className="w-9 h-9 rounded-xl object-contain shadow-xs"
+                  className="h-9 w-auto object-contain"
                 />
-                <span className="font-extrabold text-[#17233C] text-2xl tracking-tight">Helpu</span>
               </div>
 
               {/* Toggle Tabs: Sign In / Sign Up */}

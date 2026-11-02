@@ -54,14 +54,13 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
 
           <button 
             onClick={() => navigate('/home')} 
-            className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
+            className="flex items-center cursor-pointer focus:outline-none"
           >
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="h-9 w-auto object-contain group-hover:scale-105 transition-transform" 
+              className="h-8 sm:h-9 w-auto object-contain hover:scale-105 transition-transform" 
             />
-            <span className="font-black text-navy text-2xl tracking-tight">HelpU</span>
           </button>
         </div>
 
