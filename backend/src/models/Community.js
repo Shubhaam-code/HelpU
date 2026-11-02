@@ -4,6 +4,7 @@ const commentSchema = new mongoose.Schema(
   {
     authorId: { type: String, required: true, trim: true },
     authorName: { type: String, trim: true, default: 'Student' },
+    authorImage: { type: String, trim: true, default: '' },
     text: { type: String, required: true, trim: true, maxlength: 500 }
   },
   { timestamps: true }
@@ -21,6 +22,16 @@ const communityPostSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: 'Student'
+    },
+    authorImage: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    authorAvatar: {
+      type: String,
+      trim: true,
+      default: 'm1'
     },
     college: {
       type: String,

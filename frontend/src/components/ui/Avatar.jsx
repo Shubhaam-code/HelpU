@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { AvatarSVG, getAvatar } from '../../lib/avatars';
 
 const sizes = {
@@ -9,22 +10,25 @@ const sizes = {
   '2xl': 128,
 };
 
-export function Avatar({ avatarId, src, size = 'md', className = '', ring = false }) {
+export function Avatar({ avatarId, src, name, size = 'md', className = '', ring = false }) {
+  const [imgError, setImgError] = useState(false);
   const px = typeof size === 'number' ? size : sizes[size] || 48;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
 
   return (
     <div
       className={`relative inline-block flex-shrink-0 rounded-full overflow-hidden ${ring ? 'ring-2 ring-[#FF572E]' : ''} ${className}`}
       style={{ width: px, height: px }}
     >
-      {src ? (
+      {src && !imgError ? (
         <img 
           src={src} 
-          alt="Avatar" 
+          alt={name || "Avatar"} 
           className="w-full h-full object-cover rounded-full" 
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
+          onError={() => setImgError(true)}
         />
       ) : (
         <AvatarSVG avatarId={avatarId || 'm1'} size={px} />

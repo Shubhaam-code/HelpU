@@ -58,7 +58,7 @@ router.get('/posts', requireAuth, async (req, res) => {
  */
 router.post('/posts', requireAuth, async (req, res) => {
   try {
-    const { content, category, whatsapp, authorName, college } = req.body;
+    const { content, category, whatsapp, authorName, college, authorImage, authorAvatar } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, message: 'Post content is required' });
@@ -67,6 +67,8 @@ router.post('/posts', requireAuth, async (req, res) => {
     const post = await CommunityPost.create({
       authorId: req.userId,
       authorName: authorName?.trim() || 'Student',
+      authorImage: authorImage?.trim() || '',
+      authorAvatar: authorAvatar?.trim() || 'm1',
       college: college?.trim() || 'VIT, Bhopal',
       content: content.trim(),
       category: category || 'General',

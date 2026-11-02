@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { Component, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth, useUser, SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
 import { AnimatePresence } from 'framer-motion';
@@ -27,6 +27,55 @@ import CommunityPage from './pages/CommunityPage';
 import GetHelpPage from './pages/GetHelpPage';
 import AboutPage from './pages/AboutPage';
 import StaticInfoPage from './pages/StaticInfoPage';
+
+// Top-level Error Boundary to catch any child component crashes
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('HelpU App ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-dvh flex items-center justify-center bg-[#FFF8F3] p-4 text-center">
+          <div className="bg-white rounded-[28px] p-8 border border-[#F4E3D8] shadow-md max-w-md w-full">
+            <div className="w-14 h-14 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center text-2xl mx-auto mb-4">
+              ⚠️
+            </div>
+            <h2 className="font-black text-[#17233C] text-xl mb-2">Something went wrong</h2>
+            <p className="text-xs text-[#6E7587] mb-6 leading-relaxed">
+              We encountered an unexpected display issue. Don't worry, your data is safe.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => { this.setState({ hasError: false }); window.location.href = '/home'; }}
+                className="px-6 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Return to Home
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2.5 bg-white border border-[#F4E3D8] text-[#17233C] font-bold text-xs rounded-xl hover:bg-[#FFF7F2] transition-colors cursor-pointer"
+              >
+                Reload Page
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Token injector component
 function TokenInjector() {
@@ -60,7 +109,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <>
+    <ErrorBoundary>
       <TokenInjector />
       <Routes>
         {/* Public Landing & Authentication */}
@@ -101,6 +150,6 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </ErrorBoundary>
   );
 }

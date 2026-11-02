@@ -16,7 +16,9 @@ import {
   getMyBookings, 
   getReceivedBookings, 
   getUnreadCount, 
-  getTravels 
+  getTravels,
+  getCommunityPosts,
+  toggleLikePost
 } from '../lib/api';
 
 // Miniature Car SVG for Upcoming Ride Card
@@ -43,24 +45,22 @@ export default function HomePage() {
   const [bookings, setBookings] = useState([]);
   const [receivedBookings, setReceivedBookings] = useState([]);
   const [rides, setRides] = useState([]);
+  const [latestPost, setLatestPost] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchVal, setSearchVal] = useState('');
-  
-  // Interactive community like state
-  const [postLikes, setPostLikes] = useState(12);
-  const [hasLikedPost, setHasLikedPost] = useState(false);
 
   // Fetch real authenticated user dashboard data
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [profileRes, bookingsRes, receivedRes, notifRes, travelsRes] = await Promise.allSettled([
+      const [profileRes, bookingsRes, receivedRes, notifRes, travelsRes, postRes] = await Promise.allSettled([
         getProfile(),
         getMyBookings(),
         getReceivedBookings(),
         getUnreadCount(),
-        getTravels({ limit: 6 })
+        getTravels({ limit: 6 }),
+        getCommunityPosts({ limit: 1 })
       ]);
 
       if (profileRes.status === 'fulfilled') {
@@ -80,6 +80,10 @@ export default function HomePage() {
       if (travelsRes.status === 'fulfilled') {
         const tList = travelsRes.value.data?.data || travelsRes.value.data?.travels || travelsRes.value.data || [];
         setRides(Array.isArray(tList) ? tList : []);
+      }
+      if (postRes.status === 'fulfilled') {
+        const pList = postRes.value.data?.data || [];
+        setLatestPost(pList[0] || null);
       }
     } catch (err) {
       console.error('Dashboard data fetch error:', err);
@@ -149,9 +153,20 @@ export default function HomePage() {
     }
   };
 
-  const toggleCommunityLike = () => {
-    setHasLikedPost(prev => !prev);
-    setPostLikes(prev => hasLikedPost ? prev - 1 : prev + 1);
+  const toggleCommunityLike = async () => {
+    if (!latestPost) return;
+    const postId = latestPost._id || latestPost.id;
+    const nowLiked = !latestPost.isLiked;
+    setLatestPost(prev => ({
+      ...prev,
+      isLiked: nowLiked,
+      likeCount: nowLiked ? ((prev.likeCount || 0) + 1) : Math.max(0, (prev.likeCount || 0) - 1)
+    }));
+    try {
+      await toggleLikePost(postId);
+    } catch (e) {
+      console.error('Like toggle error:', e);
+    }
   };
 
   return (
@@ -184,26 +199,30 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className="bg-white rounded-[28px] border border-[#F4E3D8]/90 shadow-xs relative overflow-hidden p-6 sm:p-7 lg:p-8 flex flex-col md:flex-row items-center justify-between gap-6"
+              className="bg-white rounded-[32px] border border-[#F4E3D8]/90 shadow-xs relative overflow-hidden p-6 sm:p-8 lg:p-9 flex flex-col md:flex-row items-center justify-between gap-6"
             >
               {/* Subtle warm decorative glow */}
-              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-[#FFF0E7]/70 via-[#FFF5EE]/40 to-transparent pointer-events-none rounded-r-[28px]" />
+              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-[#FFF0E7]/80 via-[#FFF5EE]/40 to-transparent pointer-events-none rounded-r-[32px]" />
 
               {/* Left Content */}
               <div className="relative z-10 flex-1 flex flex-col items-start text-left">
-                <h1 className="font-black text-[#17233C] text-2xl sm:text-3xl lg:text-[36px] tracking-tight leading-tight">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[11px] font-black text-[#FF572E] mb-2.5 shadow-2xs">
+                  🎓 Verified Campus Ride Sharing
+                </span>
+
+                <h1 className="font-black text-[#17233C] text-2xl sm:text-3xl lg:text-[38px] tracking-tight leading-tight">
                   Hey {firstName}! 👋
                 </h1>
                 
                 <p className="mt-2 text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-sm">
-                  Find rides, share journeys, meet new friends and get campus help — all in one place.
+                  Find rides, share journeys, meet verified campus peers, and split travel expenses easily.
                 </p>
 
                 {/* Two Action CTA Buttons */}
                 <div className="flex flex-wrap items-center gap-3 mt-5">
                   <button
                     onClick={() => navigate('/rides/offer')}
-                    className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-full font-black text-xs sm:text-sm shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-full font-black text-xs sm:text-sm shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
                   >
                     <span>Offer a Ride</span>
                     <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -211,7 +230,7 @@ export default function HomePage() {
 
                   <button
                     onClick={() => navigate('/match')}
-                    className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-white hover:bg-[#FFF7F2] active:scale-[0.99] border border-[#F4E3D8] text-[#17233C] hover:text-[#FF572E] rounded-full font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white hover:bg-[#FFF7F2] active:scale-[0.99] border border-[#F4E3D8] text-[#17233C] hover:text-[#FF572E] rounded-full font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer"
                   >
                     <Users className="w-3.5 h-3.5 text-[#FF572E]" />
                     <span>Find a Match</span>
@@ -220,11 +239,11 @@ export default function HomePage() {
               </div>
 
               {/* Right Illustration: webpage.png */}
-              <div className="relative z-10 w-full md:w-[48%] flex items-center justify-center md:justify-end shrink-0">
+              <div className="relative z-10 w-full md:w-[50%] flex items-center justify-center md:justify-end shrink-0">
                 <img
                   src="/webpage.png"
                   alt="HelpU Campus Students"
-                  className="w-full max-h-[170px] sm:max-h-[200px] lg:max-h-[220px] object-contain drop-shadow-sm select-none pointer-events-none"
+                  className="w-full max-h-[190px] sm:max-h-[230px] lg:max-h-[250px] object-contain drop-shadow-sm select-none pointer-events-none"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                   }}
@@ -662,46 +681,66 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Student Community Post */}
-              <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <Avatar avatarId="m3" size="sm" />
-                  <div>
-                    <h4 className="font-extrabold text-[#17233C] text-xs">Campus Student</h4>
-                    <span className="text-[10px] text-[#6E7587]">2h ago</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-[#17233C] font-medium leading-relaxed mb-3">
-                  Daily campus carpooling and weekend trips available. Connect on WhatsApp! 🚗
-                </p>
-
-                <div className="flex items-center justify-between pt-2.5 border-t border-[#F4E3D8]">
-                  <div className="flex items-center gap-3 text-xs text-[#6E7587]">
-                    <button
-                      onClick={toggleCommunityLike}
-                      className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                        hasLikedPost ? 'text-[#FF572E] font-bold' : 'hover:text-[#FF572E]'
-                      }`}
-                    >
-                      <Heart className={`w-3.5 h-3.5 ${hasLikedPost ? 'fill-[#FF572E] text-[#FF572E]' : ''}`} />
-                      <span>{postLikes}</span>
-                    </button>
-
-                    <div className="flex items-center gap-1">
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      <span>4</span>
+              {/* Student Community Post or Empty State */}
+              {latestPost ? (
+                <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <Avatar 
+                      avatarId={latestPost.authorAvatar || 'm1'} 
+                      src={latestPost.authorImage}
+                      size="sm" 
+                    />
+                    <div>
+                      <h4 className="font-extrabold text-[#17233C] text-xs">
+                        {latestPost.authorName || 'Campus Student'}
+                      </h4>
+                      <span className="text-[10px] text-[#6E7587]">
+                        {latestPost.createdAt ? new Date(latestPost.createdAt).toLocaleDateString() : 'Recent'}
+                      </span>
                     </div>
                   </div>
 
+                  <p className="text-xs text-[#17233C] font-medium leading-relaxed mb-3 line-clamp-2">
+                    {latestPost.content}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-2.5 border-t border-[#F4E3D8]">
+                    <div className="flex items-center gap-3 text-xs text-[#6E7587]">
+                      <button
+                        onClick={toggleCommunityLike}
+                        className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                          latestPost.isLiked ? 'text-[#FF572E] font-bold' : 'hover:text-[#FF572E]'
+                        }`}
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${latestPost.isLiked ? 'fill-[#FF572E] text-[#FF572E]' : ''}`} />
+                        <span>{latestPost.likeCount ?? latestPost.likes?.length ?? 0}</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>{latestPost.commentCount ?? latestPost.comments?.length ?? 0}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => navigate('/community')}
+                      className="px-3 py-1 bg-[#FF572E] hover:bg-[#E64A22] text-white text-[11px] font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                    >
+                      Explore
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-[#FFFBF8] rounded-2xl border border-dashed border-[#F4E3D8] text-center">
+                  <p className="text-xs text-[#6E7587] font-medium">No community posts yet.</p>
                   <button
                     onClick={() => navigate('/community')}
-                    className="px-3 py-1 bg-[#FF572E] hover:bg-[#E64A22] text-white text-[11px] font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                    className="mt-2 text-xs font-bold text-[#FF572E] hover:underline cursor-pointer"
                   >
-                    Explore
+                    Start the first discussion →
                   </button>
                 </div>
-              </div>
+              )}
             </div>
 
           </div>

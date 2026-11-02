@@ -5,7 +5,7 @@ import { useUser } from '@clerk/clerk-react';
 import { 
   Users, MessageSquare, Heart, Share2, Send, Plus, 
   Sparkles, Filter, TrendingUp, ShieldCheck, Tag, 
-  MapPin, Calendar, Clock, ArrowRight, Check, X, Loader2
+  MapPin, Calendar, Clock, ArrowRight, Check, X, Loader2, Trash2
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -84,6 +84,10 @@ export default function CommunityPage() {
     return profile?.name || user?.fullName || user?.firstName || 'Campus Student';
   }, [profile, user]);
 
+  const currentUserAvatar = useMemo(() => {
+    return profile?.avatarId || 'm1';
+  }, [profile]);
+
   // Handle Create Post
   const handleCreatePost = async (e) => {
     e.preventDefault();
@@ -94,6 +98,8 @@ export default function CommunityPage() {
         content: postContent.trim(),
         category: postCategory,
         authorName: currentUserName,
+        authorImage: user?.imageUrl || '',
+        authorAvatar: currentUserAvatar,
         college: profile?.college || 'VIT, Bhopal',
         whatsapp: profile?.phone || ''
       });
@@ -104,6 +110,18 @@ export default function CommunityPage() {
       console.error('Create post error:', err);
     } finally {
       setPostSubmitting(false);
+    }
+  };
+
+  // Handle Delete Post (Owner only)
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    try {
+      await deleteCommunityPost(postId);
+      setPosts(prev => prev.filter(p => (p._id || p.id) !== postId));
+    } catch (err) {
+      console.error('Delete post error:', err);
+      alert(err.message || 'Could not delete post');
     }
   };
 
@@ -418,9 +436,20 @@ export default function CommunityPage() {
                           </div>
                         </div>
 
-                        <span className="px-2.5 py-1 rounded-full bg-[#FFF4ED] text-[#FF572E] text-[11px] font-black shrink-0">
-                          {post.category}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-full bg-[#FFF4ED] text-[#FF572E] text-[11px] font-black shrink-0">
+                            {post.category}
+                          </span>
+                          {user?.id && post.authorId === user.id && (
+                            <button
+                              onClick={() => handleDeletePost(postId)}
+                              title="Delete your post"
+                              className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Post Content */}

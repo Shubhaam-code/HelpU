@@ -15,9 +15,10 @@ router.get('/profile', requireAuth, async (req, res) => {
     const student = await Student.findOne({ clerkId });
 
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Profile not found'
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: 'Profile not created yet'
       });
     }
 
@@ -35,14 +36,9 @@ router.get('/profile', requireAuth, async (req, res) => {
   }
 });
 
-/**
- * @route   POST /api/students/profile
- * @desc    Create or update student profile for the authenticated Clerk user
- * @access  Protected
- */
-router.post('/profile', requireAuth, async (req, res) => {
+// Helper for save/update profile
+async function handleSaveProfile(req, res) {
   try {
-    // 1. Extract clerkId strictly from the verified Clerk authentication token
     const clerkId = req.userId;
 
     if (!clerkId) {
@@ -52,10 +48,8 @@ router.post('/profile', requireAuth, async (req, res) => {
       });
     }
 
-    // 2. Extract allowed fields from request body
-    const { name, email, phone, college } = req.body;
+    const { name, email, phone, college, course, avatarId } = req.body;
 
-    // 3. Validation
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({
         success: false,
@@ -78,7 +72,6 @@ router.post('/profile', requireAuth, async (req, res) => {
       });
     }
 
-    // 4. Build update data
     const updateData = {
       name: name.trim(),
       email: email.trim().toLowerCase()
@@ -92,7 +85,14 @@ router.post('/profile', requireAuth, async (req, res) => {
       updateData.college = typeof college === 'string' ? college.trim() : '';
     }
 
-    // 5. Upsert student document by clerkId
+    if (course !== undefined) {
+      updateData.course = typeof course === 'string' ? course.trim() : '';
+    }
+
+    if (avatarId !== undefined) {
+      updateData.avatarId = typeof avatarId === 'string' ? avatarId.trim() : null;
+    }
+
     const student = await Student.findOneAndUpdate(
       { clerkId },
       {
@@ -113,9 +113,8 @@ router.post('/profile', requireAuth, async (req, res) => {
       data: student
     });
   } catch (error) {
-    console.error('Error in /api/students/profile:', error);
+    console.error('Error in saving student profile:', error);
 
-    // Handle Mongoose duplicate key or validation errors
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -129,6 +128,20 @@ router.post('/profile', requireAuth, async (req, res) => {
       error: error.message
     });
   }
-});
+}
+
+/**
+ * @route   POST /api/students/profile
+ * @desc    Create or update student profile for the authenticated Clerk user
+ * @access  Protected
+ */
+router.post('/profile', requireAuth, handleSaveProfile);
+
+/**
+ * @route   PUT /api/students/profile
+ * @desc    Update student profile for the authenticated Clerk user
+ * @access  Protected
+ */
+router.put('/profile', requireAuth, handleSaveProfile);
 
 export default router;
