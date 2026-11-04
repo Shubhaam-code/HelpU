@@ -49,6 +49,10 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    passengerImage: {
+      type: String,
+      trim: true
+    },
     passengerNotes: {
       type: String,
       trim: true,
