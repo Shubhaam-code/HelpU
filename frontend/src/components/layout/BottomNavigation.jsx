@@ -4,7 +4,7 @@ import { Home, Car, Users, MessageCircle, User, Plus } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/home', icon: Home, label: 'Home' },
-  { path: '/rides', icon: Car, label: 'Rides' },
+  { path: '/rides/offer', icon: Car, label: 'Rides' },
   { path: '/create', icon: Plus, label: '', isCreate: true },
   { path: '/match', icon: Users, label: 'Match' },
   { path: '/profile', icon: User, label: 'Profile' },
@@ -16,6 +16,7 @@ export function BottomNavigation() {
 
   const isActive = (path) => {
     if (path === '/home') return location.pathname === '/home' || location.pathname === '/';
+    if (path === '/rides/offer') return location.pathname.startsWith('/rides');
     return location.pathname.startsWith(path);
   };
 

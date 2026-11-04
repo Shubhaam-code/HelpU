@@ -54,7 +54,9 @@ export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 
           >
             <Bell className="w-5 h-5 text-navy" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-coral rounded-full ring-2 ring-white shadow-xs" />
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-coral text-white text-[9px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-xs">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
             )}
           </button>
         )}

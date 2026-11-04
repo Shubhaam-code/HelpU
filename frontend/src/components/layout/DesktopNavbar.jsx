@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, Car, Users, Wrench, Info, Search, Bell, ChevronDown, Menu, X, LogOut, User, Settings
+  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, Settings, FileText, Calendar
 } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { Avatar } from '../ui/Avatar';
+import { getUnreadCount } from '../../lib/api';
 
 export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSidebarOpen }) {
   const navigate = useNavigate();
@@ -12,10 +13,38 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const { user } = useUser();
   const { signOut } = useClerk();
   
-  const [ridesDropdownOpen, setRidesDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [liveUnreadCount, setLiveUnreadCount] = useState(unreadCount);
   const profileContainerRef = useRef(null);
+
+  // Sync and fetch actual unread notification count
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      const res = await getUnreadCount();
+      if (typeof res?.data?.unreadCount === 'number') {
+        setLiveUnreadCount(res.data.unreadCount);
+      }
+    } catch {
+      // Gracefully fall back to prop
+    }
+  }, []);
+
+  useEffect(() => {
+    setLiveUnreadCount(unreadCount);
+  }, [unreadCount]);
+
+  useEffect(() => {
+    refreshUnreadCount();
+    // Refresh count on window focus or custom 'notifications-updated' event
+    const handleUpdate = () => refreshUnreadCount();
+    window.addEventListener('focus', handleUpdate);
+    window.addEventListener('notifications-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('focus', handleUpdate);
+      window.removeEventListener('notifications-updated', handleUpdate);
+    };
+  }, [refreshUnreadCount, location.pathname]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -36,15 +65,16 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
 
   const isActive = (path) => {
     if (path === '/home') return location.pathname === '/home' || location.pathname === '/';
+    if (path === '/rides/offer') return location.pathname.startsWith('/rides');
     return location.pathname.startsWith(path);
   };
 
   const navLinks = [
     { label: 'Home', path: '/home', icon: Home },
-    { label: 'Rides', path: '/rides', icon: Car, hasDropdown: true },
-    { label: 'Match', path: '/match', icon: Users },
-    { label: 'Community', path: '/community', icon: Users },
-    { label: 'Get Help', path: '/help', icon: Wrench },
+    { label: 'Rides', path: '/rides/offer', icon: Car },
+    { label: 'My Bookings', path: '/bookings', icon: Calendar },
+    { label: 'Matches', path: '/match', icon: Users },
+    { label: 'Posts', path: '/posts', icon: FileText },
     { label: 'About', path: '/about', icon: Info },
   ];
 
@@ -90,64 +120,11 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
             const active = isActive(item.path);
             const Icon = item.icon;
 
-            if (item.hasDropdown) {
-              return (
-                <div key={item.label} className="relative">
-                  <button
-                    onClick={() => setRidesDropdownOpen(!ridesDropdownOpen)}
-                    onMouseEnter={() => setRidesDropdownOpen(true)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold transition-all ${
-                      active
-                        ? 'bg-peach/70 text-coral'
-                        : 'text-text-secondary hover:text-navy hover:bg-white/60'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                    <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200" />
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {ridesDropdownOpen && (
-                    <div 
-                      onMouseLeave={() => setRidesDropdownOpen(false)}
-                      className="absolute top-full left-0 mt-1 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in slide-in-from-top-2"
-                    >
-                      <button
-                        onClick={() => { navigate('/rides'); setRidesDropdownOpen(false); }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                      >
-                        Explore Rides
-                      </button>
-                      <button
-                        onClick={() => { navigate('/rides/offer'); setRidesDropdownOpen(false); }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                      >
-                        Offer a Ride
-                      </button>
-                      <button
-                        onClick={() => { navigate('/rides/request'); setRidesDropdownOpen(false); }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                      >
-                        Request a Ride
-                      </button>
-                      <button
-                        onClick={() => { navigate('/bookings'); setRidesDropdownOpen(false); }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                      >
-                        My Bookings
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
             return (
               <button
                 key={item.label}
                 onClick={() => navigate(item.path)}
-                className={`relative flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold transition-all ${
+                className={`relative flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold transition-all cursor-pointer ${
                   active
                     ? 'bg-peach/70 text-coral shadow-sm shadow-coral/10'
                     : 'text-text-secondary hover:text-navy hover:bg-white/60'
@@ -187,8 +164,10 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
             aria-label="Notifications"
           >
             <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-navy" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-coral rounded-full ring-2 ring-white shadow-xs" />
+            {liveUnreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-coral text-white text-[10px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-xs">
+                {liveUnreadCount > 99 ? '99+' : liveUnreadCount}
+              </span>
             )}
           </button>
 
