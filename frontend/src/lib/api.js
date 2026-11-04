@@ -55,9 +55,26 @@ export const getMe = () => apiClient.get('/api/auth/me');
 // ── Travels ───────────────────────────────────────────────────────────────
 export const getTravels = (params) => apiClient.get('/api/travels', { params });
 export const getMyTravels = () => apiClient.get('/api/travels/my');
+export const getUserMatches = () => apiClient.get('/api/travels/user/matches');
 export const createTravel = (data) => apiClient.post('/api/travels', data);
-export const getTravelById = (id) => apiClient.get(`/api/travels/${id}`);
-export const getTravelMatches = (id) => apiClient.get(`/api/travels/${id}/matches`);
+export const getTravelById = (id) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  return apiClient.get(`/api/travels/${id}`);
+};
+export const getTravelMatches = (id) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  return apiClient.get(`/api/travels/${id}/matches`);
+};
+export const updateTravelStatus = (id, status) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  return apiClient.patch(`/api/travels/${id}/status`, { status });
+};
 
 // ── Bookings ──────────────────────────────────────────────────────────────
 export const createBooking = (data) => apiClient.post('/api/bookings', data);
@@ -70,7 +87,7 @@ export const confirmBooking = (id) => apiClient.patch(`/api/bookings/${id}/confi
 export const cancelBooking = (id) => apiClient.patch(`/api/bookings/${id}/cancel`);
 
 // ── Notifications ─────────────────────────────────────────────────────────
-export const getNotifications = () => apiClient.get('/api/notifications');
+export const getNotifications = (params) => apiClient.get('/api/notifications', { params });
 export const getUnreadCount = () => apiClient.get('/api/notifications/unread-count');
 export const markRead = (id) => apiClient.patch(`/api/notifications/${id}/read`);
 export const markAllRead = () => apiClient.patch('/api/notifications/read-all');
