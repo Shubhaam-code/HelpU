@@ -1,5 +1,9 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
@@ -157,15 +161,29 @@ async function runTestSuite() {
       status: 'active'
     });
 
-    // 7. Incompatible Time
-    // 03:00 PM (900 mins). Diff = |600 - 900| = 300 > (60 + 30 = 90) -> NO MATCH
-    await Travel.create({
+    // 7. Time Compatibility: Exact 420 mins (MATCH) vs 421 mins (NO MATCH)
+    // OfferA = 600 mins (10:00 AM).
+    // Exact 420 min difference: 1020 mins (05:00 PM) -> MATCH
+    const reqExact420 = await Travel.create({
       userId: userReqB,
       type: 'request',
       source,
       destination,
       travelDate: new Date(travelDate),
-      departureTime: 900,
+      departureTime: 1020,
+      timeFlexibility: 30,
+      seats: 1,
+      status: 'active'
+    });
+
+    // 421 min difference: 1021 mins (05:01 PM) -> NO MATCH
+    const reqDiff421 = await Travel.create({
+      userId: userReqB,
+      type: 'request',
+      source,
+      destination,
+      travelDate: new Date(travelDate),
+      departureTime: 1021,
       timeFlexibility: 30,
       seats: 1,
       status: 'active'
@@ -213,8 +231,12 @@ async function runTestSuite() {
 
     const foundReqB = dataOfferA.data.some(m => m._id === reqB._id.toString());
     const foundOfferC = dataOfferA.data.some(m => m._id === offerC._id.toString());
+    const foundExact420 = dataOfferA.data.some(m => m._id === reqExact420._id.toString());
+    const excludedDiff421 = !dataOfferA.data.some(m => m._id === reqDiff421._id.toString());
     console.log('Includes compatible REQUEST (ReqB):', foundReqB ? 'PASS' : 'FAIL');
     console.log('Includes compatible OFFER (OfferC):', foundOfferC ? 'PASS' : 'FAIL');
+    console.log('Includes exact 420-minute diff post:', foundExact420 ? 'PASS' : 'FAIL');
+    console.log('Excludes 421-minute diff post:', excludedDiff421 ? 'PASS' : 'FAIL');
     console.log('Private phone numbers excluded:', matchedTypes.every(m => !m.hasPhone) ? 'PASS' : 'FAIL');
 
     // ----------------------------------------------------------------

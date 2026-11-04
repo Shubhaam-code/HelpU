@@ -4,7 +4,14 @@ import { requireAuth } from '../middlewares/auth.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
 import Student from '../models/Student.js';
 import Booking from '../models/Booking.js';
-import { findMatchesForTravel } from '../services/matching.service.js';
+import { 
+  findMatchesForTravel, 
+  findMatchesForUser,
+  isSameDirection, 
+  isSameCalendarDay, 
+  areLocationsMatching, 
+  normalizeLocation 
+} from '../services/matching.service.js';
 
 const router = express.Router();
 
@@ -128,63 +135,208 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * @route   GET /api/travels
- * @desc    Get all active travel posts (with filters & student profile enrichment)
+ * @desc    Get matching active travel posts based on Helpu Smart Matching Rules:
+ *          - If user posted an OFFER: finds matching REQUESTS (same route, direction, date, time & seat compatibility).
+ *          - If user posted a REQUEST: finds matching OFFERS (same route, direction, date, time & seat availability).
+ *          - NEVER exposes a public feed. If user has no active post, returns hasPostedTravel: false.
+ *          - Rejects opposite-direction rides and unrelated routes.
  * @access  Protected
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
     const now = new Date();
-    const query = {
+
+    // 1. Check if authenticated user has created any active offer or request
+    const myActiveTravels = await Travel.find({
+      userId: req.userId,
       status: 'active',
       expiresAt: { $gt: now }
-    };
+    }).lean();
 
-    // If caller specifically requests to exclude their own rides
-    if (req.query.excludeMine === 'true') {
-      query.userId = { $ne: req.userId };
+    // STRICT RULE: If the user hasn't posted an offer/request yet, show 0 matches
+    if (myActiveTravels.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        hasPostedTravel: false,
+        message: 'Please post a ride offer or request first to see matching rides with compatible route, direction, date and time.',
+        data: []
+      });
     }
 
-    if (req.query.type && ['offer', 'request'].includes(req.query.type)) {
-      query.type = req.query.type;
+    // 2. Separate user's active posts into offers and requests
+    const myOffers = myActiveTravels.filter(t => (t.type || 'offer') === 'offer');
+    const myRequests = myActiveTravels.filter(t => t.type === 'request');
+
+    // 3. Determine candidate types:
+    // - If user specifically asks for ?type=offer, filter offers that match user's requests or offers
+    // - If user asks for ?type=request, filter requests that match user's offers
+    // - By default, show both matching offers and matching requests
+    let candidateTypes = [];
+    if (req.query.type === 'offer') {
+      candidateTypes = ['offer'];
+    } else if (req.query.type === 'request') {
+      candidateTypes = ['request'];
+    } else {
+      if (myRequests.length > 0 || myOffers.length > 0) candidateTypes.push('offer');
+      if (myOffers.length > 0) candidateTypes.push('request');
     }
 
-    if (req.query.source) {
-      query.source = { $regex: req.query.source.trim(), $options: 'i' };
+    if (candidateTypes.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        hasPostedTravel: true,
+        activeRoutes: myActiveTravels.map(t => ({ source: t.source, destination: t.destination, type: t.type })),
+        data: []
+      });
     }
 
-    if (req.query.destination) {
-      query.destination = { $regex: req.query.destination.trim(), $options: 'i' };
+    // 4. Query active unexpired candidate posts from other students
+    const candidates = await Travel.find({
+      userId: { $ne: req.userId },
+      status: 'active',
+      expiresAt: { $gt: now },
+      type: { $in: candidateTypes }
+    }).sort({ createdAt: -1 }).lean();
+
+    // 5. Apply Smart Matching Engine across user's active travels
+    const matchedMap = new Map();
+
+    for (const cand of candidates) {
+      const candBooked = cand.bookedSeats || 0;
+      const candAvailableSeats = Math.max(0, (cand.seats || 1) - candBooked);
+
+      // Check against user's relevant posts
+      if (cand.type === 'offer') {
+        // Candidate is an OFFER:
+        // A. Match against user's active REQUESTS
+        for (const reqPost of myRequests) {
+          // Rule A: Same Direction & Normalized Locations (NEVER reverse direction)
+          if (!isSameDirection(reqPost.source, reqPost.destination, cand.source, cand.destination)) {
+            continue;
+          }
+          // Rule B: Same Calendar Day (Asia/Kolkata timezone)
+          if (!isSameCalendarDay(reqPost.travelDate, cand.travelDate)) {
+            continue;
+          }
+          // Rule C: Departure time compatibility (4-5 hours window)
+          const timeDiff = Math.abs((reqPost.departureTime || 0) - (cand.departureTime || 0));
+          if (timeDiff > 420) {
+            continue;
+          }
+          // Rule D: Enough available seats for user's requested seats
+          const neededSeats = reqPost.seats || 1;
+          if (candAvailableSeats < neededSeats) {
+            continue;
+          }
+
+          matchedMap.set(cand._id.toString(), {
+            ...cand,
+            availableSeats: candAvailableSeats,
+            matchingReason: `Matches your request from ${reqPost.source} → ${reqPost.destination}`,
+            matchingUserPostId: reqPost._id
+          });
+          break;
+        }
+
+        // B. Match against user's active OFFERS (co-travel / combined offers)
+        if (!matchedMap.has(cand._id.toString()) && candAvailableSeats > 0) {
+          for (const offerPost of myOffers) {
+            if (!isSameDirection(offerPost.source, offerPost.destination, cand.source, cand.destination)) {
+              continue;
+            }
+            if (!isSameCalendarDay(offerPost.travelDate, cand.travelDate)) {
+              continue;
+            }
+            const timeDiff = Math.abs((offerPost.departureTime || 0) - (cand.departureTime || 0));
+            if (timeDiff > 420) {
+              continue;
+            }
+
+            matchedMap.set(cand._id.toString(), {
+              ...cand,
+              availableSeats: candAvailableSeats,
+              matchingReason: `Co-travel offer on your route from ${offerPost.source} → ${offerPost.destination}`,
+              matchingUserPostId: offerPost._id
+            });
+            break;
+          }
+        }
+      } else if (cand.type === 'request') {
+        // Candidate is a REQUEST: must match at least one of user's active OFFERS
+        for (const offerPost of myOffers) {
+          const offerBooked = offerPost.bookedSeats || 0;
+          const offerAvailableSeats = Math.max(0, (offerPost.seats || 1) - offerBooked);
+
+          // Rule A: Same Direction & Normalized Locations (NEVER reverse direction)
+          if (!isSameDirection(offerPost.source, offerPost.destination, cand.source, cand.destination)) {
+            continue;
+          }
+          // Rule B: Same Calendar Day (Asia/Kolkata timezone)
+          if (!isSameCalendarDay(offerPost.travelDate, cand.travelDate)) {
+            continue;
+          }
+          // Rule C: Departure time compatibility (maximum 7 hours / 420 minutes)
+          const timeDiff = Math.abs((offerPost.departureTime || 0) - (cand.departureTime || 0));
+          if (timeDiff > 420) {
+            continue;
+          }
+          // Rule D: Offer has enough seats to fulfill the candidate request
+          const requestedSeats = cand.seats || 1;
+          if (offerAvailableSeats < requestedSeats) {
+            continue;
+          }
+
+          matchedMap.set(cand._id.toString(), {
+            ...cand,
+            availableSeats: candAvailableSeats,
+            matchingReason: `Passenger request for your ride from ${offerPost.source} → ${offerPost.destination}`,
+            matchingUserPostId: offerPost._id
+          });
+          break;
+        }
+      }
     }
 
+    let matchedList = Array.from(matchedMap.values());
+
+    // Optional text search filter within matches
     if (req.query.search) {
-      const term = req.query.search.trim();
-      query.$or = [
-        { source: { $regex: term, $options: 'i' } },
-        { destination: { $regex: term, $options: 'i' } }
-      ];
+      const term = req.query.search.trim().toLowerCase();
+      matchedList = matchedList.filter(t =>
+        (t.source || '').toLowerCase().includes(term) ||
+        (t.destination || '').toLowerCase().includes(term) ||
+        (t.authorName || '').toLowerCase().includes(term)
+      );
     }
 
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
-    const travels = await Travel.find(query).sort({ createdAt: -1 }).limit(limit).lean();
+    // Enrich with creator student profile (strictly exclude phone number)
+    const userIds = [...new Set(matchedList.map(t => t.userId))];
+    const students = await Student.find(
+      { clerkId: { $in: userIds } },
+      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
+    ).lean();
+    const studentMap = new Map(students.map(s => [s.clerkId, s]));
 
-    // Enrich with creator student profile
-    const userIds = [...new Set(travels.map((t) => t.userId))];
-    const students = await Student.find({ clerkId: { $in: userIds } }).lean();
-    const studentMap = new Map(students.map((s) => [s.clerkId, s]));
-
-    const enriched = travels.map((t) => {
+    const enriched = matchedList.map(t => {
       const s = studentMap.get(t.userId);
       return {
         ...t,
-        isMine: t.userId === req.userId,
+        isMine: false,
         student: {
           name: s?.name || t.authorName || 'Campus Student',
           email: s?.email || t.authorEmail || '',
           imageUrl: s?.imageUrl || t.authorImage || null,
+          avatarId: s?.avatarId || 'm1',
           college: s?.college || 'VIT, Bhopal',
-          phone: s?.phone || ''
+          isVerified: s?.isVerified ?? true
         }
       };
     });
@@ -192,13 +344,15 @@ router.get('/', requireAuth, async (req, res) => {
     return res.status(200).json({
       success: true,
       count: enriched.length,
+      hasPostedTravel: true,
+      activeRoutes: myActiveTravels.map(t => ({ source: t.source, destination: t.destination, type: t.type })),
       data: enriched
     });
   } catch (error) {
-    console.error('Error fetching travel posts:', error);
+    console.error('Error fetching matching travel posts:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error while fetching travel posts',
+      message: 'Internal server error while fetching matching travel posts',
       error: error.message
     });
   }
@@ -217,10 +371,30 @@ router.get('/my', requireAuth, async (req, res) => {
       expiresAt: { $gt: now }
     }).sort({ createdAt: -1 }).lean();
 
+    const travelIds = travels.map(t => t._id);
+    const bookings = await Booking.find({ travelId: { $in: travelIds } }).lean();
+
+    const bookingsByTravel = new Map();
+    for (const b of bookings) {
+      const tid = b.travelId.toString();
+      if (!bookingsByTravel.has(tid)) bookingsByTravel.set(tid, []);
+      bookingsByTravel.get(tid).push(b);
+    }
+
+    const enriched = travels.map(t => {
+      const reqs = bookingsByTravel.get(t._id.toString()) || [];
+      return {
+        ...t,
+        requestsCount: reqs.length,
+        pendingRequestsCount: reqs.filter(r => r.status === 'pending').length,
+        acceptedRequestsCount: reqs.filter(r => ['accepted', 'confirmed'].includes(r.status)).length
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      count: travels.length,
-      data: travels
+      count: enriched.length,
+      data: enriched
     });
   } catch (error) {
     console.error('Error fetching user travel posts:', error);
@@ -231,6 +405,35 @@ router.get('/my', requireAuth, async (req, res) => {
     });
   }
 });
+
+/**
+ * @route   GET /api/travels/user/matches (and aliases /matches, /my-matches)
+ * @desc    Find all matching travels for the logged-in user across their active posts
+ * @access  Protected
+ */
+const handleGetUserMatches = async (req, res) => {
+  try {
+    const result = await findMatchesForUser(req.userId);
+    return res.status(200).json({
+      success: true,
+      hasPostedTravel: result.hasPostedTravel,
+      myTravels: result.myTravels,
+      count: result.matches.length,
+      data: result.matches
+    });
+  } catch (error) {
+    console.error('Error fetching user matches:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching user matches',
+      error: error.message
+    });
+  }
+};
+
+router.get('/user/matches', requireAuth, handleGetUserMatches);
+router.get('/matches', requireAuth, handleGetUserMatches);
+router.get('/my-matches', requireAuth, handleGetUserMatches);
 
 /**
  * @route   GET /api/travels/:id
@@ -256,6 +459,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       });
     }
 
+    const isMine = travel.userId === req.userId;
     const student = await Student.findOne({ clerkId: travel.userId }).lean();
 
     // Compute real-time confirmed and available seats
@@ -275,13 +479,14 @@ router.get('/:id', requireAuth, async (req, res) => {
         availableSeats,
         pricePerSeat: travel.pricePerSeat || 350,
         carModel: travel.carModel || 'Campus Ride',
-        isMine: travel.userId === req.userId,
+        isMine,
         student: {
           name: student?.name || travel.authorName || 'Campus Student',
           email: student?.email || travel.authorEmail || '',
           imageUrl: student?.imageUrl || travel.authorImage || null,
           college: student?.college || 'VIT, Bhopal',
-          phone: student?.phone || ''
+          // Strictly withhold phone number if viewing own post to prevent self WhatsApp contact
+          phone: isMine ? '' : (student?.phone || '')
         }
       }
     });
