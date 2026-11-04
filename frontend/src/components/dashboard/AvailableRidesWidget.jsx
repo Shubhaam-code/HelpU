@@ -22,7 +22,7 @@ export function AvailableRidesWidget({ rides = [] }) {
           Available Rides Near You
         </h3>
         <button 
-          onClick={() => navigate('/rides')}
+          onClick={() => navigate('/rides/offer')}
           className="text-xs font-bold text-coral hover:underline flex items-center gap-1 cursor-pointer"
         >
           <span>View All</span>
@@ -36,16 +36,24 @@ export function AvailableRidesWidget({ rides = [] }) {
           <div className="w-10 h-10 rounded-full bg-peach flex items-center justify-center text-lg mb-2">
             🚗
           </div>
-          <h4 className="font-bold text-navy text-sm">No Active Rides Yet</h4>
-          <p className="text-text-secondary text-xs mt-1 max-w-[220px]">
-            Be the first campus student to offer or request a ride today!
+          <h4 className="font-bold text-navy text-sm">Post a Ride to See Matches</h4>
+          <p className="text-text-secondary text-xs mt-1 max-w-[240px] leading-relaxed">
+            Post your route to discover verified students with the exact same departure & destination!
           </p>
-          <button
-            onClick={() => navigate('/rides/offer')}
-            className="mt-3 px-4 py-1.5 bg-coral text-white text-xs font-bold rounded-xl shadow-xs hover:bg-coral/90 cursor-pointer"
-          >
-            Offer a Ride
-          </button>
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={() => navigate('/rides/offer')}
+              className="px-3.5 py-1.5 bg-coral text-white text-xs font-bold rounded-xl shadow-xs hover:bg-coral/90 cursor-pointer"
+            >
+              Offer Ride
+            </button>
+            <button
+              onClick={() => navigate('/rides/request')}
+              className="px-3 py-1.5 bg-white border border-gray-200 text-navy text-xs font-bold rounded-xl hover:bg-cream cursor-pointer"
+            >
+              Request Ride
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

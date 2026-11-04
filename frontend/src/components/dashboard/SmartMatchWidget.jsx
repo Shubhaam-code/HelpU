@@ -16,7 +16,7 @@ export function SmartMatchWidget() {
           <span className="text-orange-500">🔥</span>
         </h3>
         <button 
-          onClick={() => navigate('/match')}
+          onClick={() => navigate('/matches')}
           className="text-xs font-bold text-coral hover:underline flex items-center gap-1 cursor-pointer"
         >
           <span>View Matches</span>
@@ -63,7 +63,7 @@ export function SmartMatchWidget() {
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5 w-full mt-4">
           <button
-            onClick={() => navigate('/match')}
+            onClick={() => navigate('/matches')}
             className="flex-1 py-2.5 px-4 bg-coral text-white rounded-2xl text-xs font-bold hover:bg-coral/90 transition-colors shadow-sm cursor-pointer"
           >
             Find Matches

@@ -3,7 +3,7 @@ import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 
-export function StaticInfoPage({ title, subtitle, icon, actionText = 'Explore Rides', actionPath = '/rides' }) {
+export function StaticInfoPage({ title, subtitle, icon, actionText = 'Offer a Ride', actionPath = '/rides/offer' }) {
   const navigate = useNavigate();
 
   return (

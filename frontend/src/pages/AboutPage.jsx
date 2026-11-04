@@ -126,10 +126,10 @@ export default function AboutPage() {
 
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-6">
               <button
-                onClick={() => navigate('/rides')}
+                onClick={() => navigate('/rides/offer')}
                 className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm rounded-full shadow-md shadow-[#FF572E]/25 transition-all flex items-center gap-2 cursor-pointer"
               >
-                <span>Explore Rides</span>
+                <span>Offer a Ride</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

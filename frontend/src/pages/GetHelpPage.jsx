@@ -514,10 +514,10 @@ export default function GetHelpPage() {
                 Use our automated ride matching engine to travel with campus peers.
               </p>
               <button
-                onClick={() => navigate('/rides')}
+                onClick={() => navigate('/rides/offer')}
                 className="w-full py-2 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
               >
-                Explore Available Rides
+                Offer or Request a Ride
               </button>
             </div>
 

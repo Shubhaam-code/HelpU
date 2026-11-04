@@ -119,7 +119,7 @@ export function UpcomingBookingWidget({ booking }) {
         <div className="p-4 rounded-2xl bg-cream/40 border border-dashed border-[#F4E3D8] text-center">
           <p className="text-xs text-text-secondary font-medium">No upcoming bookings right now.</p>
           <button
-            onClick={() => navigate('/rides')}
+            onClick={() => navigate('/rides/offer')}
             className="mt-2 text-xs font-bold text-coral hover:underline"
           >
             Explore available rides →
@@ -188,7 +188,7 @@ export function CommunityActivityWidget() {
           </div>
 
           <button 
-            onClick={() => navigate('/rides')}
+            onClick={() => navigate('/rides/offer')}
             className="px-3 py-1 bg-coral text-white text-[11px] font-bold rounded-full hover:bg-coral/90 transition-colors shadow-xs cursor-pointer"
           >
             Explore

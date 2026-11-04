@@ -172,7 +172,14 @@ export default function MatchDetailsPage() {
           </button>
           <PrimaryButton
             variant="coral"
-            onClick={() => navigate('/book/match', { state: { travel: match } })}
+            onClick={() => {
+              const travelId = match?._id || match?.id;
+              if (travelId && travelId !== 'match') {
+                navigate(`/book/${travelId}`, { state: { travel: match } });
+              } else {
+                navigate('/rides/offer');
+              }
+            }}
             className="flex-1"
             fullWidth={false}
           >

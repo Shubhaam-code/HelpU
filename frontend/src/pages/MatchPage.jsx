@@ -1,69 +1,155 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser } from '@clerk/clerk-react';
 import { 
-  Compass, Users, SlidersHorizontal, MapPin, Clock, 
-  CheckCircle2, GraduationCap, Heart, TrendingUp, ArrowRight,
-  Car, MessageSquare, Phone, ShieldCheck, ArrowLeft, Search, Calendar
+  Users, MapPin, Clock, Calendar, ShieldCheck, Car, 
+  Sparkles, RefreshCw, AlertCircle, Send, Check, Ticket, ChevronRight,
+  Heart, TrendingUp, ArrowRight, ArrowLeft, CheckCircle2, GraduationCap,
+  Search, Info
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { openWhatsAppChat } from '../lib/whatsapp';
-import { getTravels, getMyTravels, getMyBookings, getReceivedBookings } from '../lib/api';
+import { 
+  getMyTravels, 
+  getTravelMatches, 
+  getMyBookings, 
+  getReceivedBookings 
+} from '../lib/api';
+
+/**
+ * Format minutes from midnight (0..1439) into 12-hour AM/PM format
+ */
+function formatMinutesToTime(minutes) {
+  if (typeof minutes !== 'number' || isNaN(minutes)) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+/**
+ * Format date string nicely (e.g. Thu, 6 Nov)
+ */
+function formatTravelDate(dateStr) {
+  if (!dateStr) return 'Upcoming';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'Upcoming';
+  return d.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  });
+}
 
 export default function MatchPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('Discover'); // 'Discover' | 'My Matches'
-  const [loading, setLoading] = useState(true);
-  
-  // Real dynamic backend data state
-  const [allTravels, setAllTravels] = useState([]);
+  const { user } = useUser();
+  const matchesSectionRef = useRef(null);
+
+  // My Active Travel Posts
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [postsError, setPostsError] = useState(null);
   const [myTravels, setMyTravels] = useState([]);
+
+  // Selected Travel Post & its specific matching results
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [matches, setMatches] = useState([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [matchesError, setMatchesError] = useState(null);
+  const [fetchingPostId, setFetchingPostId] = useState(null);
+
+  // Global activity stats
   const [myBookings, setMyBookings] = useState([]);
   const [receivedBookings, setReceivedBookings] = useState([]);
 
-  // Fetch real data on mount
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
+  // Fetch logged-in user's active travel posts (without aggregating matches across all posts)
+  const fetchMyActivePosts = useCallback(async () => {
+    setLoadingPosts(true);
+    setPostsError(null);
 
-    Promise.allSettled([
-      getTravels(),
-      getMyTravels(),
-      getMyBookings(),
-      getReceivedBookings()
-    ]).then(([travelsRes, myTravelsRes, myBookingsRes, receivedRes]) => {
-      if (!isMounted) return;
+    try {
+      const [travelsRes, myBookingsRes, receivedRes] = await Promise.allSettled([
+        getMyTravels(),
+        getMyBookings(),
+        getReceivedBookings()
+      ]);
 
-      const travelsList = travelsRes.status === 'fulfilled' 
-        ? (travelsRes.value.data?.data || travelsRes.value.data?.travels || travelsRes.value.data || [])
-        : [];
-      const myTravelsList = myTravelsRes.status === 'fulfilled'
-        ? (myTravelsRes.value.data?.data || myTravelsRes.value.data?.travels || myTravelsRes.value.data || [])
-        : [];
-      const myBookingsList = myBookingsRes.status === 'fulfilled'
-        ? (myBookingsRes.value.data?.data || myBookingsRes.value.data?.bookings || myBookingsRes.value.data || [])
-        : [];
-      const receivedList = receivedRes.status === 'fulfilled'
-        ? (receivedRes.value.data?.data || receivedRes.value.data?.bookings || receivedRes.value.data || [])
-        : [];
+      if (travelsRes.status === 'fulfilled') {
+        const travelsList = travelsRes.value?.data?.data || travelsRes.value?.data || [];
+        setMyTravels(Array.isArray(travelsList) ? travelsList : []);
+      } else {
+        throw new Error(travelsRes.reason?.response?.data?.message || 'Unable to load your active travels');
+      }
 
-      setAllTravels(Array.isArray(travelsList) ? travelsList : []);
-      setMyTravels(Array.isArray(myTravelsList) ? myTravelsList : []);
-      setMyBookings(Array.isArray(myBookingsList) ? myBookingsList : []);
-      setReceivedBookings(Array.isArray(receivedList) ? receivedList : []);
-    }).catch((err) => {
-      console.error('Error fetching match data:', err);
-    }).finally(() => {
-      if (isMounted) setLoading(false);
-    });
+      if (myBookingsRes.status === 'fulfilled') {
+        const list = myBookingsRes.value?.data?.data || myBookingsRes.value?.data?.bookings || [];
+        setMyBookings(Array.isArray(list) ? list : []);
+      }
 
-    return () => { isMounted = false; };
+      if (receivedRes.status === 'fulfilled') {
+        const list = receivedRes.value?.data?.data || receivedRes.value?.data?.bookings || [];
+        setReceivedBookings(Array.isArray(list) ? list : []);
+      }
+    } catch (err) {
+      console.error('Error fetching travel posts:', err);
+      setPostsError(err.message || 'Unable to load your travel posts right now.');
+    } finally {
+      setLoadingPosts(false);
+    }
   }, []);
 
-  // Compute live match activity stats without hardcoded numbers
+  useEffect(() => {
+    fetchMyActivePosts();
+  }, [fetchMyActivePosts]);
+
+  // Handle Find Matches for a specifically selected travel post
+  const handleSelectPostForMatches = async (post) => {
+    if (!post || !post._id) return;
+    const postId = post._id.toString();
+
+    // Prevent duplicate API calls on rapid clicks
+    if (fetchingPostId === postId) return;
+
+    setSelectedPost(post);
+    setLoadingMatches(true);
+    setMatchesError(null);
+    setFetchingPostId(postId);
+
+    try {
+      const res = await getTravelMatches(postId);
+      const data = res?.data?.data || [];
+      setMatches(Array.isArray(data) ? data : []);
+
+      // Scroll smoothly to the results section
+      setTimeout(() => {
+        if (matchesSectionRef.current) {
+          matchesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } catch (err) {
+      console.error('Error fetching matches for travel post:', err);
+      setMatchesError(
+        err.response?.data?.message || err.message || 'Could not fetch matches for this travel post.'
+      );
+      setMatches([]);
+    } finally {
+      setLoadingMatches(false);
+      setFetchingPostId(null);
+    }
+  };
+
+  // Return from matching results back to My Active Travel Posts
+  const handleBackToPosts = () => {
+    setSelectedPost(null);
+    setMatches([]);
+    setMatchesError(null);
+  };
+
+  // Compute live match activity stats
   const stats = useMemo(() => {
     const confirmedCount = myBookings.filter(b => b.status === 'confirmed').length +
       receivedBookings.filter(b => b.status === 'confirmed').length;
@@ -71,471 +157,396 @@ export default function MatchPage() {
     const pendingCount = myBookings.filter(b => b.status === 'pending').length +
       receivedBookings.filter(b => b.status === 'pending').length;
 
-    // Matches count: total active travels available in the campus network matching user's location or active rides
-    const matchesCount = allTravels.length;
-
     return {
-      matches: matchesCount,
+      activePosts: myTravels.length,
       confirmed: confirmedCount,
       pending: pendingCount
     };
-  }, [allTravels, myBookings, receivedBookings]);
-
-  // Dynamic Popular Routes: purely aggregated from real database entries (zero hardcoded routes)
-  const popularRoutes = useMemo(() => {
-    if (!Array.isArray(allTravels) || allTravels.length === 0) {
-      return [];
-    }
-
-    const routeMap = new Map();
-
-    allTravels.forEach((t) => {
-      const from = (t.source || t.from || '').trim();
-      const to = (t.destination || t.to || '').trim();
-      if (!from || !to) return;
-
-      const key = `${from.toLowerCase()}___${to.toLowerCase()}`;
-      
-      let scheduleText = 'Active Ride';
-      if (t.travelDate) {
-        const d = new Date(t.travelDate);
-        if (!isNaN(d.getTime())) {
-          scheduleText = d.toLocaleDateString('en-IN', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-          });
-        }
-      }
-
-      if (!routeMap.has(key)) {
-        routeMap.set(key, {
-          from,
-          to,
-          activeCount: 1,
-          schedule: scheduleText,
-        });
-      } else {
-        const existing = routeMap.get(key);
-        existing.activeCount += 1;
-      }
-    });
-
-    return Array.from(routeMap.values())
-      .filter((r) => r.activeCount > 0)
-      .sort((a, b) => b.activeCount - a.activeCount)
-      .slice(0, 6);
-  }, [allTravels]);
-
-  // Handle route click -> navigate to rides with filters
-  const handleRouteClick = (route) => {
-    navigate(`/rides?from=${encodeURIComponent(route.from)}&to=${encodeURIComponent(route.to)}`);
-  };
+  }, [myTravels, myBookings, receivedBookings]);
 
   return (
     <ResponsiveShell
       hideSidebarOnDesktop={true}
-      customMobileHeader={<AppHeader title="Match" backTo={false} />}
+      customMobileHeader={<AppHeader title="Matches" backTo={false} />}
     >
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6 space-y-6 sm:space-y-8">
         
         {/* ========================================================================= */}
-        {/* SUB-HEADER TOOLBAR: TABS SWITCHER & PREFERENCES BUTTON                     */}
+        {/* TOP TOOLBAR: TITLE & REFRESH                                              */}
         {/* ========================================================================= */}
-        <div className="flex items-center justify-between mb-5 sm:mb-6">
-          
-          {/* Left Pill Switcher: Discover vs My Matches */}
-          <div className="inline-flex bg-white/90 p-1 rounded-full border border-[#F4E3D8]/90 shadow-xs backdrop-blur-sm">
-            <button
-              onClick={() => setActiveTab('Discover')}
-              className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'Discover'
-                  ? 'bg-[#FF572E] text-white shadow-sm'
-                  : 'text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2]'
-              }`}
-            >
-              <Compass className="w-4 h-4 stroke-[2.2]" />
-              <span>Discover</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('My Matches')}
-              className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'My Matches'
-                  ? 'bg-[#FF572E] text-white shadow-sm'
-                  : 'text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2]'
-              }`}
-            >
-              <Users className="w-4 h-4 stroke-[2.2]" />
-              <span>My Matches</span>
-            </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[11px] font-black text-[#FF572E] uppercase shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5" />
+                Campus Travel Matching
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#17233C] tracking-tight">
+              Campus Matches
+            </h1>
+            <p className="text-xs sm:text-sm text-[#6E7587] mt-0.5">
+              Select your travel offer or request to discover verified peers travelling on your route.
+            </p>
           </div>
 
-          {/* Right Button: Preferences */}
-          <button
-            onClick={() => navigate('/match/preferences')}
-            className="inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 bg-white rounded-2xl border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs sm:text-sm font-bold shadow-xs hover:bg-[#FFF7F2] transition-all cursor-pointer"
-          >
-            <SlidersHorizontal className="w-4 h-4 text-[#FF572E] stroke-[2.2]" />
-            <span>Preferences</span>
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => {
+                fetchMyActivePosts();
+                if (selectedPost) handleSelectPostForMatches(selectedPost);
+              }}
+              disabled={loadingPosts || loadingMatches}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] text-[#17233C] text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${(loadingPosts || loadingMatches) ? 'animate-spin text-[#FF572E]' : ''}`} />
+              <span>Refresh</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/rides/offer')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer"
+            >
+              <Car className="w-3.5 h-3.5" />
+              <span>+ Offer Ride</span>
+            </button>
+          </div>
         </div>
 
+        {/* ========================================================================= */}
+        {/* HERO SECTION: BANNER + STATS & RULES                                      */}
+        {/* ========================================================================= */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch">
+          
+          {/* HERO CARD (SPAN 8) */}
+          <div className="lg:col-span-8 bg-white rounded-[28px] border border-[#F4E3D8]/90 shadow-sm relative overflow-hidden flex flex-col justify-between p-6 sm:p-8 lg:p-9">
+            
+            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-[#FFF0E7]/60 via-[#FFF5EE]/40 to-transparent pointer-events-none rounded-r-[28px]" />
 
-        {/* ========================================================================= */}
-        {/* MAIN BODY: DISCOVER VIEW vs MY MATCHES VIEW                               */}
-        {/* ========================================================================= */}
-        <AnimatePresence mode="wait">
-          {activeTab === 'Discover' ? (
-            <motion.div
-              key="discover"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-6 sm:space-y-7"
-            >
+            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-8">
               
-              {/* ------------------------------------------------------------------- */}
-              {/* TOP HERO SECTION: LEFT CARD + RIGHT STACK CARDS                     */}
-              {/* ------------------------------------------------------------------- */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch">
+              <div className="w-full lg:max-w-[55%] flex flex-col items-center lg:items-start text-center lg:text-left">
                 
-                {/* HERO CARD (SPAN 8) */}
-                <div className="lg:col-span-8 bg-white rounded-[28px] border border-[#F4E3D8]/90 shadow-sm relative overflow-hidden flex flex-col justify-between p-6 sm:p-8 lg:p-9">
-                  
-                  {/* Subtle warm decorative glow */}
-                  <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-[#FFF0E7]/60 via-[#FFF5EE]/40 to-transparent pointer-events-none rounded-r-[28px]" />
-
-                  <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-center justify-between gap-6 lg:gap-8">
-                    
-                    {/* Left content inside Hero Card */}
-                    <div className="w-full lg:max-w-[55%] flex flex-col items-center lg:items-start text-center lg:text-left">
-                      
-                      {/* Badge */}
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFEBE0] text-[#FF572E] font-bold text-xs mb-3">
-                        <Heart className="w-3.5 h-3.5 fill-[#FF572E] text-[#FF572E]" />
-                        <span>Travel Match</span>
-                      </div>
-
-                      {/* Main Headline */}
-                      <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-[#17233C] leading-[1.14] tracking-tight">
-                        Find Your <br />
-                        <span className="text-[#FF572E] relative inline-block">
-                          Travel Match
-                          {/* Cartoon burst decorative rays */}
-                          <svg className="absolute -top-3.5 -right-6 w-5 h-5 text-[#FF572E] select-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                            <line x1="4" y1="12" x2="1" y2="10" />
-                            <line x1="8" y1="5" x2="7" y2="1" />
-                            <line x1="16" y1="4" x2="18" y2="1" />
-                          </svg>
-                        </span>
-                      </h1>
-
-                      <p className="mt-3 text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-md">
-                        Get matched with campus peers travelling on the same route, date and time. Safe, verified and cost-effective.
-                      </p>
-
-                      {/* 4 Feature Badges in a row */}
-                      <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 mt-4 pt-1">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
-                          <MapPin className="w-3.5 h-3.5 text-[#FF572E]" />
-                          <span>Same Route</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
-                          <Clock className="w-3.5 h-3.5 text-[#6E7587]" />
-                          <span>Similar Time</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#F0FAF4] border border-[#C6EFD9] text-[11px] font-bold text-[#17233C]">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
-                          <span>Verified Users</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
-                          <GraduationCap className="w-3.5 h-3.5 text-[#17233C]" />
-                          <span>Same College</span>
-                        </span>
-                      </div>
-
-                      {/* Big Orange Action CTA Button */}
-                      <div className="mt-6 pt-1">
-                        <button
-                          onClick={() => navigate('/match/preferences')}
-                          className="inline-flex items-center gap-2 px-6 sm:px-7 py-3.5 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-lg shadow-[#FF572E]/25 transition-all cursor-pointer group"
-                        >
-                          <Users className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
-                          <span>Find a Match →</span>
-                        </button>
-                      </div>
-
-                    </div>
-
-                    {/* Right Illustration Column with Floating Car Pin */}
-                    <div className="w-full lg:w-[45%] flex items-center justify-center relative mt-2 lg:mt-0">
-                      
-                      {/* Floating Car Pin above the illustration */}
-                      <div className="absolute top-2 left-1/3 -translate-x-1/2 z-20 w-10 sm:w-11 h-10 sm:h-11 rounded-full bg-white border border-[#F4E3D8] shadow-md flex items-center justify-center text-[#FF572E]">
-                        <Car className="w-5 h-5 fill-[#FF572E]/10 stroke-[#FF572E] stroke-[2.2]" />
-                      </div>
-
-                      {/* Main Illustration: match.png from public folder */}
-                      <img
-                        src="/match.png"
-                        alt="Find Your Travel Match"
-                        className="w-full max-h-[260px] sm:max-h-[300px] lg:max-h-[340px] object-contain drop-shadow-sm select-none pointer-events-none"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
-
-                  </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFEBE0] text-[#FF572E] font-bold text-xs mb-3">
+                  <Heart className="w-3.5 h-3.5 fill-[#FF572E] text-[#FF572E]" />
+                  <span>Smart Route Pairing</span>
                 </div>
 
+                <h2 className="text-3xl sm:text-4xl lg:text-[40px] font-black text-[#17233C] leading-[1.14] tracking-tight">
+                  Find Your <br />
+                  <span className="text-[#FF572E] relative inline-block">
+                    Travel Match
+                    <svg className="absolute -top-3.5 -right-6 w-5 h-5 text-[#FF572E] select-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="4" y1="12" x2="1" y2="10" />
+                      <line x1="8" y1="5" x2="7" y2="1" />
+                      <line x1="16" y1="4" x2="18" y2="1" />
+                    </svg>
+                  </span>
+                </h2>
 
-                {/* RIGHT COLUMN STACK (SPAN 4) */}
-                <div className="lg:col-span-4 flex flex-col justify-between gap-4 sm:gap-5">
-                  
-                  {/* Card 1: Your Match Activity */}
-                  <div className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs flex flex-col justify-between flex-1">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-[#FF572E] stroke-[2.2]" />
-                        <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base">
-                          Your Match Activity
-                        </h3>
-                      </div>
-                      <button 
-                        onClick={() => setActiveTab('My Matches')}
-                        className="text-[#FF572E] hover:translate-x-0.5 transition-transform p-1 cursor-pointer"
-                        title="View My Matches"
-                      >
-                        <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                    </div>
+                <p className="mt-3 text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-md">
+                  Pick any of your published travel offers or requests below to find compatible campus peers travelling on your same route, calendar date, and departure window.
+                </p>
 
-                    {/* 3 Stat Boxes in Row */}
-                    <div className="grid grid-cols-3 gap-2.5">
-                      
-                      {/* Matches */}
-                      <div className="bg-[#FFF4ED] border border-[#FDE0D0] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
-                        <div className="flex items-center justify-center gap-1.5 text-[#FF572E] mb-1">
-                          <Users className="w-3.5 h-3.5 stroke-[2.2]" />
-                          <span className="font-black text-base sm:text-lg text-[#17233C]">
-                            {stats.matches}
-                          </span>
-                        </div>
-                        <span className="text-[11px] font-bold text-[#6E7587]">Matches</span>
-                      </div>
-
-                      {/* Confirmed */}
-                      <div className="bg-[#EDFAF3] border border-[#BCECD4] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
-                        <div className="flex items-center justify-center gap-1.5 text-[#16A34A] mb-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.2]" />
-                          <span className="font-black text-base sm:text-lg text-[#17233C]">
-                            {stats.confirmed}
-                          </span>
-                        </div>
-                        <span className="text-[11px] font-bold text-[#6E7587]">Confirmed</span>
-                      </div>
-
-                      {/* Pending */}
-                      <div className="bg-[#FEF9E7] border border-[#FDEBB2] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
-                        <div className="flex items-center justify-center gap-1.5 text-[#CA8A04] mb-1">
-                          <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
-                          <span className="font-black text-base sm:text-lg text-[#17233C]">
-                            {stats.pending}
-                          </span>
-                        </div>
-                        <span className="text-[11px] font-bold text-[#6E7587]">Pending</span>
-                      </div>
-
-                    </div>
-                  </div>
-
-                  {/* Card 2: Match Tips for Campus */}
-                  <div className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs flex-1">
-                    <div className="flex items-center gap-2 mb-3.5">
-                      <span className="text-base select-none">💡</span>
-                      <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base">
-                        Match Tips for Campus
-                      </h3>
-                    </div>
-                    
-                    <ul className="space-y-2.5 text-xs text-[#555E70] leading-relaxed">
-                      <li className="flex items-start gap-2">
-                        <span className="text-[#FF572E] font-black text-sm leading-none mt-0.5">•</span>
-                        <span>Set a flexible time window of ±30 mins to get 3× more potential matches.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-[#FF572E] font-black text-sm leading-none mt-0.5">•</span>
-                        <span>Always check verified student badges and mutual rides before confirming.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-[#FF572E] font-black text-sm leading-none mt-0.5">•</span>
-                        <span>Use in-app messaging to coordinate pickup spots like Campus Main Gate.</span>
-                      </li>
-                    </ul>
-                  </div>
-
+                {/* 4 Feature Badges */}
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 mt-4 pt-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
+                    <MapPin className="w-3.5 h-3.5 text-[#FF572E]" />
+                    <span>Same Route</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
+                    <Clock className="w-3.5 h-3.5 text-[#6E7587]" />
+                    <span>Up to 7h Window</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#F0FAF4] border border-[#C6EFD9] text-[11px] font-bold text-[#17233C]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
+                    <span>Verified Students</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
+                    <GraduationCap className="w-3.5 h-3.5 text-[#17233C]" />
+                    <span>Same Campus</span>
+                  </span>
                 </div>
 
               </div>
 
+              {/* Right Illustration */}
+              <div className="w-full lg:w-[45%] flex items-center justify-center relative mt-2 lg:mt-0">
+                <div className="absolute top-2 left-1/3 -translate-x-1/2 z-20 w-10 sm:w-11 h-10 sm:h-11 rounded-full bg-white border border-[#F4E3D8] shadow-md flex items-center justify-center text-[#FF572E]">
+                  <Car className="w-5 h-5 fill-[#FF572E]/10 stroke-[#FF572E] stroke-[2.2]" />
+                </div>
 
-              {/* ------------------------------------------------------------------- */}
-              {/* BOTTOM SECTION: POPULAR TRAVEL MATCH ROUTES (Rendered only on real entries) */}
-              {/* ------------------------------------------------------------------- */}
-              {popularRoutes.length > 0 && (
-                <div className="bg-white rounded-[28px] p-6 sm:p-7 border border-[#F4E3D8]/90 shadow-xs">
-                  <h2 className="text-lg sm:text-xl font-black text-[#17233C] mb-4 tracking-tight">
-                    Popular Travel Match Routes
-                  </h2>
+                <img
+                  src="/match.png"
+                  alt="Find Your Travel Match"
+                  className="w-full max-h-[240px] sm:max-h-[280px] lg:max-h-[320px] object-contain drop-shadow-sm select-none pointer-events-none"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-                    {popularRoutes.map((route, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => handleRouteClick(route)}
-                        className="bg-[#FFFBF8] hover:bg-white rounded-2xl p-4 border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="font-extrabold text-[#17233C] text-sm sm:text-base group-hover:text-[#FF572E] transition-colors flex items-center gap-1.5">
-                            <span>{route.from}</span>
-                            <span className="text-[#FF572E]">→</span>
-                            <span>{route.to}</span>
-                          </div>
-                          <div className="text-xs text-[#6E7587] mt-0.5 font-medium">
-                            {route.schedule}
-                          </div>
-                        </div>
+            </div>
+          </div>
 
-                        <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#EAF8F0] border border-[#BCECD4] text-[#16A34A] text-xs font-black shrink-0">
-                          {route.activeCount} Active
-                        </div>
-                      </div>
-                    ))}
+          {/* RIGHT COLUMN STACK (SPAN 4) */}
+          <div className="lg:col-span-4 flex flex-col justify-between gap-4 sm:gap-5">
+            
+            {/* Card 1: Your Activity Stats */}
+            <div className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs flex flex-col justify-between flex-1">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#FF572E] stroke-[2.2]" />
+                  <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base">
+                    Your Travel Activity
+                  </h3>
+                </div>
+              </div>
+
+              {/* 3 Stat Boxes */}
+              <div className="grid grid-cols-3 gap-2.5">
+                
+                <div className="bg-[#FFF4ED] border border-[#FDE0D0] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+                  <div className="flex items-center justify-center gap-1.5 text-[#FF572E] mb-1">
+                    <Car className="w-3.5 h-3.5 stroke-[2.2]" />
+                    <span className="font-black text-base sm:text-lg text-[#17233C]">
+                      {stats.activePosts}
+                    </span>
                   </div>
+                  <span className="text-[11px] font-bold text-[#6E7587]">Active Posts</span>
                 </div>
-              )}
 
-            </motion.div>
-          ) : (
-            /* =================================================================== */
-            /* MY MATCHES VIEW                                                     */
-            /* =================================================================== */
-            <motion.div
-              key="my-matches"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-6"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-[#17233C]">
-                    Your Match Connections
-                  </h2>
-                  <p className="text-xs sm:text-sm text-[#6E7587]">
-                    Peers matched with your campus route and travel schedules.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('Discover')}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF572E] hover:underline cursor-pointer"
+                <div 
+                  onClick={() => navigate('/bookings')}
+                  className="bg-[#EDFAF3] hover:bg-[#DDF6E8] border border-[#BCECD4] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center cursor-pointer transition-colors"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Discover</span>
-                </button>
+                  <div className="flex items-center justify-center gap-1.5 text-[#16A34A] mb-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.2]" />
+                    <span className="font-black text-base sm:text-lg text-[#17233C]">
+                      {stats.confirmed}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#6E7587]">Confirmed</span>
+                </div>
+
+                <div 
+                  onClick={() => navigate('/bookings?tab=received')}
+                  className="bg-[#FEF9E7] hover:bg-[#FDF3CC] border border-[#FDEBB2] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-1.5 text-[#CA8A04] mb-1">
+                    <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
+                    <span className="font-black text-base sm:text-lg text-[#17233C]">
+                      {stats.pending}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#6E7587]">Pending</span>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Card 2: Match Principles */}
+            <div className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base select-none">💡</span>
+                <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base">
+                  Matching Rules
+                </h3>
+              </div>
+              
+              <ul className="space-y-2 text-xs text-[#555E70] leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF572E] font-black text-sm leading-none mt-0.5">•</span>
+                  <span>Must share exact route direction &amp; same calendar date.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF572E] font-black text-sm leading-none mt-0.5">•</span>
+                  <span>Departure time difference is at most 7 hours (420 mins).</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF572E] font-black text-sm leading-none mt-0.5">•</span>
+                  <span>Offer matches requests &amp; co-drivers; Requests match offers only.</span>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ========================================================================= */}
+        {/* MAIN INTERACTIVE SECTION: MY ACTIVE POSTS OR SELECTED POST RESULTS        */}
+        {/* ========================================================================= */}
+        <div ref={matchesSectionRef} className="space-y-6 pt-2">
+
+          {/* ----------------------------------------------------------------------- */}
+          {/* VIEW A: NO SPECIFIC POST SELECTED -> SHOW MY ACTIVE TRAVEL POSTS        */}
+          {/* ----------------------------------------------------------------------- */}
+          {!selectedPost ? (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-[#17233C] tracking-tight flex items-center gap-2">
+                    <Car className="w-5 h-5 text-[#FF572E]" />
+                    <span>My Active Travel Posts</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#FFF4ED] text-[#FF572E] font-black border border-[#FDE0D0]">
+                      {myTravels.length}
+                    </span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#6E7587] mt-0.5">
+                    Click "Find Matches" on any post below to search for compatible peers for that specific route.
+                  </p>
+                </div>
               </div>
 
-              {/* If no matches yet */}
-              {allTravels.length === 0 && myBookings.length === 0 ? (
-                <div className="bg-white rounded-[28px] p-10 border border-[#F4E3D8] text-center max-w-lg mx-auto">
-                  <div className="w-14 h-14 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-7 h-7" />
+              {loadingPosts ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white rounded-[24px] p-5 border border-[#F4E3D8] animate-pulse space-y-4">
+                      <div className="h-6 bg-gray-200 rounded-md w-1/3" />
+                      <div className="h-10 bg-gray-100 rounded-xl" />
+                      <div className="h-8 bg-gray-200 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              ) : postsError ? (
+                <div className="bg-white rounded-[28px] p-8 text-center border border-red-200 max-w-lg mx-auto space-y-4 shadow-sm">
+                  <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto">
+                    <AlertCircle className="w-6 h-6" />
                   </div>
-                  <h3 className="font-black text-lg text-[#17233C] mb-1">No Matches Found Yet</h3>
-                  <p className="text-xs text-[#6E7587] mb-5">
-                    Set your ride preferences or offer a ride to automatically match with campus peers going your way.
-                  </p>
+                  <div>
+                    <h4 className="font-black text-lg text-[#17233C]">Unable to Load Posts</h4>
+                    <p className="text-xs text-red-600 mt-1 max-w-sm mx-auto">{postsError}</p>
+                  </div>
                   <button
-                    onClick={() => navigate('/match/preferences')}
-                    className="px-6 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer"
+                    onClick={fetchMyActivePosts}
+                    className="px-5 py-2 bg-[#FF572E] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-2"
                   >
-                    Set Match Preferences
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Retry</span>
                   </button>
                 </div>
+              ) : myTravels.length === 0 ? (
+                /* No active posts found */
+                <div className="bg-white rounded-[28px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-xl mx-auto space-y-4 shadow-sm">
+                  <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
+                    <Car className="w-8 h-8 text-[#FF572E]" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-xl text-[#17233C]">
+                      No Active Ride Offer or Request Found
+                    </h4>
+                    <p className="text-xs sm:text-sm text-[#6E7587] mt-1.5 max-w-md mx-auto leading-relaxed">
+                      Helpu matches rides based on your own actual travel plans. Publish a ride offer or passenger request to find matching students going your way!
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button
+                      onClick={() => navigate('/rides/offer')}
+                      className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <Car className="w-4 h-4" />
+                      <span>+ Offer a Ride</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/rides/request')}
+                      className="px-6 py-3 bg-white border border-[#F4E3D8] hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs sm:text-sm rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <Send className="w-4 h-4 text-[#8B5CF6]" />
+                      <span>+ Request a Ride</span>
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {allTravels.map((travel) => {
-                    const student = travel.student || {};
-                    const fromCity = travel.source || travel.from || 'VIT, Bhopal';
-                    const toCity = travel.destination || travel.to || 'Bhopal City';
-                    const seats = travel.seats || travel.availableSeats || 1;
-                    const phone = student.phone || travel.phone || '';
-                    const dateFormatted = travel.travelDate 
-                      ? new Date(travel.travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                      : 'Today';
+                /* Grid of Active Posts with "Find Matches" Button */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {myTravels.map((travel) => {
+                    const isOffer = travel.type === 'offer';
+                    const booked = travel.bookedSeats || 0;
+                    const availableSeats = Math.max(0, (travel.seats || 1) - booked);
+                    const isCurrentlyFetching = fetchingPostId === travel._id?.toString();
 
                     return (
                       <div
-                        key={travel._id || travel.id}
-                        className="bg-white rounded-[24px] p-5 border border-[#F4E3D8] hover:border-[#FF572E]/40 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                        key={travel._id}
+                        className="bg-white rounded-[24px] border border-[#F4E3D8] p-5 shadow-xs hover:shadow-md hover:border-[#FF572E]/40 transition-all flex flex-col justify-between gap-4"
                       >
-                        <div>
-                          {/* Student Info Header */}
-                          <div className="flex items-center justify-between mb-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <Avatar avatarId={student.avatarId || 'm1'} size="md" ring />
-                              <div>
-                                <h4 className="font-extrabold text-sm text-[#17233C]">
-                                  {student.name || 'Campus Student'}
-                                </h4>
-                                <span className="inline-flex items-center gap-1 text-[11px] text-[#16A34A] font-semibold">
-                                  <ShieldCheck className="w-3 h-3" />
-                                  Verified Student
-                                </span>
-                              </div>
-                            </div>
-
-                            <span className="px-2.5 py-1 rounded-full bg-[#FFF4ED] text-[#FF572E] text-xs font-black">
-                              {seats} seat{seats > 1 ? 's' : ''}
+                        <div className="space-y-3.5">
+                          {/* Card Header: Type Badge & Price / Vehicle */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              isOffer
+                                ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
+                                : 'bg-[#F5F3FF] text-[#8B5CF6] border border-[#DDD6FE]'
+                            }`}>
+                              {isOffer ? 'Ride Offer' : 'Passenger Request'}
                             </span>
+
+                            {isOffer && travel.pricePerSeat > 0 && (
+                              <span className="text-[#FF572E] font-black text-xs sm:text-sm font-mono">
+                                ₹{travel.pricePerSeat}/seat
+                              </span>
+                            )}
                           </div>
 
-                          {/* Route box */}
-                          <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/80 text-xs space-y-1.5 mb-3.5">
-                            <div className="flex items-center gap-2 text-[#17233C] font-bold">
-                              <MapPin className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                              <span className="truncate">{fromCity} → {toCity}</span>
+                          {/* Route Block */}
+                          <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/80 text-xs space-y-1.5">
+                            <div className="flex items-center gap-2 font-black text-[#17233C] text-sm">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                              <span className="truncate">{travel.source}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-[#6E7587]">
-                              <Calendar className="w-3.5 h-3.5 shrink-0" />
-                              <span>{dateFormatted}</span>
+                            <div className="pl-1 border-l-2 border-dashed border-[#F4E3D8] ml-1 my-0.5 py-0.5">
+                              <span className="text-[10px] text-[#FF572E] font-bold">Direction</span>
                             </div>
+                            <div className="flex items-center gap-2 font-black text-[#17233C] text-sm">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                              <span className="truncate">{travel.destination}</span>
+                            </div>
+                          </div>
+
+                          {/* Schedule & Seats Metadata */}
+                          <div className="grid grid-cols-2 gap-2 text-[11px] text-[#6E7587] pt-1 border-t border-[#F4E3D8]/60">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <Calendar className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
+                              <span className="font-bold text-[#17233C]">{formatTravelDate(travel.travelDate)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 truncate">
+                              <Clock className="w-3.5 h-3.5 text-[#6E7587] shrink-0" />
+                              <span>{formatMinutesToTime(travel.departureTime)}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] font-semibold text-[#6E7587]">
+                            {isOffer ? (
+                              <span className="text-[#16A34A]">
+                                🟢 <strong>{availableSeats}</strong> of {travel.seats} seats available
+                              </span>
+                            ) : (
+                              <span className="text-[#8B5CF6]">
+                                🟣 <strong>{travel.seats || 1}</strong> seat(s) requested
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 pt-2 border-t border-[#F4E3D8]">
+                        {/* Primary Card Action: Find Matches for this post */}
+                        <div className="pt-2 border-t border-[#F4E3D8]/70">
                           <button
-                            onClick={() => openWhatsAppChat({
-                              phone,
-                              name: student.name || 'Campus Peer',
-                              route: `${fromCity} → ${toCity}`
-                            })}
-                            className="flex-1 py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            type="button"
+                            onClick={() => handleSelectPostForMatches(travel)}
+                            disabled={isCurrentlyFetching}
+                            className="w-full py-2.5 px-4 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
                           >
-                            <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
-                            <span>WhatsApp</span>
-                          </button>
-
-                          <button
-                            onClick={() => navigate(`/book/${travel._id || travel.id}`)}
-                            className="flex-1 py-2 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer text-center"
-                          >
-                            Book Seat
+                            {isCurrentlyFetching ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Searching Matches...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Search className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Find Matches</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>
@@ -543,9 +554,293 @@ export default function MatchPage() {
                   })}
                 </div>
               )}
-            </motion.div>
+            </div>
+          ) : (
+            /* --------------------------------------------------------------------- */
+            /* VIEW B: POST SELECTED -> SHOW RESULTS ONLY FOR THE SELECTED POST      */
+            /* --------------------------------------------------------------------- */
+            <div className="space-y-5">
+              
+              {/* Back Navigation & Selected Post Header */}
+              <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <button
+                    onClick={handleBackToPosts}
+                    className="inline-flex items-center gap-1.5 text-xs font-black text-[#FF572E] hover:text-[#E64A22] cursor-pointer group"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>← Back to My Active Travel Posts</span>
+                  </button>
+
+                  <button
+                    onClick={handleBackToPosts}
+                    className="px-3 py-1 bg-[#FFF4ED] hover:bg-[#FFE8DC] border border-[#FDE0D0] text-[#FF572E] text-xs font-bold rounded-lg transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    Select Another Post
+                  </button>
+                </div>
+
+                {/* Selected Post Summary Strip */}
+                <div className="bg-[#FFFBF8] p-3.5 rounded-2xl border border-[#F4E3D8]/90 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                      selectedPost.type === 'offer'
+                        ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
+                        : 'bg-[#F5F3FF] text-[#8B5CF6] border border-[#DDD6FE]'
+                    }`}>
+                      {selectedPost.type === 'offer' ? 'Your Offer' : 'Your Request'}
+                    </span>
+                    <span className="font-black text-sm sm:text-base text-[#17233C]">
+                      {selectedPost.source} → {selectedPost.destination}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-[#6E7587]">
+                    <span className="flex items-center gap-1 font-bold text-[#17233C]">
+                      <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                      <span>{formatTravelDate(selectedPost.travelDate)}</span>
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{formatMinutesToTime(selectedPost.departureTime)}</span>
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {selectedPost.type === 'offer'
+                        ? `${Math.max(0, (selectedPost.seats || 1) - (selectedPost.bookedSeats || 0))} seats avail`
+                        : `${selectedPost.seats || 1} seat requested`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Matching Results Header */}
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <h3 className="text-xl font-black text-[#17233C] tracking-tight">
+                    Matched Students
+                  </h3>
+                  <p className="text-xs text-[#6E7587]">
+                    Compatible rides matching your route, date and up to 7-hour time window.
+                  </p>
+                </div>
+
+                {!loadingMatches && matches.length > 0 && (
+                  <span className="px-3 py-1 rounded-full bg-[#EDFAF3] border border-[#BCECD4] text-[#16A34A] text-xs font-black">
+                    {matches.length} Match{matches.length > 1 ? 'es' : ''} Found
+                  </span>
+                )}
+              </div>
+
+              {/* Match Results Content */}
+              {loadingMatches ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white rounded-[24px] p-5 border border-[#F4E3D8] animate-pulse space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gray-200 rounded-full" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-4 bg-gray-200 rounded-md w-3/4" />
+                          <div className="h-3 bg-gray-100 rounded-md w-1/2" />
+                        </div>
+                      </div>
+                      <div className="h-14 bg-gray-100 rounded-xl" />
+                      <div className="h-8 bg-gray-200 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              ) : matchesError ? (
+                <div className="bg-white rounded-[28px] p-8 text-center border border-red-200 max-w-lg mx-auto space-y-4 shadow-sm">
+                  <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-lg text-[#17233C]">Unable to Fetch Matches</h4>
+                    <p className="text-xs text-red-600 mt-1 max-w-sm mx-auto">{matchesError}</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => handleSelectPostForMatches(selectedPost)}
+                      className="px-5 py-2 bg-[#FF572E] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Retry</span>
+                    </button>
+                    <button
+                      onClick={handleBackToPosts}
+                      className="px-4 py-2 bg-white border border-[#F4E3D8] text-[#17233C] font-bold text-xs rounded-xl cursor-pointer"
+                    >
+                      Back to Posts
+                    </button>
+                  </div>
+                </div>
+              ) : matches.length === 0 ? (
+                /* Empty state required by prompt */
+                <div className="bg-white rounded-[28px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4 shadow-sm">
+                  <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto">
+                    <Users className="w-8 h-8 text-[#FF572E]" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-xl text-[#17233C]">
+                      No matching students found yet.
+                    </h4>
+                    <p className="text-xs sm:text-sm text-[#6E7587] mt-2 max-w-md mx-auto leading-relaxed">
+                      Helpu will find compatible students when they publish a ride.
+                    </p>
+                    <p className="text-[11px] text-[#A0A6B5] mt-1">
+                      (Checked route {selectedPost.source} → {selectedPost.destination} on {formatTravelDate(selectedPost.travelDate)} within 7 hours departure difference)
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
+                    <button
+                      onClick={handleBackToPosts}
+                      className="px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                    >
+                      ← Select Another Travel Post
+                    </button>
+                    <button
+                      onClick={() => navigate('/rides/offer')}
+                      className="px-5 py-2.5 bg-white border border-[#F4E3D8] text-[#17233C] font-bold text-xs rounded-xl shadow-2xs hover:bg-[#FFF7F2] transition-colors cursor-pointer"
+                    >
+                      Offer a Ride
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Grid of Matching Student Cards */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {matches.map((match) => {
+                    const student = match.student || match.creator || {};
+                    const fromCity = match.source || match.from || 'Campus';
+                    const toCity = match.destination || match.to || 'Destination';
+                    const dateFormatted = formatTravelDate(match.travelDate);
+                    const timeFormatted = formatMinutesToTime(match.departureTime);
+                    const seats = match.availableSeats || match.seats || 1;
+                    const isOffer = match.type === 'offer';
+                    const travelId = match._id?.toString();
+
+                    return (
+                      <motion.div
+                        key={match._id || Math.random()}
+                        layout
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-[24px] border border-[#F4E3D8] p-5 shadow-xs hover:shadow-md hover:border-[#FF572E]/30 transition-all flex flex-col justify-between gap-4"
+                      >
+                        <div className="space-y-3.5">
+                          {/* Student Profile Header */}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar
+                                name={student.name || 'Campus Student'}
+                                avatarId={student.avatarId || student.imageUrl}
+                                size="md"
+                                className="ring-2 ring-[#FF572E]/15 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <h4 className="font-extrabold text-[#17233C] text-sm truncate">
+                                  {student.name || 'Campus Student'}
+                                </h4>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#16A34A]">
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  <span>Verified Student</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                              isOffer
+                                ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
+                                : 'bg-[#F5F3FF] text-[#8B5CF6] border border-[#DDD6FE]'
+                            }`}>
+                              {isOffer ? 'Ride Offer' : 'Passenger Request'}
+                            </span>
+                          </div>
+
+                          {/* Reason Pill */}
+                          {match.matchingReason && (
+                            <div className="px-3 py-1 bg-[#FFF4ED] rounded-xl text-[11px] font-bold text-[#FF572E] border border-[#FDE0D0] flex items-center gap-1.5">
+                              <span>🎯</span>
+                              <span className="truncate">{match.matchingReason}</span>
+                            </div>
+                          )}
+
+                          {/* Route & Schedule Box */}
+                          <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/80 text-xs space-y-2">
+                            <div className="flex items-center gap-2 font-bold text-[#17233C]">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                              <span className="truncate">{fromCity}</span>
+                              <span className="text-[#FF572E]">→</span>
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                              <span className="truncate">{toCity}</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[11px] text-[#6E7587] pt-1.5 border-t border-[#F4E3D8]/60">
+                              <div className="flex items-center gap-1 truncate">
+                                <Calendar className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
+                                <span>{dateFormatted}</span>
+                                {timeFormatted && <span>• {timeFormatted}</span>}
+                              </div>
+                              <div className="text-right font-medium">
+                                {isOffer ? (
+                                  <span className="text-[#16A34A] font-bold">{seats} seat(s) available</span>
+                                ) : (
+                                  <span className="text-[#8B5CF6] font-bold">{match.seats || 1} seat requested</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Vehicle / Price */}
+                          <div className="flex items-center justify-between text-xs px-1 font-semibold text-[#6E7587]">
+                            <span>{match.carModel || (isOffer ? 'Campus Carpool' : 'Needs Ride')}</span>
+                            {isOffer && match.pricePerSeat > 0 && (
+                              <span className="text-[#FF572E] font-black text-sm font-mono">
+                                ₹{match.pricePerSeat}/seat
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Appropriate Existing Booking or Coordination Action */}
+                        <div className="pt-2 border-t border-[#F4E3D8]/70">
+                          {isOffer ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
+                                  navigate(`/book/${travelId}`);
+                                } else {
+                                  navigate('/rides/offer');
+                                }
+                              }}
+                              className="w-full py-2.5 px-4 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              <Ticket className="w-3.5 h-3.5" />
+                              <span>Book Seat</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/bookings?tab=received')}
+                              className="w-full py-2.5 px-4 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              <Users className="w-3.5 h-3.5" />
+                              <span>View Requests</span>
+                            </button>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+
+            </div>
           )}
-        </AnimatePresence>
+
+        </div>
 
       </div>
     </ResponsiveShell>

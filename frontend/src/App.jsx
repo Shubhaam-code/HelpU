@@ -9,13 +9,13 @@ import { setTokenGetter, getProfile, saveProfile } from './lib/api';
 import OnboardingPage from './pages/OnboardingPage';
 import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
-import RidesPage from './pages/RidesPage';
 import OfferRidePage from './pages/OfferRidePage';
 import RideDetailsPage from './pages/RideDetailsPage';
 import BookSeatPage from './pages/BookSeatPage';
 import BookingDetailsPage from './pages/BookingDetailsPage';
 import BookingsListPage from './pages/BookingsListPage';
 import MatchPage from './pages/MatchPage';
+import MyMatchesPage from './pages/MyMatchesPage';
 import MatchPreferencesPage from './pages/MatchPreferencesPage';
 import MatchDetailsPage from './pages/MatchDetailsPage';
 import MatchSuccessPage from './pages/MatchSuccessPage';
@@ -23,6 +23,7 @@ import ChatConversationPage from './pages/ChatConversationPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import CreatePage from './pages/CreatePage';
+import MyPostsPage from './pages/MyPostsPage';
 import CommunityPage from './pages/CommunityPage';
 import GetHelpPage from './pages/GetHelpPage';
 import AboutPage from './pages/AboutPage';
@@ -91,15 +92,19 @@ function TokenInjector() {
       getProfile()
         .then((res) => {
           const p = res.data?.data;
-          const currentImg = user.imageUrl;
-          if (!p || !p.imageUrl || (currentImg && p.imageUrl !== currentImg)) {
+          const currentImg = user.imageUrl || '';
+          const email = p?.email || user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '';
+          const name = p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Campus Student';
+          const phone = p?.phone || user.primaryPhoneNumber?.phoneNumber || user.phoneNumbers?.[0]?.phoneNumber || '';
+
+          if ((!p || !p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email) {
             saveProfile({
-              name: p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Campus Student',
-              email: p?.email || user.primaryEmailAddress?.emailAddress || '',
-              phone: p?.phone || user.primaryPhoneNumber?.phoneNumber || '',
+              name,
+              email,
+              phone,
               college: p?.college || 'VIT, Bhopal',
-              imageUrl: currentImg || ''
-            }).catch(() => {});
+              imageUrl: currentImg
+            }).catch((err) => console.warn('Failed to sync profile image:', err));
           }
         })
         .catch(() => {});
@@ -145,7 +150,7 @@ export default function App() {
 
         {/* Protected */}
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/rides" element={<ProtectedRoute><RidesPage /></ProtectedRoute>} />
+        <Route path="/rides" element={<ProtectedRoute><Navigate to="/rides/offer" replace /></ProtectedRoute>} />
         <Route path="/rides/offer" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
         <Route path="/rides/request" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
         <Route path="/rides/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
@@ -153,6 +158,8 @@ export default function App() {
         <Route path="/bookings" element={<ProtectedRoute><BookingsListPage /></ProtectedRoute>} />
         <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
         <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
+        <Route path="/matches" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
+        <Route path="/match/my" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
         <Route path="/match/preferences" element={<ProtectedRoute><MatchPreferencesPage /></ProtectedRoute>} />
         <Route path="/match/success" element={<ProtectedRoute><MatchSuccessPage /></ProtectedRoute>} />
         <Route path="/match/:id" element={<ProtectedRoute><MatchDetailsPage /></ProtectedRoute>} />
@@ -162,8 +169,9 @@ export default function App() {
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
 
-        {/* Community, Help & About dedicated pages */}
-        <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
+        {/* Posts, Help & About dedicated pages */}
+        <Route path="/posts" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+        <Route path="/community" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
         <Route path="/help" element={<ProtectedRoute><GetHelpPage /></ProtectedRoute>} />
         <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
         <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />

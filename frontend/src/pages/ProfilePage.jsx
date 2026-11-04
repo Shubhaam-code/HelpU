@@ -105,7 +105,7 @@ export default function ProfilePage() {
 
   const navMenuItems = [
     { icon: Calendar, label: 'My Bookings', subtitle: 'View upcoming and active ride seats', path: '/bookings' },
-    { icon: Car, label: 'Offers & Requests', subtitle: 'Manage your campus travel posts', path: '/rides' },
+    { icon: Car, label: 'Offers & Requests', subtitle: 'Manage your campus travel posts', path: '/rides/offer' },
     { icon: Heart, label: 'Saved Rides', subtitle: 'Frequently used routes & bookmarks', path: '/saved' },
     { icon: HelpCircle, label: 'Campus Help & Support', subtitle: 'Campus assistance and student FAQs', path: '/help' },
     { icon: Settings, label: 'Account Settings', subtitle: 'Notifications, privacy & security', path: '/settings' },

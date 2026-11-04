@@ -7,7 +7,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 const OPTIONS = [
   { icon: '🚗', title: 'Offer a Ride', subtitle: 'Share your journey & earn', color: 'bg-peach hover:bg-peach/90', path: '/rides/offer' },
   { icon: '📍', title: 'Request a Ride', subtitle: 'Find someone going your way', color: 'bg-lavender hover:bg-lavender/90', path: '/rides/request' },
-  { icon: '🤝', title: 'Find a Match', subtitle: 'Get matched with co-travellers', color: 'bg-mint hover:bg-mint/90', path: '/match/preferences' },
+  { icon: '🤝', title: 'Find a Match', subtitle: 'Get matched with co-travellers', color: 'bg-mint hover:bg-mint/90', path: '/match' },
   { icon: '🔧', title: 'Request Help', subtitle: 'Get campus peer assistance', color: 'bg-sky hover:bg-sky/90', path: '/help' },
 ];
 
