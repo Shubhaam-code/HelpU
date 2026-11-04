@@ -13,8 +13,7 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getTravels } from '../lib/api';
 
-const TABS = ['All', 'Offers', 'Requests'];
-const QUICK_FILTERS = ['All Routes', 'VIT ↔ Bhopal', 'Railway Station', 'Airport', 'Available Seats'];
+const TABS = ['All Matches', 'Matching Offers', 'Matching Requests'];
 const SORT_OPTIONS = [
   { id: 'latest', label: 'Latest Posted' },
   { id: 'date_asc', label: 'Departure: Earliest' },
@@ -28,27 +27,28 @@ export default function RidesPage() {
   
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'offers') return 'Offers';
-    if (tabParam === 'requests') return 'Requests';
-    return 'All';
+    if (tabParam === 'offers' || tabParam === 'Matching Offers') return 'Matching Offers';
+    if (tabParam === 'requests' || tabParam === 'Matching Requests') return 'Matching Requests';
+    return 'All Matches';
   });
 
-  const [activeQuickFilter, setActiveQuickFilter] = useState('All Routes');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || searchParams.get('to') || '');
   const [sortBy, setSortBy] = useState('latest');
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [hasPostedTravel, setHasPostedTravel] = useState(true);
+  const [activeRoutes, setActiveRoutes] = useState([]);
 
   // Sync activeTab when query param ?tab= changes
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'offers') {
-      setActiveTab('Offers');
-    } else if (tabParam === 'requests') {
-      setActiveTab('Requests');
-    } else if (tabParam === 'all') {
-      setActiveTab('All');
+    if (tabParam === 'offers' || tabParam === 'Matching Offers') {
+      setActiveTab('Matching Offers');
+    } else if (tabParam === 'requests' || tabParam === 'Matching Requests') {
+      setActiveTab('Matching Requests');
+    } else if (tabParam === 'all' || tabParam === 'All Matches') {
+      setActiveTab('All Matches');
     }
     const searchVal = searchParams.get('search') || searchParams.get('to');
     if (searchVal !== null && searchVal !== undefined) {
@@ -61,12 +61,14 @@ export default function RidesPage() {
     setError('');
     try {
       const params = {};
-      if (activeTab === 'Offers') params.type = 'offer';
-      if (activeTab === 'Requests') params.type = 'request';
+      if (activeTab === 'Matching Offers') params.type = 'offer';
+      if (activeTab === 'Matching Requests') params.type = 'request';
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const res = await getTravels(params);
       const data = res.data?.data || res.data?.travels || res.data || [];
+      setHasPostedTravel(res.data?.hasPostedTravel !== false);
+      setActiveRoutes(res.data?.activeRoutes || []);
       setRides(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Rides fetch error:', err);
@@ -81,33 +83,9 @@ export default function RidesPage() {
     fetchRides();
   }, [fetchRides]);
 
-  // Client-side quick filter and sorting
+  // Client-side sorting
   const processedRides = useMemo(() => {
     let list = [...rides];
-
-    // Quick filter chips
-    if (activeQuickFilter === 'VIT ↔ Bhopal') {
-      list = list.filter(r => {
-        const from = (r.source || r.from || '').toLowerCase();
-        const to = (r.destination || r.to || '').toLowerCase();
-        return (from.includes('vit') && to.includes('bhopal')) || (from.includes('bhopal') && to.includes('vit'));
-      });
-    } else if (activeQuickFilter === 'Railway Station') {
-      list = list.filter(r => {
-        const route = `${r.source || r.from || ''} ${r.destination || r.to || ''}`.toLowerCase();
-        return route.includes('station') || route.includes('junction') || route.includes('rkmp');
-      });
-    } else if (activeQuickFilter === 'Airport') {
-      list = list.filter(r => {
-        const route = `${r.source || r.from || ''} ${r.destination || r.to || ''}`.toLowerCase();
-        return route.includes('airport') || route.includes('bho');
-      });
-    } else if (activeQuickFilter === 'Available Seats') {
-      list = list.filter(r => {
-        const seatsLeft = typeof r.seats === 'number' ? (r.seats - (r.bookedSeats || 0)) : (r.availableSeats || 1);
-        return seatsLeft > 0;
-      });
-    }
 
     // Sort
     list.sort((a, b) => {
@@ -129,7 +107,7 @@ export default function RidesPage() {
     });
 
     return list;
-  }, [rides, activeQuickFilter, sortBy]);
+  }, [rides, sortBy]);
 
   return (
     <ResponsiveShell
@@ -163,17 +141,17 @@ export default function RidesPage() {
             {/* Direct Action Buttons */}
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={() => navigate('/rides/offer?mode=offer')}
+                onClick={() => navigate('/rides/offer')}
                 className="px-5 py-3 rounded-2xl bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
                 <span>Offer a Ride</span>
               </button>
               <button
-                onClick={() => navigate('/rides/offer?mode=request')}
+                onClick={() => navigate('/bookings')}
                 className="px-5 py-3 rounded-2xl bg-white hover:bg-[#FFF7F2] text-[#17233C] font-black text-xs sm:text-sm border border-[#F4E3D8] flex items-center gap-2 shadow-xs transition-all cursor-pointer"
               >
-                <span>Request a Ride</span>
+                <span>My Bookings</span>
               </button>
             </div>
           </div>
@@ -239,23 +217,6 @@ export default function RidesPage() {
 
           </div>
 
-          {/* Quick Filter Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-[#F4E3D8]/60">
-            {QUICK_FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setActiveQuickFilter(f)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeQuickFilter === f
-                    ? 'bg-[#17233C] text-white shadow-xs'
-                    : 'bg-[#FFFBF8] text-[#596277] hover:text-[#17233C] border border-[#F4E3D8]'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-
         </div>
 
         {/* ========================================================================= */}
@@ -281,52 +242,97 @@ export default function RidesPage() {
                 <span>Retry Loading</span>
               </button>
             </div>
+          ) : !hasPostedTravel ? (
+            <div className="bg-white rounded-[32px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4 shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl shadow-inner">
+                🎯
+              </div>
+              <div>
+                <h3 className="font-black text-[#17233C] text-lg sm:text-xl">Smart Matching Campus Rides</h3>
+                <p className="text-xs sm:text-sm text-[#6E7587] mt-1.5 max-w-sm mx-auto leading-relaxed">
+                  Helpu protects campus privacy by matching rides intelligently. You will only see verified peers traveling on your <strong>same route, direction, date, and schedule</strong>!
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
+                <button
+                  onClick={() => navigate('/rides/offer')}
+                  className="px-6 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm rounded-xl shadow-sm transition-all cursor-pointer"
+                >
+                  Offer a Ride
+                </button>
+                <button
+                  onClick={() => navigate('/bookings')}
+                  className="px-6 py-2.5 bg-white hover:bg-[#FFF7F2] text-[#17233C] font-black text-xs sm:text-sm border border-[#F4E3D8] rounded-xl shadow-2xs transition-all cursor-pointer"
+                >
+                  My Bookings
+                </button>
+              </div>
+            </div>
           ) : processedRides.length === 0 ? (
             <div className="bg-white rounded-[32px] p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4">
               <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
-                🚗
+                🔍
               </div>
               <div>
-                <h3 className="font-black text-[#17233C] text-lg">No Active Campus Rides</h3>
-                <p className="text-xs text-[#6E7587] mt-1 max-w-sm mx-auto">
-                  {searchQuery || activeQuickFilter !== 'All Routes'
-                    ? 'No rides match your current search filters. Try clearing your filters or check back later.'
-                    : 'Be the first student to offer or request a campus carpool today!'}
+                <h3 className="font-black text-[#17233C] text-lg">No Matching Rides Right Now</h3>
+                <p className="text-xs text-[#6E7587] mt-1.5 max-w-sm mx-auto leading-relaxed">
+                  {searchQuery
+                    ? 'No rides match your active search keyword.'
+                    : 'Currently no peers have posted a ride matching your exact route, direction, date, and schedule. As soon as someone posts, it will appear here!'}
                 </p>
               </div>
               <div className="flex items-center justify-center gap-3 pt-2">
-                {(searchQuery || activeQuickFilter !== 'All Routes') && (
+                {searchQuery && (
                   <button
-                    onClick={() => { setSearchQuery(''); setActiveQuickFilter('All Routes'); }}
+                    onClick={() => setSearchQuery('')}
                     className="px-4 py-2 rounded-xl text-xs font-bold text-[#6E7587] hover:bg-[#FFFBF8] border border-[#F4E3D8] cursor-pointer"
                   >
-                    Clear Filters
+                    Clear Search
                   </button>
                 )}
                 <button
-                  onClick={() => navigate('/rides/offer?mode=offer')}
-                  className="px-6 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                  onClick={() => navigate('/rides/offer')}
+                  className="px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
                 >
-                  Offer a Ride Now
+                  Offer a Ride
+                </button>
+                <button
+                  onClick={() => navigate('/bookings')}
+                  className="px-5 py-2.5 bg-white hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs border border-[#F4E3D8] rounded-xl cursor-pointer"
+                >
+                  My Bookings
                 </button>
               </div>
             </div>
           ) : (
-            <motion.div
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-            >
-              {processedRides.map((ride) => (
-                <RideCard
-                  key={ride._id || ride.id}
-                  travel={ride}
-                  onPress={() => navigate(`/rides/${ride._id || ride.id}`)}
-                />
-              ))}
-            </motion.div>
+            <div className="space-y-4">
+              {activeRoutes.length > 0 && (
+                <div className="flex items-center gap-2 p-3 px-4 rounded-2xl bg-[#FFF6EE] border border-[#F4E3D8] text-xs font-bold text-[#FF572E]">
+                  <MapPin className="w-4 h-4 shrink-0" />
+                  <span>
+                    Matching your active route:{' '}
+                    <span className="text-[#17233C]">
+                      {activeRoutes.map((r) => `${r.source} → ${r.destination}`).join(' | ')}
+                    </span>
+                  </span>
+                </div>
+              )}
+              <motion.div
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+              >
+                {processedRides.map((ride) => (
+                  <RideCard
+                    key={ride._id || ride.id}
+                    travel={ride}
+                    onPress={() => navigate(`/rides/${ride._id || ride.id}`)}
+                  />
+                ))}
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 

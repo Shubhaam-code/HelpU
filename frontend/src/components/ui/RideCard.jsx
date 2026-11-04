@@ -68,6 +68,14 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
           </div>
         </div>
 
+        {/* Matching Reason Tag */}
+        {travel?.matchingReason && (
+          <div className="mb-2.5 px-2.5 py-1 rounded-lg bg-[#EDFAF3] border border-[#BCECD4] text-[10px] font-black text-[#16A34A] flex items-center gap-1">
+            <span>🎯</span>
+            <span className="truncate">{travel.matchingReason}</span>
+          </div>
+        )}
+
         {/* Route Details */}
         <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8] mb-3 space-y-2">
           <div className="flex items-center gap-2 text-xs">

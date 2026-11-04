@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useUser } from '@clerk/clerk-react';
 import {
@@ -79,11 +79,18 @@ const POPULAR_LOCATIONS = [
 
 export default function OfferRidePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUser();
   const [searchParams] = useSearchParams();
-  const initialMode = searchParams.get('mode') === 'request' ? 'request' : 'offer';
+  const isRequestPath = location.pathname.includes('/request') || searchParams.get('mode') === 'request';
 
-  const [mode, setMode] = useState(initialMode); // 'offer' | 'request'
+  const [mode, setMode] = useState(isRequestPath ? 'request' : 'offer'); // 'offer' | 'request'
+
+  // Sync mode if route changes between /rides/offer and /rides/request
+  useEffect(() => {
+    const isReq = location.pathname.includes('/request') || searchParams.get('mode') === 'request';
+    setMode(isReq ? 'request' : 'offer');
+  }, [location.pathname, searchParams]);
   const [fromLoc, setFromLoc] = useState('VIT, Bhopal');
   const [toLoc, setToLoc] = useState('Bhopal Railway Station');
   const [date, setDate] = useState(() => {
@@ -210,13 +217,13 @@ export default function OfferRidePage() {
             </button>
           </div>
 
-          {/* Quick link button to View All Rides */}
+          {/* Quick link button to Match Page */}
           <button
             type="button"
-            onClick={() => navigate('/rides')}
+            onClick={() => navigate('/match')}
             className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-white rounded-2xl border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs sm:text-sm font-bold shadow-xs hover:bg-[#FFF7F2] transition-all cursor-pointer"
           >
-            <span>Explore Rides</span>
+            <span>Find Matches</span>
             <ArrowRight className="w-3.5 h-3.5 text-[#FF572E]" />
           </button>
         </div>

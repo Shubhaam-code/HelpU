@@ -212,14 +212,22 @@ export default function BookSeatPage() {
     setIsSubmitting(true);
 
     try {
+      const targetTravelId = travel?._id || id;
+      if (!targetTravelId || typeof targetTravelId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(targetTravelId)) {
+        setSubmitError('Invalid travel ID format. Please select an active ride from the campus listing.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const bookingPayload = {
-        travelId: travel?._id || id,
+        travelId: targetTravelId,
         requestedSeats: Number(seats),
         seatsBooked: Number(seats),
         passengerName: fullName.trim(),
         passengerEmail: email.trim(),
         passengerPhone: phone.trim(),
         passengerNotes: notes.trim(),
+        passengerImage: user?.imageUrl || profile?.imageUrl || '',
         notes: notes.trim(),
         totalPrice: totalAmount
       };
@@ -298,10 +306,10 @@ export default function BookSeatPage() {
             </p>
             <div className="pt-2">
               <button
-                onClick={() => navigate('/rides')}
+                onClick={() => navigate('/rides/offer')}
                 className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-bold rounded-full shadow-sm transition-all cursor-pointer"
               >
-                Browse Available Rides →
+                Go to Rides →
               </button>
             </div>
           </div>

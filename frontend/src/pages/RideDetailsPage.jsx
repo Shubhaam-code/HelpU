@@ -206,8 +206,15 @@ export default function RideDetailsPage() {
     setIsSubmitting(true);
 
     try {
+      const targetTravelId = travel?._id || id;
+      if (!targetTravelId || typeof targetTravelId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(targetTravelId)) {
+        setSubmitError('Invalid travel ID format. Please select an active ride from the campus listing.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const bookingPayload = {
-        travelId: travel?._id || id,
+        travelId: targetTravelId,
         requestedSeats: Number(seats),
         seatsBooked: Number(seats),
         passengerName: fullName.trim(),
@@ -240,12 +247,20 @@ export default function RideDetailsPage() {
 
   // 6. Connect via WhatsApp for ride requests
   const handleConnectWhatsApp = () => {
+    if (isOwnRide) return; // Prevent coordination with own post
+    const targetPhone = travel.student?.phone || travel.studentPhone || '';
+    if (!targetPhone) return;
     const creatorName = travel.student?.name || 'Fellow Student';
     const from = travel.source || travel.from || 'Campus';
     const to = travel.destination || travel.to || 'City';
     const message = `Hi ${creatorName}! I saw your ride request on HelpU from ${from} to ${to} on ${formattedDate}. I am traveling the same way and can offer a ride!`;
-    const targetPhone = travel.student?.phone || travel.studentPhone || '';
-    openWhatsAppChat(targetPhone, message);
+    openWhatsAppChat({
+      phone: targetPhone,
+      name: creatorName,
+      route: `${from} → ${to}`,
+      message,
+      isOwn: isOwnRide
+    });
   };
 
   return (
@@ -263,13 +278,13 @@ export default function RideDetailsPage() {
         {/* Navigation Breadcrumb / Go Back Link */}
         <div className="mb-6 flex items-center justify-between">
           <button
-            onClick={() => navigate('/rides')}
+            onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer group"
           >
             <div className="w-7 h-7 rounded-full bg-white border border-[#F4E3D8] flex items-center justify-center group-hover:border-[#FF572E] group-hover:text-[#FF572E] shadow-2xs transition-all">
               <ArrowLeft className="w-3.5 h-3.5" />
             </div>
-            <span>Back to Offers & Requests</span>
+            <span>Back</span>
           </button>
 
           <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[#FF572E] text-xs font-black">
@@ -302,10 +317,10 @@ export default function RideDetailsPage() {
             </p>
             <div className="pt-2">
               <button
-                onClick={() => navigate('/rides')}
+                onClick={() => navigate('/rides/offer')}
                 className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-bold rounded-full shadow-sm transition-all cursor-pointer"
               >
-                Browse All Rides →
+                Go to Rides →
               </button>
             </div>
           </div>
@@ -625,26 +640,40 @@ export default function RideDetailsPage() {
                 >
                   <div className="flex items-center gap-2 text-base font-black text-[#17233C]">
                     <MessageSquare className="w-5 h-5 text-[#2563EB]" />
-                    <span>Travel Buddy Request</span>
+                    <span>{isOwnRide ? 'Your Travel Request' : 'Travel Buddy Request'}</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#6E7587] leading-relaxed">
-                    This verified campus peer has requested a ride for this date and time. If you have an empty seat in your car or cab, you can connect directly on WhatsApp to offer a ride and split travel costs.
+                    {isOwnRide
+                      ? 'You published this travel request. Verified campus peers traveling on your route can connect with you on WhatsApp to offer a ride.'
+                      : 'This verified campus peer has requested a ride for this date and time. If you have an empty seat in your car or cab, you can connect directly on WhatsApp to offer a ride and split travel costs.'}
                   </p>
 
-                  <div className="p-4 bg-[#EFF6FF] rounded-2xl border border-[#BFDBFE] flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-black text-[#1E40AF] block">Have an empty seat?</span>
-                      <span className="text-[11px] text-[#3B82F6]">Chat with {travel.student?.name || 'requester'} to coordinate pickup.</span>
+                  {!isOwnRide ? (
+                    <div className="p-4 bg-[#EFF6FF] rounded-2xl border border-[#BFDBFE] flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-black text-[#1E40AF] block">Have an empty seat?</span>
+                        <span className="text-[11px] text-[#3B82F6]">Chat with {travel.student?.name || 'requester'} to coordinate pickup.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleConnectWhatsApp}
+                        className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-black rounded-full shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleConnectWhatsApp}
-                      className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-black rounded-full shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>WhatsApp</span>
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="p-4 bg-[#FFF9F5] rounded-2xl border border-[#FDE0D0] flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-black text-[#17233C] block">Your Published Request</span>
+                        <span className="text-[11px] text-[#6E7587]">You are the creator of this ride request.</span>
+                      </div>
+                      <span className="px-3 py-1 bg-[#FFF4ED] text-[#FF572E] text-[11px] font-bold rounded-full border border-[#FDE0D0]">
+                        Your Post
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               )}
 
@@ -837,20 +866,25 @@ export default function RideDetailsPage() {
                   <button
                     type="button"
                     onClick={handleConnectWhatsApp}
-                    className="w-full py-3.5 px-6 bg-[#16A34A] hover:bg-[#15803D] active:scale-[0.99] text-white rounded-full font-black text-sm shadow-md shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={isOwnRide}
+                    className={`w-full py-3.5 px-6 rounded-full font-black text-sm transition-all flex items-center justify-center gap-2 ${
+                      isOwnRide
+                        ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
+                        : 'bg-[#16A34A] hover:bg-[#15803D] active:scale-[0.99] text-white shadow-md shadow-emerald-600/25 cursor-pointer'
+                    }`}
                   >
                     <Phone className="w-4 h-4" />
-                    <span>Connect on WhatsApp</span>
-                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                    <span>{isOwnRide ? 'Cannot Contact Own Ride' : 'Connect on WhatsApp'}</span>
+                    {!isOwnRide && <ArrowRight className="w-4 h-4 stroke-[2.5]" />}
                   </button>
                 )}
 
                 <button
                   type="button"
-                  onClick={() => navigate('/rides')}
+                  onClick={() => navigate('/rides/offer')}
                   className="w-full py-2.5 text-xs font-bold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer text-center"
                 >
-                  Return to all rides
+                  Return to Rides
                 </button>
               </div>
 
