@@ -39,7 +39,6 @@ export function Avatar({
           src={src} 
           alt={name || 'User Profile'} 
           referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
           className="w-full h-full object-cover rounded-full" 
           onError={() => setImgError(true)}
         />

@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@clerk/clerk-react';
 import { 
   Calendar, MapPin, Users, CheckCircle2, Clock, XCircle, 
-  AlertCircle, ArrowRight, Car, Plus, Search, MessageSquare, 
-  ShieldCheck, RefreshCw, ChevronRight, Check, X, Phone
+  AlertCircle, ArrowRight, Car, MessageSquare, 
+  ShieldCheck, RefreshCw, Check, X, Phone,
+  Ticket, Send, Inbox, AlertTriangle
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -17,35 +18,36 @@ import {
   getReceivedBookings, 
   cancelBooking, 
   respondBooking, 
-  confirmBooking, 
   getWhatsAppDetails 
 } from '../lib/api';
-import { openWhatsAppChat } from '../lib/whatsapp';
+import { openWhatsAppChat, getWhatsAppUrl } from '../lib/whatsapp';
 import { formatDate, formatCurrency } from '../lib/utils';
-
-const STATUS_TABS = [
-  { id: 'all', label: 'All Bookings' },
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'confirmed', label: 'Confirmed' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'cancelled', label: 'Cancelled' }
-];
 
 export default function BookingsListPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useUser();
 
-  // Role toggle: 'passenger' (rides I booked) vs 'host' (requests received for my rides)
-  const [activeRole, setActiveRole] = useState('passenger');
-  const [activeStatusTab, setActiveStatusTab] = useState('all');
+  // Primary Tab: 'confirmed' (My Confirmed Bookings), 'sent' (My Ride Requests), 'received' (Received Requests)
+  const initialTab = searchParams.get('tab') || 'confirmed';
+  const [activeTab, setActiveTab] = useState(['confirmed', 'sent', 'received'].includes(initialTab) ? initialTab : 'confirmed');
   
+  // Sub-filter for Sent Requests ('all', 'pending', 'rejected')
+  const [sentFilter, setSentFilter] = useState('all');
+  // Sub-filter for Received Requests ('all', 'pending', 'accepted', 'rejected')
+  const [receivedFilter, setReceivedFilter] = useState('all');
+
   const [myBookings, setMyBookings] = useState([]);
   const [receivedBookings, setReceivedBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Sync tab with URL
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId });
+  };
 
   // Fetch both passenger bookings and host received bookings
   const fetchAllBookings = useCallback(async () => {
@@ -77,59 +79,60 @@ export default function BookingsListPage() {
     fetchAllBookings();
   }, [fetchAllBookings]);
 
-  // Current raw list depending on selected role
-  const currentRoleBookings = useMemo(() => {
-    return activeRole === 'passenger' ? myBookings : receivedBookings;
-  }, [activeRole, myBookings, receivedBookings]);
+  // 1. Confirmed Bookings (ONLY confirmed or accepted passenger bookings)
+  const confirmedBookings = useMemo(() => {
+    return myBookings.filter(b => ['confirmed', 'accepted'].includes((b.status || '').toLowerCase()));
+  }, [myBookings]);
 
-  // Dynamic counts for each status tab
-  const statusCounts = useMemo(() => {
-    const counts = { all: currentRoleBookings.length, upcoming: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
-    const now = new Date();
+  // 2. Sent Requests (All requests sent by current user)
+  const sentRequests = useMemo(() => {
+    if (sentFilter === 'all') return myBookings;
+    if (sentFilter === 'pending') return myBookings.filter(b => (b.status || 'pending').toLowerCase() === 'pending');
+    if (sentFilter === 'rejected') return myBookings.filter(b => ['rejected', 'cancelled'].includes((b.status || '').toLowerCase()));
+    if (sentFilter === 'accepted') return myBookings.filter(b => ['confirmed', 'accepted'].includes((b.status || '').toLowerCase()));
+    return myBookings;
+  }, [myBookings, sentFilter]);
 
-    currentRoleBookings.forEach((b) => {
-      const status = (b.status || 'pending').toLowerCase();
-      const travelDate = b.travelId?.travelDate ? new Date(b.travelId.travelDate) : null;
-      const isFutureOrToday = !travelDate || travelDate >= new Date(now.setHours(0, 0, 0, 0));
+  // Counts for Sent Requests
+  const sentCounts = useMemo(() => {
+    return {
+      all: myBookings.length,
+      pending: myBookings.filter(b => (b.status || 'pending').toLowerCase() === 'pending').length,
+      accepted: myBookings.filter(b => ['confirmed', 'accepted'].includes((b.status || '').toLowerCase())).length,
+      rejected: myBookings.filter(b => ['rejected', 'cancelled'].includes((b.status || '').toLowerCase())).length,
+    };
+  }, [myBookings]);
 
-      if (status === 'pending') counts.pending += 1;
-      if (status === 'confirmed') counts.confirmed += 1;
-      if (status === 'cancelled' || status === 'rejected') counts.cancelled += 1;
-      if (status === 'completed' || (!isFutureOrToday && status === 'confirmed')) counts.completed += 1;
-      if ((status === 'confirmed' || status === 'accepted') && isFutureOrToday) counts.upcoming += 1;
-    });
+  // 3. Received Requests (All requests received on user's offered rides)
+  const filteredReceived = useMemo(() => {
+    if (receivedFilter === 'all') return receivedBookings;
+    if (receivedFilter === 'pending') return receivedBookings.filter(b => (b.status || 'pending').toLowerCase() === 'pending');
+    if (receivedFilter === 'accepted') return receivedBookings.filter(b => ['confirmed', 'accepted'].includes((b.status || '').toLowerCase()));
+    if (receivedFilter === 'rejected') return receivedBookings.filter(b => ['rejected', 'cancelled'].includes((b.status || '').toLowerCase()));
+    return receivedBookings;
+  }, [receivedBookings, receivedFilter]);
 
-    return counts;
-  }, [currentRoleBookings]);
+  // Counts for Received Requests
+  const receivedCounts = useMemo(() => {
+    return {
+      all: receivedBookings.length,
+      pending: receivedBookings.filter(b => (b.status || 'pending').toLowerCase() === 'pending').length,
+      accepted: receivedBookings.filter(b => ['confirmed', 'accepted'].includes((b.status || '').toLowerCase())).length,
+      rejected: receivedBookings.filter(b => ['rejected', 'cancelled'].includes((b.status || '').toLowerCase())).length,
+    };
+  }, [receivedBookings]);
 
-  // Filtered list based on selected status tab
-  const filteredBookings = useMemo(() => {
-    if (activeStatusTab === 'all') return currentRoleBookings;
-    const now = new Date();
+  // Handle Cancellation / Withdrawal of Request or Booking
+  const handleCancelBooking = async (bookingId, isPending = false) => {
+    const confirmMsg = isPending
+      ? 'Are you sure you want to withdraw this ride request?'
+      : 'Are you sure you want to cancel this confirmed booking? This will release reserved seats.';
 
-    return currentRoleBookings.filter((b) => {
-      const status = (b.status || 'pending').toLowerCase();
-      const travelDate = b.travelId?.travelDate ? new Date(b.travelId.travelDate) : null;
-      const isFutureOrToday = !travelDate || travelDate >= new Date(now.setHours(0, 0, 0, 0));
+    if (!window.confirm(confirmMsg)) return;
 
-      if (activeStatusTab === 'pending') return status === 'pending';
-      if (activeStatusTab === 'confirmed') return status === 'confirmed';
-      if (activeStatusTab === 'cancelled') return status === 'cancelled' || status === 'rejected';
-      if (activeStatusTab === 'completed') return status === 'completed' || (!isFutureOrToday && status === 'confirmed');
-      if (activeStatusTab === 'upcoming') return (status === 'confirmed' || status === 'accepted') && isFutureOrToday;
-      return true;
-    });
-  }, [currentRoleBookings, activeStatusTab]);
-
-  // Handle Booking Cancellation
-  const handleCancelBooking = async (bookingId) => {
-    if (!window.confirm('Are you sure you want to cancel this booking? This will release reserved seats.')) {
-      return;
-    }
     setActionLoadingId(bookingId);
     try {
       await cancelBooking(bookingId);
-      // Optimistic state update
       const updater = (list) => list.map(b => b._id === bookingId ? { ...b, status: 'cancelled' } : b);
       setMyBookings(updater);
       setReceivedBookings(updater);
@@ -146,15 +149,7 @@ export default function BookingsListPage() {
     setActionLoadingId(bookingId);
     try {
       await respondBooking(bookingId, { action });
-      // If accepted, immediately confirm to reserve seats atomically
-      if (action === 'accept') {
-        try {
-          await confirmBooking(bookingId);
-        } catch (e) {
-          console.warn('Confirm booking step note:', e);
-        }
-      }
-      fetchAllBookings();
+      await fetchAllBookings();
     } catch (err) {
       console.error('Respond booking error:', err);
       alert(err.message || `Failed to ${action} booking.`);
@@ -164,71 +159,67 @@ export default function BookingsListPage() {
   };
 
   // Direct WhatsApp Connection
-  const handleWhatsAppChat = async (booking) => {
+  const handleWhatsAppChat = async (booking, role = 'passenger') => {
     try {
-      // First try to fetch specific WhatsApp details if endpoint available
       const travel = booking.travelId || booking.travel || {};
       const routeText = `${travel.source || travel.from || 'Campus'} → ${travel.destination || travel.to || 'Destination'}`;
-      const partner = activeRole === 'passenger' ? booking.owner : booking.passenger;
+      const partner = role === 'passenger' ? booking.owner : booking.passenger;
+      const partnerName = partner?.name || (role === 'passenger' ? booking.ownerName : booking.passengerName) || 'Campus Peer';
+      const directPhone = partner?.phone || (role === 'host' ? booking.passengerPhone : '');
 
-      openWhatsAppChat({
-        phone: partner?.phone,
-        name: partner?.name || 'Campus Peer',
-        route: routeText,
-        message: `Hi ${partner?.name || 'there'}! Connecting regarding HelpU Booking #${booking._id?.slice(-6)?.toUpperCase()} for route ${routeText}. Let's coordinate pickup!`
-      });
+      // 1. If direct phone number is already known locally, open immediately (prevents browser popup blocking)
+      if (directPhone) {
+        openWhatsAppChat({
+          phone: directPhone,
+          name: partnerName,
+          route: routeText,
+          message: `Hi ${partnerName}! Connecting regarding HelpU Booking #${booking._id?.slice(-6)?.toUpperCase()} for route ${routeText}. Let's coordinate pickup!`
+        });
+        return;
+      }
+
+      // 2. Otherwise open a window right away before async call to avoid popup blocking
+      const newWin = window.open('about:blank', '_blank');
+
+      try {
+        const res = await getWhatsAppDetails(booking._id);
+        const data = res?.data?.data || res?.data;
+        if (data?.whatsappUrl) {
+          if (newWin) {
+            newWin.location.href = data.whatsappUrl;
+          } else {
+            window.location.href = data.whatsappUrl;
+          }
+          return;
+        }
+        if (data?.normalizedPhone || data?.phone) {
+          const directUrl = getWhatsAppUrl({
+            phone: data.normalizedPhone || data.phone,
+            name: data.name || partnerName,
+            route: routeText
+          });
+          if (newWin && directUrl) {
+            newWin.location.href = directUrl;
+          } else if (directUrl) {
+            window.location.href = directUrl;
+          }
+          return;
+        }
+      } catch (apiErr) {
+        console.warn('getWhatsAppDetails failed:', apiErr?.response?.data || apiErr);
+      }
+
+      if (newWin) newWin.close();
+      alert('Phone number is not available to start WhatsApp chat. Please ensure contact details are updated.');
     } catch (err) {
       console.error('WhatsApp chat error:', err);
     }
   };
 
-  // Helper for status badge styling
-  const renderStatusBadge = (status) => {
-    const s = (status || 'pending').toLowerCase();
-    if (s === 'confirmed') {
-      return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] text-[11px] font-black">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          Confirmed
-        </span>
-      );
-    }
-    if (s === 'pending') {
-      return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FEF9E7] text-[#CA8A04] border border-[#FDEBB2] text-[11px] font-black">
-          <Clock className="w-3.5 h-3.5" />
-          Pending Approval
-        </span>
-      );
-    }
-    if (s === 'accepted') {
-      return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] text-[11px] font-black">
-          <Check className="w-3.5 h-3.5" />
-          Accepted
-        </span>
-      );
-    }
-    if (s === 'completed') {
-      return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5F3FF] text-[#7C3AED] border border-[#DDD6FE] text-[11px] font-black">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          Completed
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 text-[11px] font-black">
-        <XCircle className="w-3.5 h-3.5" />
-        Cancelled
-      </span>
-    );
-  };
-
   return (
     <ResponsiveShell
       hideSidebarOnDesktop={true}
-      customMobileHeader={<AppHeader title="My Bookings" backTo="/home" />}
+      customMobileHeader={<AppHeader title="My Bookings & Requests" backTo="/home" />}
     >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
 
@@ -236,29 +227,29 @@ export default function BookingsListPage() {
         {/* PAGE HEADER: TITLE, SUBTITLE & FIND NEW RIDE CTA                          */}
         {/* ========================================================================= */}
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-gradient-to-r from-[#FFF0E6] via-[#FFF6EE] to-[#FFFBF8] rounded-[28px] sm:rounded-[36px] p-6 sm:p-8 border border-[#F4E3D8] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6"
         >
           <div className="max-w-xl">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 border border-[#F4E3D8] text-[11px] font-black text-[#FF572E] mb-3 shadow-2xs">
-              🎫 Campus Travel Bookings
+              🎫 Campus Rides & Bookings
             </span>
             <h1 className="font-black text-[#17233C] text-2xl sm:text-3xl lg:text-4xl tracking-tight leading-tight">
-              My Campus <span className="text-[#FF572E]">Bookings</span>
+              My Rides &amp; <span className="text-[#FF572E]">Requests</span>
             </h1>
             <p className="text-xs sm:text-sm text-[#596277] font-medium mt-2 leading-relaxed">
-              Manage your upcoming journeys, active bookings, and travel history.
+              Track your confirmed journey tickets, pending ride requests, and approve passengers for your rides.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/rides')}
+              onClick={() => navigate('/rides/offer')}
               className="px-6 py-3 rounded-2xl bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
             >
               <Car className="w-4 h-4 stroke-[2.5]" />
-              <span>Find New Ride</span>
+              <span>Offer a Ride</span>
             </button>
             <button
               onClick={fetchAllBookings}
@@ -272,201 +263,175 @@ export default function BookingsListPage() {
 
 
         {/* ========================================================================= */}
-        {/* ROLE TOGGLE (PASSENGER VS HOST) & CATEGORY TABS                           */}
+        {/* 3 STRICTLY SEPARATE TOP-LEVEL TABS                                        */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-[26px] p-4 sm:p-5 border border-[#F4E3D8]/90 shadow-xs space-y-4">
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[#F4E3D8]/60">
-            {/* Passenger / Host Role Switcher */}
-            <div className="inline-flex bg-[#FFFBF8] p-1 rounded-2xl border border-[#F4E3D8] shadow-2xs self-start">
-              <button
-                onClick={() => setActiveRole('passenger')}
-                className={`px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                  activeRole === 'passenger'
-                    ? 'bg-[#FF572E] text-white shadow-xs'
-                    : 'text-[#6E7587] hover:text-[#17233C]'
-                }`}
-              >
-                <span>My Booked Rides</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  activeRole === 'passenger' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {myBookings.length}
-                </span>
-              </button>
+        <div className="bg-white rounded-[26px] p-2.5 sm:p-3 border border-[#F4E3D8]/90 shadow-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            
+            {/* TAB 1: CONFIRMED BOOKINGS */}
+            <button
+              onClick={() => handleTabChange('confirmed')}
+              className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
+                activeTab === 'confirmed'
+                  ? 'bg-[#17233C] text-white shadow-sm'
+                  : 'bg-[#FFFBF8] text-[#596277] hover:bg-[#FFF5EE] hover:text-[#17233C]'
+              }`}
+            >
+              <Ticket className="w-4 h-4" />
+              <span>Confirmed Bookings</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'confirmed' ? 'bg-[#FF572E] text-white' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {confirmedBookings.length}
+              </span>
+            </button>
 
-              <button
-                onClick={() => setActiveRole('host')}
-                className={`px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                  activeRole === 'host'
-                    ? 'bg-[#FF572E] text-white shadow-xs'
-                    : 'text-[#6E7587] hover:text-[#17233C]'
-                }`}
-              >
-                <span>Ride Requests Received</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  activeRole === 'host' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {receivedBookings.length}
-                </span>
-              </button>
-            </div>
+            {/* TAB 2: MY RIDE REQUESTS (SENT) */}
+            <button
+              onClick={() => handleTabChange('sent')}
+              className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
+                activeTab === 'sent'
+                  ? 'bg-[#FF572E] text-white shadow-sm'
+                  : 'bg-[#FFFBF8] text-[#596277] hover:bg-[#FFF5EE] hover:text-[#17233C]'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              <span>My Ride Requests</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'sent' ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {sentCounts.pending > 0 ? `${sentCounts.pending} Pending` : myBookings.length}
+              </span>
+            </button>
 
-            <div className="text-xs text-[#6E7587] font-semibold flex items-center gap-1.5 self-start sm:self-auto">
-              <span>Showing:</span>
-              <strong className="text-[#17233C]">
-                {filteredBookings.length} {filteredBookings.length === 1 ? 'booking' : 'bookings'}
-              </strong>
-            </div>
+            {/* TAB 3: RECEIVED REQUESTS (HOST) */}
+            <button
+              onClick={() => handleTabChange('received')}
+              className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
+                activeTab === 'received'
+                  ? 'bg-[#FF572E] text-white shadow-sm'
+                  : 'bg-[#FFFBF8] text-[#596277] hover:bg-[#FFF5EE] hover:text-[#17233C]'
+              }`}
+            >
+              <Inbox className="w-4 h-4" />
+              <span>Received Requests</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'received' ? 'bg-white/25 text-white' : receivedCounts.pending > 0 ? 'bg-[#FF572E] text-white' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {receivedCounts.pending > 0 ? `${receivedCounts.pending} New` : receivedBookings.length}
+              </span>
+            </button>
+
           </div>
-
-          {/* Booking Categories Tabs with Live Counts */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1">
-            {STATUS_TABS.map((tab) => {
-              const count = statusCounts[tab.id] || 0;
-              const isActive = activeStatusTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveStatusTab(tab.id)}
-                  className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-[#17233C] text-white shadow-xs'
-                      : 'bg-[#FFFBF8] text-[#596277] hover:text-[#17233C] border border-[#F4E3D8]'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-[#FFEBE0] text-[#FF572E]'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
         </div>
 
 
         {/* ========================================================================= */}
-        {/* BOOKINGS LISTING / LOADING / ERROR / EMPTY STATES                         */}
+        {/* VIEW 1: CONFIRMED BOOKINGS (OFFICIAL TICKET / RESERVED SEATS ONLY)       */}
         {/* ========================================================================= */}
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <LoadingSkeleton count={4} />
+        {activeTab === 'confirmed' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="font-black text-[#17233C] text-base sm:text-lg flex items-center gap-2">
+                <span>Active Confirmed Bookings</span>
+                <span className="text-xs font-bold text-[#6E7587]">({confirmedBookings.length})</span>
+              </h2>
+              <span className="text-[11px] text-[#16A34A] font-extrabold flex items-center gap-1 bg-[#EDFAF3] px-2.5 py-1 rounded-full border border-[#BCECD4]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Verified &amp; Accepted by Host
+              </span>
             </div>
-          ) : error ? (
-            <div className="bg-white rounded-[26px] p-10 text-center border border-red-100 max-w-md mx-auto space-y-3">
-              <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto">
-                <AlertCircle className="w-6 h-6" />
-              </div>
-              <h3 className="font-black text-[#17233C] text-base">Failed to Load Bookings</h3>
-              <p className="text-xs text-[#6E7587] leading-relaxed">{error}</p>
-              <button
-                onClick={fetchAllBookings}
-                className="px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-bold rounded-xl shadow-xs transition-colors inline-flex items-center gap-2 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Retry</span>
-              </button>
-            </div>
-          ) : filteredBookings.length === 0 ? (
-            <div className="bg-white rounded-[32px] p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4">
-              <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
-                🎫
-              </div>
-              <div>
-                <h3 className="font-black text-[#17233C] text-lg">No Bookings Found</h3>
-                <p className="text-xs text-[#6E7587] mt-1 max-w-sm mx-auto">
-                  {activeStatusTab === 'all'
-                    ? activeRole === 'passenger'
-                      ? 'You haven\'t booked any campus rides yet. Find a shared ride and book available seats!'
-                      : 'You haven\'t received any booking requests on your offered rides yet.'
-                    : `No ${activeStatusTab} bookings found for this category.`}
-                </p>
-              </div>
-              <div className="pt-2">
-                <button
-                  onClick={() => navigate('/rides')}
-                  className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
-                >
-                  <Car className="w-4 h-4" />
-                  <span>Browse Campus Rides</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <motion.div
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start"
-            >
-              {filteredBookings.map((b) => {
-                const travel = b.travelId || b.travel || {};
-                const partner = activeRole === 'passenger' ? b.owner : b.passenger;
-                const partnerName = partner?.name || (activeRole === 'passenger' ? 'Student Driver' : 'Co-traveler');
-                const partnerAvatar = partner?.avatarId || 'm1';
-                const fromCity = travel.source || travel.from || 'Campus Gate';
-                const toCity = travel.destination || travel.to || 'City Center';
-                
-                const seatsCount = b.requestedSeats || b.seatsBooked || 1;
-                const pricePerSeat = travel.pricePerSeat || 350;
-                const totalAmount = seatsCount * pricePerSeat;
 
-                const timeDisplay = travel.travelDate
-                  ? new Date(travel.travelDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
-                    (typeof travel.departureTime === 'number'
-                      ? ` • ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}`
-                      : '')
-                  : formatDate(travel.departureTime);
-
-                const status = (b.status || 'pending').toLowerCase();
-                const canCancel = ['pending', 'accepted', 'confirmed'].includes(status);
-                const isHostPending = activeRole === 'host' && status === 'pending';
-
-                return (
-                  <motion.div
-                    key={b._id}
-                    layout
-                    whileHover={{ y: -2 }}
-                    className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs hover:border-[#FF572E]/40 hover:shadow-md transition-all flex flex-col justify-between"
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <LoadingSkeleton count={2} />
+              </div>
+            ) : confirmedBookings.length === 0 ? (
+              <div className="bg-white rounded-[32px] p-10 sm:p-14 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-full bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center mx-auto text-2xl">
+                  🎫
+                </div>
+                <div>
+                  <h3 className="font-black text-[#17233C] text-lg">No Confirmed Bookings Yet</h3>
+                  <p className="text-xs text-[#6E7587] mt-1.5 leading-relaxed max-w-sm mx-auto">
+                    When a ride owner accepts your ride request, your confirmed journey ticket with driver details and seats will appear right here.
+                  </p>
+                </div>
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => handleTabChange('sent')}
+                    className="px-5 py-2.5 bg-[#FFF4ED] hover:bg-[#FFE8DC] text-[#FF572E] font-bold text-xs rounded-xl border border-[#FDE0D0] transition-colors cursor-pointer"
                   >
-                    <div>
-                      {/* Top Meta: Partner Info, Status & Booking ID */}
+                    Check My Sent Requests ({sentCounts.pending} Pending)
+                  </button>
+                  <button
+                    onClick={() => navigate('/match')}
+                    className="px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Find Matches
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                {confirmedBookings.map((b) => {
+                  const travel = b.travelId || b.travel || {};
+                  const owner = b.owner || {};
+                  const fromCity = travel.source || travel.from || 'Campus Gate';
+                  const toCity = travel.destination || travel.to || 'Destination';
+                  const seatsCount = b.requestedSeats || b.seatsBooked || 1;
+                  const pricePerSeat = travel.pricePerSeat || 350;
+                  const totalAmount = seatsCount * pricePerSeat;
+
+                  const timeDisplay = travel.travelDate
+                    ? new Date(travel.travelDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
+                      (typeof travel.departureTime === 'number'
+                        ? ` • ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}`
+                        : '')
+                    : formatDate(travel.departureTime);
+
+                  return (
+                    <motion.div
+                      key={b._id}
+                      layout
+                      whileHover={{ y: -2 }}
+                      className="bg-white rounded-[28px] p-5 sm:p-6 border-2 border-[#16A34A]/30 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden"
+                    >
+                      {/* Top Ribbon */}
                       <div className="flex items-start justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3 min-w-0">
                           <Avatar 
-                            avatarId={partnerAvatar}
-                            src={partner?.imageUrl} 
+                            avatarId={owner?.avatarId || 'm1'} 
+                            src={owner?.imageUrl || (owner?.clerkId === user?.id ? user?.imageUrl : null)} 
+                            name={owner?.name}
                             size="md" 
                             ring 
                           />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <h4 className="font-extrabold text-[#17233C] text-sm sm:text-base truncate">
-                                {partnerName}
+                              <h4 className="font-black text-[#17233C] text-sm sm:text-base truncate">
+                                {owner?.name || 'Student Host'}
                               </h4>
-                              <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                              <ShieldCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
                             </div>
                             <span className="text-[11px] text-[#6E7587] block mt-0.5">
-                              {activeRole === 'passenger' ? 'Driver / Host' : 'Passenger Request'} • {partner?.college || 'VIT, Bhopal'}
+                              Ride Host • {owner?.college || 'VIT, Bhopal'}
                             </span>
                           </div>
                         </div>
 
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          {renderStatusBadge(status)}
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] text-[11px] font-black">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Confirmed Booking
+                          </span>
                           <span className="text-[10px] font-mono font-bold text-[#8C93A4]">
                             #{b._id.slice(-6).toUpperCase()}
                           </span>
                         </div>
                       </div>
 
-                      {/* Route Timeline Box */}
+                      {/* Route Box */}
                       <div className="bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8] mb-4 space-y-2.5">
                         <div className="flex items-center gap-2.5 text-xs sm:text-sm">
                           <span className="w-3 h-3 rounded-full bg-[#16A34A] shrink-0 ring-3 ring-[#DCFCE7]" />
@@ -478,10 +443,10 @@ export default function BookingsListPage() {
                         </div>
                       </div>
 
-                      {/* Travel Details Grid */}
+                      {/* Booking Meta Details */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-4 text-xs">
                         <div className="bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100">
-                          <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Date &amp; Time</span>
+                          <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Travel Schedule</span>
                           <span className="font-bold text-[#17233C] text-[11px] truncate block">{timeDisplay}</span>
                         </div>
 
@@ -493,84 +458,502 @@ export default function BookingsListPage() {
                         </div>
 
                         <div className="bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100 col-span-2 sm:col-span-1">
-                          <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Seats Booked</span>
-                          <span className="font-bold text-[#FF572E] text-[11px]">
-                            {seatsCount} {seatsCount === 1 ? 'Seat' : 'Seats'}
+                          <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Seats Reserved</span>
+                          <span className="font-black text-[#16A34A] text-[11px]">
+                            {seatsCount} {seatsCount === 1 ? 'Seat' : 'Seats'} Confirmed
                           </span>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Bottom Actions Row */}
-                    <div className="pt-3.5 border-t border-[#F4E3D8]/80 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-[#6E7587] block">Total Amount</span>
-                        <span className="font-black text-base sm:text-lg text-[#17233C]">
-                          {formatCurrency(totalAmount)}
-                        </span>
-                      </div>
+                      {/* Actions */}
+                      <div className="pt-3.5 border-t border-[#F4E3D8]/80 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-[#6E7587] block">Fare</span>
+                          <span className="font-black text-base sm:text-lg text-[#17233C]">
+                            {formatCurrency(totalAmount)}
+                          </span>
+                        </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* Host Pending Request Accept / Reject */}
-                        {isHostPending && (
-                          <>
-                            <button
-                              onClick={() => handleHostRespond(b._id, 'accept')}
-                              disabled={actionLoadingId === b._id}
-                              className="px-3.5 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Accept</span>
-                            </button>
-                            <button
-                              onClick={() => handleHostRespond(b._id, 'reject')}
-                              disabled={actionLoadingId === b._id}
-                              className="px-3 py-2 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs cursor-pointer disabled:opacity-50"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>Reject</span>
-                            </button>
-                          </>
-                        )}
-
-                        {/* WhatsApp Connect Button */}
-                        <button
-                          onClick={() => handleWhatsAppChat(b)}
-                          title="Coordinate on WhatsApp"
-                          className="px-3 py-2 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] font-bold text-xs border border-[#25D366]/30 flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
-                          <span className="hidden sm:inline">WhatsApp</span>
-                        </button>
-
-                        {/* Cancel Booking Action */}
-                        {canCancel && (
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleCancelBooking(b._id)}
-                            disabled={actionLoadingId === b._id}
-                            className="px-3 py-2 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                            onClick={() => handleWhatsAppChat(b, 'passenger')}
+                            className="px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-black text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                           >
-                            {actionLoadingId === b._id ? 'Cancelling...' : 'Cancel'}
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>WhatsApp Host</span>
                           </button>
+
+                          <button
+                            onClick={() => handleCancelBooking(b._id, false)}
+                            disabled={actionLoadingId === b._id}
+                            className="px-3.5 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {actionLoadingId === b._id ? 'Cancelling...' : 'Cancel Booking'}
+                          </button>
+                        </div>
+                      </div>
+
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+
+        {/* ========================================================================= */}
+        {/* VIEW 2: MY RIDE REQUESTS (SENT REQUESTS & STATUSES)                       */}
+        {/* ========================================================================= */}
+        {activeTab === 'sent' && (
+          <div className="space-y-4">
+            
+            {/* Filter Pills */}
+            <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-[#F4E3D8]">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {[
+                  { id: 'all', label: 'All Requests', count: sentCounts.all },
+                  { id: 'pending', label: 'Pending Approval', count: sentCounts.pending },
+                  { id: 'accepted', label: 'Accepted', count: sentCounts.accepted },
+                  { id: 'rejected', label: 'Declined / Cancelled', count: sentCounts.rejected }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setSentFilter(f.id)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      sentFilter === f.id
+                        ? 'bg-[#17233C] text-white shadow-xs'
+                        : 'bg-[#FFFBF8] text-[#596277] hover:text-[#17233C] border border-[#F4E3D8]'
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      sentFilter === f.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {f.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <span className="text-xs text-[#6E7587] font-semibold">
+                Showing <strong>{sentRequests.length}</strong> sent requests
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <LoadingSkeleton count={3} />
+              </div>
+            ) : sentRequests.length === 0 ? (
+              <div className="bg-white rounded-[32px] p-10 sm:p-14 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-full bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
+                  🚀
+                </div>
+                <div>
+                  <h3 className="font-black text-[#17233C] text-lg">No Sent Ride Requests Found</h3>
+                  <p className="text-xs text-[#6E7587] mt-1 max-w-sm mx-auto">
+                    You haven't requested any rides yet. Explore available campus rides and send a request!
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => navigate('/rides/offer')}
+                    className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <Car className="w-4 h-4" />
+                    <span>Offer a Ride</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                {sentRequests.map((b) => {
+                  const travel = b.travelId || b.travel || {};
+                  const owner = b.owner || {};
+                  const fromCity = travel.source || travel.from || 'Campus Gate';
+                  const toCity = travel.destination || travel.to || 'Destination';
+                  const seatsCount = b.requestedSeats || 1;
+                  const pricePerSeat = travel.pricePerSeat || 350;
+                  const totalAmount = seatsCount * pricePerSeat;
+                  const status = (b.status || 'pending').toLowerCase();
+
+                  const isPending = status === 'pending';
+                  const isAccepted = ['confirmed', 'accepted'].includes(status);
+                  const isRejected = ['rejected', 'cancelled'].includes(status);
+
+                  const timeDisplay = travel.travelDate
+                    ? new Date(travel.travelDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
+                      (typeof travel.departureTime === 'number'
+                        ? ` • ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}`
+                        : '')
+                    : 'Upcoming';
+
+                  return (
+                    <motion.div
+                      key={b._id}
+                      layout
+                      className={`bg-white rounded-[26px] p-5 sm:p-6 border transition-all flex flex-col justify-between ${
+                        isPending 
+                          ? 'border-[#FED7AA] bg-gradient-to-b from-[#FFFDFB] to-white shadow-xs'
+                          : isAccepted
+                          ? 'border-[#BCECD4] shadow-xs'
+                          : 'border-red-200 bg-red-50/20'
+                      }`}
+                    >
+                      <div>
+                        {/* Header Banner: Clarifies Pending vs Accepted vs Declined */}
+                        <div className="flex items-start justify-between gap-3 mb-3.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Avatar 
+                              avatarId={owner?.avatarId || 'm1'} 
+                              src={owner?.imageUrl || (owner?.clerkId === user?.id ? user?.imageUrl : null)} 
+                              name={owner?.name}
+                              size="sm" 
+                              ring 
+                            />
+                            <div className="min-w-0">
+                              <h4 className="font-extrabold text-[#17233C] text-xs sm:text-sm truncate">
+                                {owner?.name || 'Ride Provider'}
+                              </h4>
+                              <span className="text-[10px] text-[#6E7587] block">
+                                Host • {owner?.college || 'VIT, Bhopal'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FEF9E7] text-[#CA8A04] border border-[#FDEBB2] text-[11px] font-black">
+                                <Clock className="w-3.5 h-3.5 animate-pulse" />
+                                Pending Approval
+                              </span>
+                            )}
+                            {isAccepted && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] text-[11px] font-black">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Accepted by Host
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 text-[11px] font-black">
+                                <XCircle className="w-3.5 h-3.5" />
+                                {status === 'rejected' ? 'Declined by Host' : 'Cancelled'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Status Notice Banner for Pending */}
+                        {isPending && (
+                          <div className="mb-3.5 p-3 rounded-xl bg-[#FFF7ED] border border-[#FFEDD5] text-xs text-[#9A3412] flex items-center gap-2 font-medium">
+                            <Clock className="w-4 h-4 shrink-0 text-[#EA580C]" />
+                            <span>Your request is awaiting host review. This is not a confirmed booking yet.</span>
+                          </div>
                         )}
 
-                        {/* View Details Button */}
-                        <button
-                          onClick={() => navigate(`/bookings/${b._id}`)}
-                          className="px-4 py-2 rounded-xl bg-[#17233C] hover:bg-[#1F2D4A] text-white font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <span>Details</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                        {/* Route Box */}
+                        <div className="bg-[#FFFBF8] rounded-2xl p-3.5 border border-[#F4E3D8] mb-3.5 space-y-2">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                            <span className="font-extrabold text-[#17233C] truncate">{fromCity}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                            <span className="font-extrabold text-[#17233C] truncate">{toCity}</span>
+                          </div>
+                        </div>
 
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                        {/* Quick Specs */}
+                        <div className="grid grid-cols-2 gap-2 mb-3.5 text-xs">
+                          <div className="bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100">
+                            <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Travel Date &amp; Time</span>
+                            <span className="font-bold text-[#17233C] text-[11px] truncate block">{timeDisplay}</span>
+                          </div>
+                          <div className="bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100">
+                            <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Requested Seats</span>
+                            <span className="font-bold text-[#FF572E] text-[11px] truncate block">
+                              {seatsCount} {seatsCount === 1 ? 'Seat' : 'Seats'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Actions Row */}
+                      <div className="pt-3 border-t border-[#F4E3D8]/80 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-[#6E7587] block">Estimated Fare</span>
+                          <span className="font-black text-sm sm:text-base text-[#17233C]">
+                            {formatCurrency(totalAmount)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isPending && (
+                            <button
+                              onClick={() => handleCancelBooking(b._id, true)}
+                              disabled={actionLoadingId === b._id}
+                              className="px-3.5 py-2 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {actionLoadingId === b._id ? 'Cancelling...' : 'Withdraw Request'}
+                            </button>
+                          )}
+
+                          {isAccepted && (
+                            <button
+                              onClick={() => handleTabChange('confirmed')}
+                              className="px-4 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                            >
+                              <Ticket className="w-3.5 h-3.5" />
+                              <span>View Confirmed Ticket</span>
+                            </button>
+                          )}
+
+                          {isRejected && (
+                            <button
+                              onClick={() => navigate('/match')}
+                              className="px-3.5 py-2 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              Find Other Matches
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+
+        {/* ========================================================================= */}
+        {/* VIEW 3: RECEIVED REQUESTS (MANAGE PASSENGERS AS A RIDE OWNER)             */}
+        {/* ========================================================================= */}
+        {activeTab === 'received' && (
+          <div className="space-y-4">
+            
+            {/* Filter Pills */}
+            <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-[#F4E3D8]">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {[
+                  { id: 'all', label: 'All Received', count: receivedCounts.all },
+                  { id: 'pending', label: 'Needs Action (Pending)', count: receivedCounts.pending },
+                  { id: 'accepted', label: 'Accepted Passengers', count: receivedCounts.accepted },
+                  { id: 'rejected', label: 'Declined', count: receivedCounts.rejected }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setReceivedFilter(f.id)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      receivedFilter === f.id
+                        ? 'bg-[#FF572E] text-white shadow-xs'
+                        : 'bg-[#FFFBF8] text-[#596277] hover:text-[#17233C] border border-[#F4E3D8]'
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      receivedFilter === f.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {f.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <span className="text-xs text-[#6E7587] font-semibold">
+                Showing <strong>{filteredReceived.length}</strong> received requests
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <LoadingSkeleton count={3} />
+              </div>
+            ) : filteredReceived.length === 0 ? (
+              <div className="bg-white rounded-[32px] p-10 sm:p-14 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-full bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
+                  📬
+                </div>
+                <div>
+                  <h3 className="font-black text-[#17233C] text-lg">No Received Requests Yet</h3>
+                  <p className="text-xs text-[#6E7587] mt-1 max-w-sm mx-auto">
+                    When campus peers request seats on your offered rides, their details and approval actions will appear here.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => navigate('/rides/offer')}
+                    className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <Car className="w-4 h-4" />
+                    <span>Offer a New Ride</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                {filteredReceived.map((b) => {
+                  const travel = b.travelId || b.travel || {};
+                  const passenger = b.passenger || {};
+                  const fromCity = travel.source || travel.from || 'Campus Gate';
+                  const toCity = travel.destination || travel.to || 'Destination';
+                  const seatsCount = b.requestedSeats || 1;
+                  const pricePerSeat = travel.pricePerSeat || 350;
+                  const totalAmount = seatsCount * pricePerSeat;
+                  const status = (b.status || 'pending').toLowerCase();
+
+                  const isPending = status === 'pending';
+                  const isAccepted = ['confirmed', 'accepted'].includes(status);
+                  const isRejected = ['rejected', 'cancelled'].includes(status);
+
+                  const requestDate = b.createdAt
+                    ? new Date(b.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    : 'Recently';
+
+                  return (
+                    <motion.div
+                      key={b._id}
+                      layout
+                      className={`bg-white rounded-[26px] p-5 sm:p-6 border transition-all flex flex-col justify-between ${
+                        isPending 
+                          ? 'border-[#FF572E]/40 shadow-sm'
+                          : isAccepted 
+                          ? 'border-[#16A34A]/30' 
+                          : 'border-gray-200 opacity-75'
+                      }`}
+                    >
+                      <div>
+                        {/* Passenger Details Header */}
+                        <div className="flex items-start justify-between gap-3 mb-3.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar 
+                              avatarId={passenger?.avatarId || 'm1'} 
+                              src={passenger?.imageUrl || b.passengerImage || (passenger?.clerkId === user?.id || b.passengerId === user?.id ? user?.imageUrl : null)} 
+                              name={passenger?.name || b.passengerName}
+                              size="md" 
+                              ring 
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="font-black text-[#17233C] text-sm sm:text-base truncate">
+                                  {passenger?.name || b.passengerName || 'Student Requester'}
+                                </h4>
+                                <ShieldCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
+                              </div>
+                              <span className="text-[11px] text-[#6E7587] block mt-0.5">
+                                {passenger?.college || 'VIT, Bhopal'} • Requested {requestDate}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FEF9E7] text-[#CA8A04] border border-[#FDEBB2] text-[11px] font-black">
+                                <Clock className="w-3.5 h-3.5 animate-pulse" />
+                                Awaiting Decision
+                              </span>
+                            )}
+                            {isAccepted && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] text-[11px] font-black">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Accepted Passenger
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-black">
+                                <XCircle className="w-3.5 h-3.5" />
+                                Declined
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Route Box */}
+                        <div className="bg-[#FFFBF8] rounded-2xl p-3.5 border border-[#F4E3D8] mb-3.5 space-y-2">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                            <span className="font-extrabold text-[#17233C] truncate">{fromCity}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                            <span className="font-extrabold text-[#17233C] truncate">{toCity}</span>
+                          </div>
+                        </div>
+
+                        {/* Request Meta */}
+                        <div className="grid grid-cols-2 gap-2 mb-3.5 text-xs">
+                          <div className="bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100">
+                            <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Seats Requested</span>
+                            <span className="font-black text-[#FF572E] text-[11px]">
+                              {seatsCount} {seatsCount === 1 ? 'Seat' : 'Seats'}
+                            </span>
+                          </div>
+                          <div className="bg-[#F9FAFB] p-2.5 rounded-xl border border-gray-100">
+                            <span className="text-[10px] font-bold text-[#6E7587] block mb-0.5">Fare Contribution</span>
+                            <span className="font-black text-[#17233C] text-[11px]">
+                              {formatCurrency(totalAmount)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Passenger Notes if any */}
+                        {(b.passengerNotes || b.notes) && (
+                          <div className="mb-3.5 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-[#596277]">
+                            <strong className="text-[#17233C]">Passenger note:</strong> "{b.passengerNotes || b.notes}"
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Decision Buttons */}
+                      <div className="pt-3.5 border-t border-[#F4E3D8]/80 flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-[11px] font-mono text-[#8C93A4]">
+                          ID: #{b._id.slice(-6).toUpperCase()}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={() => handleHostRespond(b._id, 'accept')}
+                                disabled={actionLoadingId === b._id}
+                                className="px-4 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white font-black text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>{actionLoadingId === b._id ? 'Accepting...' : 'Accept'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleHostRespond(b._id, 'reject')}
+                                disabled={actionLoadingId === b._id}
+                                className="px-3.5 py-2 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                            </>
+                          )}
+
+                          {isAccepted && (
+                            <button
+                              onClick={() => handleWhatsAppChat(b, 'host')}
+                              className="px-4 py-2 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-black text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>WhatsApp Passenger</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </ResponsiveShell>
