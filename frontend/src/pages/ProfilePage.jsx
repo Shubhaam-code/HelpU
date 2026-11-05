@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/clerk-react';
 import {
   Calendar, Car, Heart, HelpCircle, Settings, ChevronRight, LogOut,
   ShieldCheck, Mail, Phone, GraduationCap, BookOpen, Edit3, CheckCircle2,
-  ArrowRight, Sparkles, X, User as UserIcon
+  ArrowRight, Sparkles, X, User as UserIcon, Download
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -106,6 +106,7 @@ export default function ProfilePage() {
   const navMenuItems = [
     { icon: Calendar, label: 'My Bookings', subtitle: 'View upcoming and active ride seats', path: '/bookings' },
     { icon: Car, label: 'Offers & Requests', subtitle: 'Manage your campus travel posts', path: '/rides/offer' },
+    { icon: Download, label: 'Install Helpu App', subtitle: 'Fast offline access & home screen alerts', onClick: () => window.dispatchEvent(new CustomEvent('pwa-prompt-install')) },
     { icon: Heart, label: 'Saved Rides', subtitle: 'Frequently used routes & bookmarks', path: '/saved' },
     { icon: HelpCircle, label: 'Campus Help & Support', subtitle: 'Campus assistance and student FAQs', path: '/help' },
     { icon: Settings, label: 'Account Settings', subtitle: 'Notifications, privacy & security', path: '/settings' },
@@ -341,7 +342,10 @@ export default function ProfilePage() {
               return (
                 <div
                   key={item.label}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    if (item.onClick) item.onClick();
+                    else if (item.path) navigate(item.path);
+                  }}
                   className="flex items-center justify-between p-3.5 hover:bg-[#FFFBF8] rounded-2xl transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-3.5">

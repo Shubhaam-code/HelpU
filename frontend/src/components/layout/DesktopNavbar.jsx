@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, Settings, FileText, Calendar
+  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, Settings, FileText, Calendar, Download
 } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { Avatar } from '../ui/Avatar';
@@ -66,15 +66,16 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const isActive = (path) => {
     if (path === '/home') return location.pathname === '/home' || location.pathname === '/';
     if (path === '/rides/offer') return location.pathname.startsWith('/rides');
+    if (path === '/matches') return location.pathname.startsWith('/match');
+    if (path === '/posts') return location.pathname.startsWith('/posts');
     return location.pathname.startsWith(path);
   };
 
   const navLinks = [
     { label: 'Home', path: '/home', icon: Home },
-    { label: 'Rides', path: '/rides/offer', icon: Car },
-    { label: 'My Bookings', path: '/bookings', icon: Calendar },
-    { label: 'Matches', path: '/match', icon: Users },
-    { label: 'Posts', path: '/posts', icon: FileText },
+    { label: 'Ride', path: '/rides/offer', icon: Car },
+    { label: 'My Posts', path: '/posts', icon: FileText },
+    { label: 'My Matches', path: '/matches', icon: Users },
     { label: 'About', path: '/about', icon: Info },
   ];
 
@@ -235,6 +236,16 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
                   >
                     <Settings className="w-4 h-4 text-text-secondary" />
                     Settings
+                  </button>
+                  <button
+                    onClick={() => { 
+                      setProfileDropdownOpen(false); 
+                      window.dispatchEvent(new CustomEvent('pwa-prompt-install')); 
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-[#FF572E] hover:bg-[#FFF4ED] transition-colors"
+                  >
+                    <Download className="w-4 h-4 text-[#FF572E]" />
+                    Install Helpu App
                   </button>
                 </div>
 

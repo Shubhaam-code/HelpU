@@ -29,6 +29,10 @@ import GetHelpPage from './pages/GetHelpPage';
 import AboutPage from './pages/AboutPage';
 import StaticInfoPage from './pages/StaticInfoPage';
 
+// PWA Utilities & Banners
+import { OfflineBanner } from './components/ui/OfflineBanner';
+import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
+
 // Top-level Error Boundary to catch any child component crashes
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -138,6 +142,8 @@ function ProtectedRoute({ children }) {
 export default function App() {
   return (
     <ErrorBoundary>
+      <OfflineBanner />
+      <InstallPwaPrompt />
       <TokenInjector />
       <Routes>
         {/* Public Landing & Authentication */}
@@ -157,9 +163,10 @@ export default function App() {
         <Route path="/book/:id" element={<ProtectedRoute><BookSeatPage /></ProtectedRoute>} />
         <Route path="/bookings" element={<ProtectedRoute><BookingsListPage /></ProtectedRoute>} />
         <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
-        <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
-        <Route path="/matches" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
-        <Route path="/match/my" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
+        <Route path="/match" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
+        <Route path="/matches" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
+        <Route path="/match/my" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
+        <Route path="/match/explore" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
         <Route path="/match/preferences" element={<ProtectedRoute><MatchPreferencesPage /></ProtectedRoute>} />
         <Route path="/match/success" element={<ProtectedRoute><MatchSuccessPage /></ProtectedRoute>} />
         <Route path="/match/:id" element={<ProtectedRoute><MatchDetailsPage /></ProtectedRoute>} />
