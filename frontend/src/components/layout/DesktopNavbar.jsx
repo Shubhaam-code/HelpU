@@ -22,8 +22,9 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const refreshUnreadCount = useCallback(async () => {
     try {
       const res = await getUnreadCount();
-      if (typeof res?.data?.unreadCount === 'number') {
-        setLiveUnreadCount(res.data.unreadCount);
+      const count = res?.data?.unreadCount ?? res?.data?.count ?? res?.data?.data?.count;
+      if (typeof count === 'number') {
+        setLiveUnreadCount(count);
       }
     } catch {
       // Gracefully fall back to prop
@@ -31,16 +32,21 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   }, []);
 
   useEffect(() => {
-    setLiveUnreadCount(unreadCount);
+    if (typeof unreadCount === 'number' && unreadCount > 0) {
+      setLiveUnreadCount(unreadCount);
+    }
   }, [unreadCount]);
 
   useEffect(() => {
     refreshUnreadCount();
+    // 10s polling fallback for real-time unread count updates
+    const interval = setInterval(refreshUnreadCount, 10000);
     // Refresh count on window focus or custom 'notifications-updated' event
     const handleUpdate = () => refreshUnreadCount();
     window.addEventListener('focus', handleUpdate);
     window.addEventListener('notifications-updated', handleUpdate);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('focus', handleUpdate);
       window.removeEventListener('notifications-updated', handleUpdate);
     };

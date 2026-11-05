@@ -45,6 +45,7 @@ export default function ProfilePage() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [editCollege, setEditCollege] = useState('');
   const [editCourse, setEditCourse] = useState('');
+  const [editBio, setEditBio] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -92,6 +93,7 @@ export default function ProfilePage() {
         
         setEditCollege(p?.college || 'VIT, Bhopal');
         setEditCourse(p?.course || 'B.Tech Computer Science');
+        setEditBio(p?.bio || '');
       }
       if (bookingsRes.status === 'fulfilled') {
         const bList = bookingsRes.value.data?.data || bookingsRes.value.data?.bookings || [];
@@ -122,9 +124,10 @@ export default function ProfilePage() {
     try {
       const payload = {
         name: editName.trim() || user?.fullName || 'Campus Student',
-        email: profile?.email || user?.primaryEmailAddress?.emailAddress || '',
+        email: profile?.email || user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '',
         college: editCollege.trim(),
         course: editCourse.trim(),
+        bio: editBio.trim(),
         imageUrl: user?.imageUrl || profile?.imageUrl || ''
       };
 
@@ -199,12 +202,23 @@ export default function ProfilePage() {
           transition={{ duration: 0.3 }}
           className="bg-white rounded-[32px] border border-[#F4E3D8]/90 shadow-xs overflow-hidden"
         >
-          {/* Warm decorative cover banner */}
+          {/* Warm decorative cover banner with cta-road.png background */}
           <div className="h-32 sm:h-40 bg-gradient-to-r from-[#FFF0E7] via-[#FFE5D8] to-[#FFF5ED] relative overflow-hidden">
-            <div className="absolute right-0 top-0 bottom-0 w-2/3 bg-gradient-to-l from-white/30 to-transparent pointer-events-none" />
-            <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-[#FF572E]/10 blur-xl pointer-events-none" />
-            <div className="absolute top-4 right-5 sm:right-7">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 text-[#FF572E] text-xs font-black shadow-xs backdrop-blur-xs">
+            {/* Background Image - positioned lower with increased opacity */}
+            <div 
+              className="absolute inset-0 opacity-50"
+              style={{
+                backgroundImage: 'url(/assets/cta-road.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center bottom',
+                backgroundRepeat: 'no-repeat'
+              }}
+            />
+            {/* Lighter gradient overlay for better visibility */}
+            <div className="absolute right-0 top-0 bottom-0 w-2/3 bg-gradient-to-l from-white/20 to-transparent pointer-events-none" />
+            <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-[#FF572E]/8 blur-xl pointer-events-none" />
+            <div className="absolute top-4 right-5 sm:right-7 z-10">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 text-[#FF572E] text-xs font-black shadow-xs backdrop-blur-sm">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Verified Student</span>
               </span>
@@ -318,6 +332,56 @@ export default function ProfilePage() {
           </div>
 
         </div>
+
+
+        {/* ========================================================================= */}
+        {/* 2.5. PERSONAL BIO SECTION (OPTIONAL)                                      */}
+        {/* ========================================================================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="bg-white rounded-[28px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center shrink-0">
+                <MessageCircle className="w-4.5 h-4.5 stroke-[2.2]" />
+              </div>
+              <div>
+                <h3 className="font-black text-[#17233C] text-sm sm:text-base">
+                  About Me
+                </h3>
+                <p className="text-[10px] sm:text-xs text-[#6E7587] font-medium">
+                  Share something about yourself (optional)
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-xs font-bold text-[#FF572E] hover:underline cursor-pointer"
+            >
+              {profile?.bio ? 'Edit' : 'Add'}
+            </button>
+          </div>
+
+          {profile?.bio ? (
+            <div className="p-4 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
+              <p className="text-sm text-[#17233C] font-medium leading-relaxed">
+                {profile.bio}
+              </p>
+            </div>
+          ) : (
+            <div 
+              onClick={() => setIsEditing(true)}
+              className="p-4 bg-[#FFFBF8] rounded-2xl border border-dashed border-[#F4E3D8] hover:border-[#FF572E]/40 hover:bg-white cursor-pointer transition-all group"
+            >
+              <p className="text-xs text-[#6E7587] group-hover:text-[#FF572E] font-medium text-center">
+                💬 Click to add a personal message about your travel preferences, hobbies, or campus life
+              </p>
+            </div>
+          )}
+        </motion.div>
 
 
         {/* ========================================================================= */}
@@ -602,6 +666,33 @@ export default function ProfilePage() {
                     placeholder="B.Tech Computer Science"
                     className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
                   />
+                </div>
+
+                {/* Bio / About Me (Optional) */}
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle className="w-3.5 h-3.5 text-[#FF572E]" />
+                      <span>About Me (Optional)</span>
+                    </span>
+                    <span className="text-[10px] font-semibold text-[#6E7587]">
+                      {editBio.length}/200
+                    </span>
+                  </label>
+                  <textarea
+                    value={editBio}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 200) {
+                        setEditBio(e.target.value);
+                      }
+                    }}
+                    placeholder="Share your travel preferences, hobbies, or something interesting about yourself..."
+                    rows={3}
+                    className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all resize-none"
+                  />
+                  <p className="text-[11px] text-[#6E7587] mt-1.5">
+                    💡 This helps other students know you better for campus carpooling
+                  </p>
                 </div>
 
                 {saveError && (

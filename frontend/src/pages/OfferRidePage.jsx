@@ -103,6 +103,7 @@ export default function OfferRidePage() {
   const [preferredCar, setPreferredCar] = useState('Omni');
   const [travellers, setTravellers] = useState(1);
   const [pricePerSeat, setPricePerSeat] = useState('350');
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -150,6 +151,7 @@ export default function OfferRidePage() {
           pricePerSeat: Number(pricePerSeat) || 350,
           carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
           type: 'offer',
+          notes: notes.trim(),
           authorImage: user?.imageUrl || null,
           authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
           authorEmail: user?.primaryEmailAddress?.emailAddress || null,
@@ -166,6 +168,7 @@ export default function OfferRidePage() {
           seats: travellers,
           pricePerSeat: Number(pricePerSeat) || 350,
           carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
+          notes: notes.trim(),
         });
         setShowSuccessModal(true);
       } else {
@@ -180,6 +183,7 @@ export default function OfferRidePage() {
           pricePerSeat: 0,
           carModel: 'Ride Request',
           type: 'request',
+          notes: notes.trim(),
           authorImage: user?.imageUrl || null,
           authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
           authorEmail: user?.primaryEmailAddress?.emailAddress || null,
@@ -196,6 +200,7 @@ export default function OfferRidePage() {
           seats: travellers,
           pricePerSeat: 0,
           carModel: 'Ride Request',
+          notes: notes.trim(),
         });
         setShowSuccessModal(true);
       }
@@ -624,6 +629,35 @@ export default function OfferRidePage() {
                   </div>
                 </div>
 
+                {/* Optional Message / Personal Notes Box */}
+                <div className="bg-[#FFFBF8] rounded-2xl p-3 sm:p-3.5 border border-[#F4E3D8] space-y-1.5 focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] sm:text-xs font-black text-[#17233C] flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-[#FF572E]" />
+                      <span>{mode === 'offer' ? 'Ride Notes / Preferences' : 'Request Notes / Details'}</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-[#8C93A4] bg-white px-2 py-0.5 rounded-full border border-[#F4E3D8]">
+                      Optional
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={
+                      mode === 'offer'
+                        ? 'Add any extra details (e.g. AC available, trunk space for 1 luggage, leaving sharp on time)...'
+                        : 'Add any extra details (e.g. Carrying 1 backpack, flexible by 15 mins, will wait near gate 2)...'
+                    }
+                    className="w-full text-xs font-semibold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none bg-transparent resize-none leading-relaxed"
+                    maxLength={300}
+                  />
+                  {notes.length > 0 && (
+                    <div className="text-right text-[10px] font-bold text-[#A0A6B5]">
+                      {notes.length}/300
+                    </div>
+                  )}
+                </div>
 
                 {/* Error Banner */}
                 {error && (
@@ -740,6 +774,17 @@ export default function OfferRidePage() {
                   <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between text-[11px] font-bold">
                     <span className="text-[#6E7587]">Vehicle: {createdSummary.carModel}</span>
                     <span className="text-[#FF572E] font-black text-sm">₹{createdSummary.pricePerSeat}/seat</span>
+                  </div>
+                )}
+
+                {/* Notes if provided */}
+                {createdSummary.notes && (
+                  <div className="pt-2 border-t border-[#F4E3D8]/60 text-[11px] text-[#6E7587] flex items-start gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#FF572E] shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-[#17233C]">Notes: </span>
+                      <span className="text-[#6E7587] italic break-words">{createdSummary.notes}</span>
+                    </div>
                   </div>
                 )}
               </div>

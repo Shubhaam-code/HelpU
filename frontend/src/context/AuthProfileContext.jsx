@@ -9,13 +9,6 @@ export function AuthProfileProvider({ children }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [profile, setProfile] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
-  const [isSkipped, setIsSkipped] = useState(() => {
-    try {
-      return sessionStorage.getItem('whatsapp_onboarding_skipped') === 'true';
-    } catch {
-      return false;
-    }
-  });
 
   // Always ensure token getter is registered with apiClient
   useEffect(() => {
@@ -79,13 +72,6 @@ export function AuthProfileProvider({ children }) {
     fetchProfile();
   }, [isLoaded, isSignedIn, fetchProfile]);
 
-  const skipWhatsAppOnboarding = useCallback(() => {
-    try {
-      sessionStorage.setItem('whatsapp_onboarding_skipped', 'true');
-    } catch {}
-    setIsSkipped(true);
-  }, []);
-
   const setWhatsAppNumber = useCallback((number) => {
     setProfile((prev) => ({
       ...(prev || {}),
@@ -97,9 +83,7 @@ export function AuthProfileProvider({ children }) {
   const value = {
     profile,
     isProfileLoading,
-    isSkipped,
     hasWhatsApp: Boolean(profile?.whatsappNumber?.trim() || profile?.phone?.trim()),
-    skipWhatsAppOnboarding,
     setWhatsAppNumber,
     refreshProfile: fetchProfile
   };

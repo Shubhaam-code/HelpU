@@ -891,85 +891,22 @@ export default function MatchPage() {
                           </div>
                         </div>
 
-                        {/* Appropriate Existing Booking or WhatsApp Action */}
-                        <div className="pt-2 border-t border-[#F4E3D8]/70 flex items-center gap-2">
+                        {/* Match Card Action: View Details button (Opens Ride Details) */}
+                        <div className="pt-2 border-t border-[#F4E3D8]/70">
                           <button
                             type="button"
-                            onClick={() => handleContactWhatsApp(match)}
-                            className="flex-1 py-2.5 px-3 bg-[#EDFAF3] hover:bg-[#25D366] text-[#15803D] hover:text-white border border-[#BCECD4] hover:border-[#25D366] font-bold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 group/wa"
-                            title="Contact on WhatsApp"
+                            onClick={() => {
+                              if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
+                                navigate(`/rides/${travelId}`);
+                              } else {
+                                navigate('/rides/offer');
+                              }
+                            }}
+                            className="w-full py-2.5 px-4 bg-[#FFF4ED] hover:bg-[#FF572E] text-[#FF572E] hover:text-white border border-[#FDE0D0] hover:border-[#FF572E] font-extrabold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
                           >
-                            <MessageSquare className="w-3.5 h-3.5 text-[#25D366] group-hover/wa:text-white transition-colors" />
-                            <span className="truncate">Contact on WhatsApp</span>
+                            <span>View Details</span>
+                            <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
                           </button>
-
-                          {isOffer ? (
-                            (() => {
-                              const activeStatus = activeBookingStatusByTravelId[String(travelId)];
-                              const isPending = activeStatus === 'pending';
-                              const isConfirmed = activeStatus === 'confirmed' || activeStatus === 'accepted';
-
-                              if (isPending) {
-                                return (
-                                  <button
-                                    type="button"
-                                    disabled
-                                    className="flex-1 py-2.5 px-3 bg-amber-500 text-white font-bold text-xs rounded-xl shadow-xs opacity-90 cursor-not-allowed flex items-center justify-center gap-1.5"
-                                    title="Booking request pending host response"
-                                  >
-                                    <Clock className="w-3.5 h-3.5" />
-                                    <span className="truncate">Request Pending</span>
-                                  </button>
-                                );
-                              }
-
-                              if (isConfirmed) {
-                                return (
-                                  <button
-                                    type="button"
-                                    disabled
-                                    className="flex-1 py-2.5 px-3 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs opacity-90 cursor-not-allowed flex items-center justify-center gap-1.5"
-                                    title="Seat reservation already confirmed"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span className="truncate">Already Confirmed</span>
-                                  </button>
-                                );
-                              }
-
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
-                                      navigate(`/book/${travelId}`);
-                                    } else {
-                                      navigate('/rides/offer');
-                                    }
-                                  }}
-                                  className="flex-1 py-2.5 px-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                                >
-                                  <Ticket className="w-3.5 h-3.5" />
-                                  <span className="truncate">Book Seat</span>
-                                </button>
-                              );
-                            })()
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
-                                  navigate(`/rides/${travelId}`);
-                                } else {
-                                  navigate('/posts');
-                                }
-                              }}
-                              className="flex-1 py-2.5 px-3 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                            >
-                              <Users className="w-3.5 h-3.5" />
-                              <span className="truncate">View Details</span>
-                            </button>
-                          )}
                         </div>
                       </motion.div>
                     );

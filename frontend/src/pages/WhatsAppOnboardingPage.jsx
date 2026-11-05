@@ -21,7 +21,7 @@ const COUNTRIES = [
 export default function WhatsAppOnboardingPage() {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { profile, setWhatsAppNumber, skipWhatsAppOnboarding } = useAuthProfile();
+  const { profile, setWhatsAppNumber } = useAuthProfile();
 
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Default: India
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -68,9 +68,13 @@ export default function WhatsAppOnboardingPage() {
 
       setLoading(true);
 
+      const userEmail = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || profile?.email || '';
+      const userName = user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || profile?.name || 'Campus Student';
+
       const payload = {
-        name: user?.fullName || profile?.name || 'Campus Student',
-        email: user?.primaryEmailAddress?.emailAddress || profile?.email || '',
+        name: userName,
+        email: userEmail,
+        college: profile?.college || 'VIT, Bhopal',
         phone: normalizedNumber,
         whatsappNumber: normalizedNumber,
         whatsappCountryCode: selectedCountry.code
@@ -90,11 +94,6 @@ export default function WhatsAppOnboardingPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSkip = () => {
-    skipWhatsAppOnboarding();
-    navigate('/home', { replace: true });
   };
 
   return (
@@ -274,16 +273,6 @@ export default function WhatsAppOnboardingPage() {
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </>
               )}
-            </button>
-
-            {/* Skip Button */}
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={loading}
-              className="w-full py-2.5 text-xs sm:text-sm font-bold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer disabled:opacity-50"
-            >
-              Skip for now, I'll add it later
             </button>
 
           </form>

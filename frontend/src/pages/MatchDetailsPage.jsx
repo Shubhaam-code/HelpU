@@ -167,7 +167,7 @@ export default function MatchDetailsPage() {
             })}
             className="flex-1 py-3 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm shadow-[#25D366]/20 transition-all cursor-pointer"
           >
-            <MessageSquare className="w-4 h-4" />
+            <img src="/whatsapp.png" alt="WhatsApp" className="w-4 h-4 object-contain shrink-0" onError={(e) => { e.currentTarget.src = '/whatsapp.svg'; }} />
             <span>Chat on WhatsApp</span>
           </button>
           <PrimaryButton
@@ -175,7 +175,7 @@ export default function MatchDetailsPage() {
             onClick={() => {
               const travelId = match?._id || match?.id;
               if (travelId && travelId !== 'match') {
-                navigate(`/book/${travelId}`, { state: { travel: match } });
+                navigate(`/rides/${travelId}`, { state: { travel: match } });
               } else {
                 navigate('/rides/offer');
               }

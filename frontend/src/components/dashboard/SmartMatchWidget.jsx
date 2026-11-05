@@ -61,19 +61,12 @@ export function SmartMatchWidget() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 w-full mt-4">
+        <div className="w-full mt-4">
           <button
             onClick={() => navigate('/matches')}
-            className="flex-1 py-2.5 px-4 bg-coral text-white rounded-2xl text-xs font-bold hover:bg-coral/90 transition-colors shadow-sm cursor-pointer"
+            className="w-full py-2.5 px-4 bg-coral text-white rounded-2xl text-xs font-bold hover:bg-coral/90 transition-colors shadow-sm cursor-pointer text-center"
           >
             Find Matches
-          </button>
-          <button
-            onClick={() => openWhatsAppChat({ route: 'Campus Route' })}
-            className="flex-1 py-2.5 px-4 bg-[#25D366]/10 text-[#128C7E] border border-[#25D366]/30 rounded-2xl text-xs font-bold hover:bg-[#25D366]/20 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
-            <span>WhatsApp</span>
           </button>
         </div>
 

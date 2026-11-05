@@ -100,21 +100,16 @@ export default function NotificationsPage() {
       handleMarkOneRead(notification._id);
     }
 
-    const type = notification.type || '';
     const bookingId = notification.relatedBookingId;
     const travelId = notification.relatedTravelId;
 
-    // 1. Booking requested / contacted: Ride owner coordinates or reviews request
-    if (type === 'BOOKING_REQUESTED' || type === 'BOOKING_CONTACTED') {
-      if (travelId) {
-        navigate(`/rides/${travelId}`);
-      } else {
-        navigate('/posts');
-      }
+    // Direct routing to the exact booking details whenever a related booking exists
+    if (bookingId) {
+      navigate(`/bookings/${bookingId}`);
       return;
     }
 
-    // 2. Booking confirmed, accepted or cancelled: passenger or owner checks ride
+    // Fallback to ride details if no booking is linked
     if (travelId) {
       navigate(`/rides/${travelId}`);
       return;

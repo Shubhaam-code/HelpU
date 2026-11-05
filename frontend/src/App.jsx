@@ -14,6 +14,7 @@ import HomePage from './pages/HomePage';
 import OfferRidePage from './pages/OfferRidePage';
 import RideDetailsPage from './pages/RideDetailsPage';
 import BookSeatPage from './pages/BookSeatPage';
+import BookingDetailsPage from './pages/BookingDetailsPage';
 import MatchPage from './pages/MatchPage';
 import MyMatchesPage from './pages/MyMatchesPage';
 import MatchPreferencesPage from './pages/MatchPreferencesPage';
@@ -32,7 +33,6 @@ import StaticInfoPage from './pages/StaticInfoPage';
 // PWA Utilities & Banners
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
-import { WhatsAppOnboardingCheck } from './components/auth/WhatsAppOnboardingCheck';
 
 // Top-level Error Boundary to catch any child component crashes
 class ErrorBoundary extends Component {
@@ -129,7 +129,7 @@ function TokenInjector() {
 // BEFORE rendering any protected page, completely eliminating Home page flicker.
 function ProtectedRoute({ children }) {
   const { isLoaded, isSignedIn } = useUser();
-  const { isProfileLoading, hasWhatsApp, isSkipped } = useAuthProfile();
+  const { isProfileLoading, hasWhatsApp } = useAuthProfile();
   const location = useLocation();
 
   // 1. Show clean Helpu loading screen while Clerk or Profile status is resolving
@@ -156,9 +156,9 @@ function ProtectedRoute({ children }) {
 
   const isOnWhatsAppSetup = location.pathname === '/whatsapp-setup';
 
-  // 3. User does NOT have WhatsApp number and has NOT skipped:
+  // 3. User does NOT have WhatsApp number:
   // Redirect IMMEDIATELY to /whatsapp-setup BEFORE Home or any protected page ever mounts!
-  if (!hasWhatsApp && !isSkipped) {
+  if (!hasWhatsApp) {
     if (isOnWhatsAppSetup) {
       return children;
     }
@@ -170,7 +170,7 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/home" replace />;
   }
 
-  // 5. User has completed setup or skipped: render requested protected route
+  // 5. User has completed setup: render requested protected route
   return children;
 }
 
@@ -181,7 +181,6 @@ export default function App() {
         <OfflineBanner />
         <InstallPwaPrompt />
         <TokenInjector />
-        <WhatsAppOnboardingCheck />
         <Routes>
           {/* Public Landing & Authentication */}
           <Route path="/" element={<OnboardingPage />} />
@@ -200,10 +199,9 @@ export default function App() {
           <Route path="/rides/offer" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
           <Route path="/rides/request" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
           <Route path="/rides/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
-          <Route path="/book/:id" element={<ProtectedRoute><BookSeatPage /></ProtectedRoute>} />
-          {/* Bookings route removed as per request: gracefully redirected to /posts */}
+          <Route path="/book/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
-          <Route path="/bookings/:id" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
+          <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
           <Route path="/match" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
           <Route path="/matches" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
           <Route path="/match/my" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />

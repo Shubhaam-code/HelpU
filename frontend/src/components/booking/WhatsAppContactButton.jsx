@@ -16,8 +16,8 @@ export function WhatsAppContactButton({ bookingId, bookingStatus, contactPerson 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Only show for confirmed or accepted bookings
-  const isEligible = ['confirmed', 'accepted'].includes(bookingStatus);
+  // Show for pending, confirmed, accepted, or completed bookings
+  const isEligible = ['pending', 'confirmed', 'accepted', 'completed'].includes(bookingStatus);
 
   if (!isEligible) {
     return null;
@@ -52,18 +52,18 @@ export function WhatsAppContactButton({ bookingId, bookingStatus, contactPerson 
         type="button"
         onClick={handleOpenWhatsApp}
         disabled={loading}
-        className="flex items-center justify-center gap-2 w-full px-5 py-3.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#20BD5A] hover:to-[#0F7A6B] text-white font-bold text-sm rounded-2xl shadow-lg shadow-[#25D366]/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+        className="flex items-center justify-center gap-2.5 w-full px-5 py-3.5 bg-[#25D366] hover:bg-[#20BD5A] active:scale-[0.99] text-white font-extrabold text-sm rounded-2xl shadow-md shadow-[#25D366]/25 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {loading ? (
           <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Loading...</span>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Opening WhatsApp...</span>
           </>
         ) : (
           <>
-            <MessageCircle className="w-5 h-5" strokeWidth={2} />
+            <img src="/whatsapp.png" alt="WhatsApp" className="w-5 h-5 object-contain shrink-0" />
             <span>Open WhatsApp Chat</span>
-            <ExternalLink className="w-4 h-4 opacity-70" />
+            <ExternalLink className="w-3.5 h-3.5 opacity-80" />
           </>
         )}
       </button>
@@ -90,25 +90,27 @@ export function WhatsAppContactButton({ bookingId, bookingStatus, contactPerson 
  * Used in detailed booking views.
  */
 export function WhatsAppContactCard({ bookingId, bookingStatus, contactPerson, title }) {
-  const isEligible = ['confirmed', 'accepted'].includes(bookingStatus);
+  const isEligible = ['pending', 'confirmed', 'accepted', 'completed'].includes(bookingStatus);
 
   if (!isEligible) {
     return null;
   }
 
   return (
-    <div className="bg-gradient-to-br from-[#FFF7F2] to-white rounded-2xl p-5 border border-[#F4E3D8] shadow-sm">
+    <div className="bg-white rounded-[24px] p-5 sm:p-6 border border-[#F4E3D8] shadow-xs">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#25D366] to-[#128C7E] flex items-center justify-center">
-          <MessageCircle className="w-5 h-5 text-white" strokeWidth={2} />
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-11 h-11 rounded-2xl bg-[#EAF8F0] border border-[#BCECD4] flex items-center justify-center p-2 shadow-2xs shrink-0">
+          <img src="/whatsapp.png" alt="WhatsApp" className="w-6 h-6 object-contain" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h3 className="text-sm font-black text-[#17233C]">
             {title || 'WhatsApp Coordination'}
           </h3>
-          <p className="text-xs text-[#6E7587] mt-0.5">
-            Your ride is confirmed
+          <p className="text-xs text-[#6E7587] mt-0.5 font-medium truncate">
+            {['confirmed', 'accepted'].includes(bookingStatus)
+              ? 'Ride is confirmed! Coordinate pickup details.'
+              : 'Request is pending. Connect to finalize trip details!'}
           </p>
         </div>
       </div>
