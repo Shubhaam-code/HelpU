@@ -1,6 +1,10 @@
 import crypto from 'crypto';
 import Outbox from '../models/Outbox.js';
+import Notification from '../models/Notification.js';
+import { formatNotificationContent } from '../jobs/notification.jobs.js';
+import { emitRealtimeNotification } from './socket.service.js';
 import { addNotificationJob } from '../queues/notification.queue.js';
+import { hasRedisConfigured } from '../config/redis.js';
 
 let processorIntervalTimer = null;
 let isProcessing = false;
@@ -44,20 +48,21 @@ export async function createOutboxEvent(
  * Implements atomic status transitions and lease reclamation to prevent
  * duplicate processing across multiple processor instances.
  */
-export async function dispatchOutboxEvents({ batchSize = 25, leaseMs = 2 * 60 * 1000 } = {}) {
+export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 * 1000, eventId = null } = {}) {
   const now = new Date();
   const leaseCutoff = new Date(now.getTime() - leaseMs);
 
-  // Find IDs of candidate events
-  const candidates = await Outbox.find(
-    {
-      $or: [
-        { status: 'pending' },
-        { status: 'processing', lockedAt: { $lt: leaseCutoff } }
-      ]
-    },
-    { _id: 1 }
-  )
+  const filter = eventId
+    ? { eventId }
+    : {
+        $or: [
+          { status: 'pending' },
+          { status: 'processing', lockedAt: { $lt: leaseCutoff } }
+        ]
+      };
+
+  // Find candidate events
+  const candidates = await Outbox.find(filter, { _id: 1 })
     .sort({ createdAt: 1 })
     .limit(batchSize);
 
@@ -65,14 +70,18 @@ export async function dispatchOutboxEvents({ batchSize = 25, leaseMs = 2 * 60 * 
 
   for (const candidate of candidates) {
     // Atomically claim the event with a lease
+    const claimFilter = eventId
+      ? { _id: candidate._id }
+      : {
+          _id: candidate._id,
+          $or: [
+            { status: 'pending' },
+            { status: 'processing', lockedAt: { $lt: leaseCutoff } }
+          ]
+        };
+
     const event = await Outbox.findOneAndUpdate(
-      {
-        _id: candidate._id,
-        $or: [
-          { status: 'pending' },
-          { status: 'processing', lockedAt: { $lt: leaseCutoff } }
-        ]
-      },
+      claimFilter,
       {
         $set: {
           status: 'processing',
@@ -86,24 +95,62 @@ export async function dispatchOutboxEvents({ batchSize = 25, leaseMs = 2 * 60 * 
     if (!event) continue;
 
     try {
-      // Enqueue into BullMQ using stable eventId as jobId for queue-level idempotency
-      await addNotificationJob(
-        event.eventType,
+      // 1. Idempotently persist in-app notification in MongoDB using eventId
+      const { title, message } = formatNotificationContent(event.eventType, event.payload || {});
+      const notificationDoc = await Notification.findOneAndUpdate(
+        { eventId: event.eventId },
         {
-          eventId: event.eventId,
-          eventType: event.eventType,
-          recipientId: event.recipientId,
-          relatedBookingId: event.relatedBookingId,
-          relatedTravelId: event.relatedTravelId,
-          payload: event.payload,
-          createdAt: event.createdAt
+          $setOnInsert: {
+            recipientId: event.recipientId,
+            eventId: event.eventId,
+            type: event.eventType,
+            title,
+            message,
+            relatedBookingId: event.relatedBookingId || null,
+            relatedTravelId: event.relatedTravelId || null,
+            isRead: false
+          }
         },
-        {
-          jobId: event.eventId
-        }
+        { upsert: true, returnDocument: 'after' }
       );
 
-      // Mark outbox event as successfully processed
+      // 2. Real-time Socket.IO emission if available
+      emitRealtimeNotification(event.recipientId, {
+        _id: notificationDoc?._id,
+        eventId: event.eventId,
+        type: event.eventType,
+        title,
+        message,
+        relatedBookingId: event.relatedBookingId,
+        relatedTravelId: event.relatedTravelId,
+        isRead: false,
+        createdAt: notificationDoc?.createdAt || new Date()
+      });
+
+      // 3. If Redis is configured, also enqueue into BullMQ for background reminder scheduling
+      if (hasRedisConfigured()) {
+        try {
+          await addNotificationJob(
+            event.eventType,
+            {
+              eventId: event.eventId,
+              eventType: event.eventType,
+              recipientId: event.recipientId,
+              relatedBookingId: event.relatedBookingId,
+              relatedTravelId: event.relatedTravelId,
+              payload: event.payload,
+              createdAt: event.createdAt
+            },
+            {
+              jobId: event.eventId
+            }
+          );
+        } catch (queueErr) {
+          console.warn(`[Outbox] Optional queue enqueue failed for ${event.eventId}:`, queueErr.message);
+        }
+      }
+
+      // 4. Mark outbox event as successfully processed
       await Outbox.updateOne(
         { _id: event._id },
         {
@@ -117,7 +164,7 @@ export async function dispatchOutboxEvents({ batchSize = 25, leaseMs = 2 * 60 * 
 
       processedCount++;
     } catch (err) {
-      console.error(`[Outbox] Failed to enqueue event ${event.eventId}:`, err.message);
+      console.error(`[Outbox] Failed to deliver event ${event.eventId}:`, err.message);
 
       const nextRetries = (event.retries || 0) + 1;
       const nextStatus = nextRetries >= (event.maxRetries || 3) ? 'failed' : 'pending';

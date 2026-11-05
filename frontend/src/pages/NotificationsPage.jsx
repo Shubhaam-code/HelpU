@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, CheckCheck, Clock, CheckCircle2, XCircle, Car, AlertCircle, 
-  ArrowRight, ShieldCheck, RefreshCw, Sparkles, Filter, Calendar, MessageSquare, ChevronRight
+  ArrowRight, ShieldCheck, RefreshCw, Sparkles, Filter, Calendar, MessageSquare, ChevronRight, Check, Users
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -18,7 +18,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'coordination' | 'booking' | 'reminders'
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'read'
   const [markingAll, setMarkingAll] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -106,39 +106,22 @@ export default function NotificationsPage() {
 
     // 1. Booking requested / contacted: Ride owner coordinates or reviews request
     if (type === 'BOOKING_REQUESTED' || type === 'BOOKING_CONTACTED') {
-      navigate('/bookings?tab=received');
+      if (travelId) {
+        navigate(`/rides/${travelId}`);
+      } else {
+        navigate('/posts');
+      }
       return;
     }
 
-    // 2. Booking confirmed, accepted or cancelled: passenger or owner checks booking
-    if (bookingId) {
-      navigate(`/bookings/${bookingId}`);
-      return;
-    }
-
-    // 3. Travel reminders or travel-related updates
+    // 2. Booking confirmed, accepted or cancelled: passenger or owner checks ride
     if (travelId) {
       navigate(`/rides/${travelId}`);
       return;
     }
 
-    // Fallback: general bookings list
-    navigate('/bookings');
-  };
-
-  // Classify notification into category
-  const categorizeNotification = (type) => {
-    const t = (type || '').toUpperCase();
-    if (t.includes('REQUESTED') || t.includes('CONTACTED') || t.includes('ACCEPTED') || t.includes('REJECTED')) {
-      return 'coordination';
-    }
-    if (t.includes('CONFIRM') || t.includes('CANCEL')) {
-      return 'booking';
-    }
-    if (t.includes('REMIND')) {
-      return 'reminders';
-    }
-    return 'booking';
+    // Fallback: My Posts page
+    navigate('/posts');
   };
 
   // Filter tab counts
@@ -146,9 +129,7 @@ export default function NotificationsPage() {
     return {
       all: notifications.length,
       unread: notifications.filter((n) => !n.isRead).length,
-      coordination: notifications.filter((n) => categorizeNotification(n.type) === 'coordination').length,
-      booking: notifications.filter((n) => categorizeNotification(n.type) === 'booking').length,
-      reminders: notifications.filter((n) => categorizeNotification(n.type) === 'reminders').length,
+      read: notifications.filter((n) => n.isRead).length,
     };
   }, [notifications]);
 
@@ -156,9 +137,7 @@ export default function NotificationsPage() {
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
       if (activeFilter === 'unread') return !n.isRead;
-      if (activeFilter === 'coordination') return categorizeNotification(n.type) === 'coordination';
-      if (activeFilter === 'booking') return categorizeNotification(n.type) === 'booking';
-      if (activeFilter === 'reminders') return categorizeNotification(n.type) === 'reminders';
+      if (activeFilter === 'read') return n.isRead;
       return true; // 'all'
     });
   }, [notifications, activeFilter]);
@@ -265,9 +244,7 @@ export default function NotificationsPage() {
   const filterTabs = [
     { id: 'all', label: 'All', count: counts.all },
     { id: 'unread', label: 'Unread', count: counts.unread },
-    { id: 'coordination', label: 'Coordination', count: counts.coordination },
-    { id: 'booking', label: 'Booking', count: counts.booking },
-    { id: 'reminders', label: 'Reminders', count: counts.reminders },
+    { id: 'read', label: 'Read', count: counts.read },
   ];
 
   return (
@@ -407,12 +384,16 @@ export default function NotificationsPage() {
               <h3 className="font-black text-lg sm:text-xl text-[#17233C]">
                 {activeFilter === 'all'
                   ? "You're all caught up! 🎉"
-                  : `No ${activeFilter} notifications`}
+                  : activeFilter === 'unread'
+                  ? "No unread notifications"
+                  : "No read notifications"}
               </h3>
               <p className="text-xs sm:text-sm text-[#6E7587] mt-1 max-w-xs mx-auto leading-relaxed">
                 {activeFilter === 'all'
                   ? "New ride connections and travel updates will appear here."
-                  : `You don't have any notifications under "${activeFilter}" right now.`}
+                  : activeFilter === 'unread'
+                  ? "All your notifications have been read."
+                  : "You haven't read any notifications yet."}
               </p>
             </div>
             {activeFilter !== 'all' && (
