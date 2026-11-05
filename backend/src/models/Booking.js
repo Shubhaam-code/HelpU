@@ -65,11 +65,23 @@ const bookingSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['pending', 'accepted', 'confirmed', 'rejected', 'cancelled'],
-        message: 'Status must be one of: pending, accepted, confirmed, rejected, cancelled'
+        values: ['pending', 'accepted', 'confirmed', 'rejected', 'cancelled', 'completed'],
+        message: 'Status must be one of: pending, accepted, confirmed, rejected, cancelled, completed'
       },
       default: 'pending',
       index: true
+    },
+    approvedAt: {
+      type: Date
+    },
+    rejectedAt: {
+      type: Date
+    },
+    cancelledAt: {
+      type: Date
+    },
+    completedAt: {
+      type: Date
     }
   },
   {
@@ -77,8 +89,18 @@ const bookingSchema = new mongoose.Schema(
   }
 );
 
-// Compound index for querying a passenger's bookings for a specific travel post
-bookingSchema.index({ travelId: 1, passengerId: 1 });
+// Compound unique partial index to ensure a student cannot create multiple active booking requests for the same post.
+// Only active statuses ('pending', 'accepted', 'confirmed') are constrained to be unique.
+// Once a booking request is 'rejected' or 'cancelled', the student is permitted to re-book.
+bookingSchema.index(
+  { travelId: 1, passengerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ['pending', 'accepted', 'confirmed'] }
+    }
+  }
+);
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
