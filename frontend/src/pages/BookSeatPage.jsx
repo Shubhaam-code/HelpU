@@ -12,7 +12,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { getTravelById, getProfile, createBooking } from '../lib/api';
+import { getTravelById, getProfile, createBooking, getMyBookings } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
 
 export default function BookSeatPage() {
@@ -24,6 +24,7 @@ export default function BookSeatPage() {
   // Ride & Profile States
   const [travel, setTravel] = useState(state?.travel || null);
   const [profile, setProfile] = useState(null);
+  const [existingBooking, setExistingBooking] = useState(null);
   const [loading, setLoading] = useState(!state?.travel);
   const [fetchError, setFetchError] = useState('');
 
@@ -39,48 +40,55 @@ export default function BookSeatPage() {
   const [submitError, setSubmitError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // 1. Fetch live ride details and passenger profile on mount
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadData() {
-      if (!state?.travel) {
-        setLoading(true);
-      }
-      setFetchError('');
-
-      try {
-        const [travelRes, profileRes] = await Promise.allSettled([
-          id ? getTravelById(id) : Promise.reject(new Error('No ride ID provided')),
-          getProfile()
-        ]);
-
-        if (!isMounted) return;
-
-        if (travelRes.status === 'fulfilled') {
-          const tData = travelRes.value.data?.data || travelRes.value.data?.travel || travelRes.value.data;
-          setTravel(tData);
-        } else if (!state?.travel) {
-          setFetchError(travelRes.reason?.response?.data?.message || travelRes.reason?.message || 'Could not load ride details.');
-        }
-
-        if (profileRes.status === 'fulfilled') {
-          const pData = profileRes.value.data?.data || null;
-          setProfile(pData);
-        }
-      } catch (err) {
-        if (isMounted && !state?.travel) {
-          setFetchError('Failed to load ride information. Please try again.');
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+  // 1. Fetch live ride details, passenger profile, and existing booking on mount
+  const loadData = useCallback(async () => {
+    if (!state?.travel) {
+      setLoading(true);
     }
+    setFetchError('');
 
-    loadData();
+    try {
+      const [travelRes, profileRes, bookingsRes] = await Promise.allSettled([
+        id ? getTravelById(id) : Promise.reject(new Error('No ride ID provided')),
+        getProfile(),
+        getMyBookings()
+      ]);
 
-    return () => { isMounted = false; };
+      if (travelRes.status === 'fulfilled') {
+        const tData = travelRes.value.data?.data || travelRes.value.data?.travel || travelRes.value.data;
+        setTravel(tData);
+      } else if (!state?.travel) {
+        setFetchError(travelRes.reason?.response?.data?.message || travelRes.reason?.message || 'Could not load ride details.');
+      }
+
+      if (profileRes.status === 'fulfilled') {
+        const pData = profileRes.value.data?.data || null;
+        setProfile(pData);
+      }
+
+      if (bookingsRes.status === 'fulfilled') {
+        const rawBookings = bookingsRes.value.data?.data || bookingsRes.value.data?.bookings || bookingsRes.value.data || [];
+        const bookingsList = Array.isArray(rawBookings) ? rawBookings : [];
+        const activeBooking = bookingsList.find((b) => {
+          const bTravelId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
+          const matches = String(bTravelId) === String(id);
+          const isActive = ['pending', 'accepted', 'confirmed'].includes(b.status);
+          return matches && isActive;
+        });
+        setExistingBooking(activeBooking || null);
+      }
+    } catch (err) {
+      if (!state?.travel) {
+        setFetchError('Failed to load ride information. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [id, state?.travel]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // 2. Auto-fill passenger details from Clerk user and student profile
   useEffect(() => {
@@ -141,6 +149,15 @@ export default function BookSeatPage() {
     return Boolean(currentUserId && travel.userId === currentUserId);
   }, [travel, user]);
 
+  // Check if current user already has an active request for this travel post
+  const isPending = useMemo(() => {
+    return existingBooking?.status === 'pending';
+  }, [existingBooking]);
+
+  const isConfirmed = useMemo(() => {
+    return existingBooking?.status === 'confirmed' || existingBooking?.status === 'accepted';
+  }, [existingBooking]);
+
   // Date and Time formatting
   const formattedDate = useMemo(() => {
     if (!travel?.travelDate) return 'Upcoming Date';
@@ -200,6 +217,16 @@ export default function BookSeatPage() {
       return;
     }
 
+    if (isPending) {
+      setSubmitError('You already have a pending booking request for this ride post. Please wait for the host to respond.');
+      return;
+    }
+
+    if (isConfirmed) {
+      setSubmitError('You already have a confirmed booking for this ride post.');
+      return;
+    }
+
     if (maxAvailableSeats < 1) {
       setSubmitError('This ride is already fully booked. Please browse other rides.');
       return;
@@ -235,8 +262,8 @@ export default function BookSeatPage() {
       const res = await createBooking(bookingPayload);
       const createdBooking = res.data?.data || res.data;
 
-      // Navigate to My Bookings page where the new booking is listed
-      navigate('/bookings', {
+      // Navigate to My Posts page with success state
+      navigate('/posts', {
         replace: true,
         state: {
           highlightId: createdBooking?._id,
@@ -247,6 +274,9 @@ export default function BookSeatPage() {
       console.error('Booking confirmation failed:', err);
       const msg = err.response?.data?.message || err.message || 'Failed to submit booking request. Please try again.';
       setSubmitError(msg);
+      if (err.status === 409 || err.code === 'DUPLICATE_BOOKING_REQUEST' || msg.toLowerCase().includes('already')) {
+        loadData();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -765,19 +795,60 @@ export default function BookSeatPage() {
                 </div>
               )}
 
+              {/* PENDING REQUEST BANNER */}
+              {isPending && !isOwnRide && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 flex items-start gap-2.5 text-xs">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Booking Request Pending</span>
+                    <p className="mt-0.5">
+                      You already have a pending booking request for this ride post. Please wait for the host to respond.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* CONFIRMED BOOKING BANNER */}
+              {isConfirmed && !isOwnRide && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-start gap-2.5 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Booking Already Confirmed</span>
+                    <p className="mt-0.5">
+                      You already have a confirmed seat reservation for this ride post.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* CONFIRM BOOKING ACTION BUTTON */}
               <div className="space-y-3">
                 <button
                   type="button"
                   onClick={handleConfirmBooking}
-                  disabled={isSubmitting || isOwnRide || maxAvailableSeats < 1}
-                  className="w-full py-3.5 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-full font-black text-sm shadow-md shadow-[#FF572E]/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#FF572E]"
+                  disabled={isSubmitting || isOwnRide || isPending || isConfirmed || maxAvailableSeats < 1}
+                  className={`w-full py-3.5 px-6 rounded-full font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
+                    isPending
+                      ? 'bg-amber-500 hover:bg-amber-500 text-white shadow-amber-500/20 opacity-90'
+                      : isConfirmed
+                      ? 'bg-emerald-600 hover:bg-emerald-600 text-white shadow-emerald-600/20 opacity-90'
+                      : 'bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white shadow-[#FF572E]/25 disabled:opacity-50 disabled:hover:bg-[#FF572E]'
+                  }`}
                 >
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       <span>Submitting Reservation...</span>
+                    </>
+                  ) : isPending ? (
+                    <>
+                      <Clock className="w-4 h-4 stroke-[2.5]" />
+                      <span>Request Pending</span>
+                    </>
+                  ) : isConfirmed ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                      <span>Already Confirmed</span>
                     </>
                   ) : maxAvailableSeats < 1 ? (
                     <span>Ride Fully Booked</span>
@@ -785,7 +856,7 @@ export default function BookSeatPage() {
                     <span>Cannot Book Own Ride</span>
                   ) : (
                     <>
-                      <span>Confirm Booking • {formatCurrency(totalAmount)}</span>
+                      <span>Book Seat • {formatCurrency(totalAmount)}</span>
                       <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                     </>
                   )}

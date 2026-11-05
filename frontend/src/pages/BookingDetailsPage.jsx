@@ -7,6 +7,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { Avatar } from '../components/ui/Avatar';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { WhatsAppContactCard } from '../components/booking/WhatsAppContactButton';
 import { getBookingById, cancelBooking } from '../lib/api';
 import { formatDate, formatCurrency } from '../lib/utils';
 import { openWhatsAppChat } from '../lib/whatsapp';
@@ -99,6 +100,26 @@ export default function BookingDetailsPage() {
           </div>
         </motion.div>
 
+        {/* WhatsApp Coordination - Only for confirmed/accepted bookings */}
+        {['confirmed', 'accepted'].includes(booking?.status) && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+          >
+            <WhatsAppContactCard
+              bookingId={booking?._id}
+              bookingStatus={booking?.status}
+              contactPerson={booking?.ownerStudent || booking?.passengerStudent || {
+                name: booking?.ownerStudent?.name || booking?.passengerStudent?.name || 'Fellow Student',
+                imageUrl: booking?.ownerStudent?.imageUrl || booking?.passengerStudent?.imageUrl,
+                college: booking?.ownerStudent?.college || booking?.passengerStudent?.college
+              }}
+              title="Coordinate Your Ride"
+            />
+          </motion.div>
+        )}
+
         {/* Driver / Partner */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -123,18 +144,6 @@ export default function BookingDetailsPage() {
               <span>{travel?.carModel || 'Campus Carpool'}</span>
             </div>
           </div>
-          <button 
-            onClick={() => openWhatsAppChat({
-              phone: booking?.ownerStudent?.phone || booking?.passengerStudent?.phone || travel?.student?.phone,
-              name: booking?.ownerStudent?.name || booking?.passengerStudent?.name || 'Campus Peer',
-              route: `${travel?.source || travel?.from || 'Campus'} → ${travel?.destination || travel?.to || 'Destination'}`
-            })}
-            title="Chat on WhatsApp"
-            className="p-2.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 rounded-xl text-[#128C7E] flex items-center gap-1.5 font-bold text-xs cursor-pointer transition-colors shrink-0"
-          >
-            <MessageSquare className="w-4 h-4 text-[#25D366]" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </button>
         </motion.div>
 
         {/* Details */}

@@ -8,7 +8,8 @@ import {
   respondToBookingRequest,
   getWhatsAppDetails,
   confirmBooking,
-  cancelBooking
+  cancelBooking,
+  completeBooking
 } from '../controllers/booking.controller.js';
 
 const router = express.Router();
@@ -69,6 +70,13 @@ router.patch('/:id/confirm', requireAuth, confirmBooking);
  * @access  Protected (Booking Owner or Passenger only)
  */
 router.patch('/:id/cancel', requireAuth, cancelBooking);
+
+/**
+ * @route   PATCH /api/bookings/:id/complete
+ * @desc    Owner or passenger marks a confirmed booking as completed
+ * @access  Protected (Booking Owner or Passenger only)
+ */
+router.patch('/:id/complete', requireAuth, completeBooking);
 
 export default router;
 
