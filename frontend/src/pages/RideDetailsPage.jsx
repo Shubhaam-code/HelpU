@@ -20,7 +20,8 @@ import {
   getReceivedBookings, 
   confirmBooking, 
   cancelBooking, 
-  getWhatsAppDetails 
+  getWhatsAppDetails,
+  respondBooking 
 } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
 
@@ -340,12 +341,25 @@ export default function RideDetailsPage() {
     setSuccessNotice('');
 
     try {
-      const res = await confirmBooking(targetBookingId);
+      await confirmBooking(targetBookingId);
       setSuccessNotice('Booking confirmed! Seats have been reserved successfully.');
       loadData();
     } catch (err) {
       console.error('Confirm booking error:', err);
-      setSubmitError(err.response?.data?.message || 'Failed to confirm booking.');
+      const errMsg = err.response?.data?.message || err.message || '';
+      if (errMsg.toLowerCase().includes('only accepted bookings')) {
+        try {
+          await respondBooking(targetBookingId, { action: 'accept' });
+          await confirmBooking(targetBookingId);
+          setSuccessNotice('Booking confirmed! Seats have been reserved successfully.');
+          loadData();
+          return;
+        } catch (fallbackErr) {
+          setSubmitError(fallbackErr.response?.data?.message || fallbackErr.message || 'Failed to confirm booking.');
+          return;
+        }
+      }
+      setSubmitError(errMsg || 'Failed to confirm booking.');
     } finally {
       setIsConfirming(false);
     }

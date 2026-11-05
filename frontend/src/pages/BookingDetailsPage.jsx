@@ -10,7 +10,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { getBookingById, confirmBooking, cancelBooking, getWhatsAppDetails } from '../lib/api';
+import { getBookingById, confirmBooking, cancelBooking, getWhatsAppDetails, respondBooking } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
 
 export default function BookingDetailsPage() {
@@ -50,7 +50,20 @@ export default function BookingDetailsPage() {
       loadBooking();
     } catch (err) {
       console.error('Error confirming booking:', err);
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to confirm booking.');
+      const errMsg = err.response?.data?.message || err.message || '';
+      if (errMsg.toLowerCase().includes('only accepted bookings')) {
+        try {
+          await respondBooking(id, { action: 'accept' });
+          await confirmBooking(id);
+          setSuccessMsg('Booking confirmed! Seats have been reserved successfully.');
+          loadBooking();
+          return;
+        } catch (fallbackErr) {
+          setErrorMsg(fallbackErr.response?.data?.message || fallbackErr.message || 'Failed to confirm booking.');
+          return;
+        }
+      }
+      setErrorMsg(errMsg || 'Failed to confirm booking.');
     } finally {
       setConfirming(false);
     }
