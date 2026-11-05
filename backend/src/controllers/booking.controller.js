@@ -105,9 +105,21 @@ export async function createBookingRequest(req, res) {
     });
 
     if (existingBooking) {
-      return res.status(400).json({
+      let duplicateMessage = 'You already have an active booking request for this travel post.';
+      if (existingBooking.status === 'pending') {
+        duplicateMessage = 'You already have a pending booking request for this ride post. Please wait for the host to respond.';
+      } else if (existingBooking.status === 'confirmed') {
+        duplicateMessage = 'You already have a confirmed booking for this ride post.';
+      } else if (existingBooking.status === 'accepted') {
+        duplicateMessage = 'You already have an accepted booking request for this ride post.';
+      }
+
+      return res.status(409).json({
         success: false,
-        message: `You already have an active (${existingBooking.status}) booking for this travel post`
+        code: 'DUPLICATE_BOOKING_REQUEST',
+        status: existingBooking.status,
+        bookingId: existingBooking._id,
+        message: duplicateMessage
       });
     }
 
@@ -167,11 +179,27 @@ export async function createBookingRequest(req, res) {
       });
     } catch (txErr) {
       await session.abortTransaction();
+      // Handle race condition duplicate key error from MongoDB unique partial index
+      if (txErr.code === 11000 || (txErr.name === 'MongoServerError' && txErr.code === 11000)) {
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE_BOOKING_REQUEST',
+          message: 'You already have an active booking request for this ride post.'
+        });
+      }
       throw txErr;
     } finally {
       await session.endSession().catch(() => {});
     }
   } catch (error) {
+    // Top-level duplicate key catch (in case index error surfaces outside tx catch)
+    if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) {
+      return res.status(409).json({
+        success: false,
+        code: 'DUPLICATE_BOOKING_REQUEST',
+        message: 'You already have an active booking request for this ride post.'
+      });
+    }
     console.error('Error in createBookingRequest:', error);
     return res.status(500).json({
       success: false,
@@ -201,7 +229,7 @@ export async function getReceivedBookings(req, res) {
     const passengerIds = [...new Set(bookings.map((b) => b.passengerId))];
     const passengers = await Student.find(
       { clerkId: { $in: passengerIds } },
-      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, phone: 1, clerkId: 1, _id: 0 }
+      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, phone: 1, whatsappNumber: 1, clerkId: 1, _id: 0 }
     );
 
     const passengerMap = new Map();
@@ -218,9 +246,10 @@ export async function getReceivedBookings(req, res) {
         isVerified: p?.isVerified ?? true,
         avatarId: p?.avatarId || null,
         imageUrl: p?.imageUrl || b.passengerImage || null,
-        // Expose passenger contact phone once booking is accepted/confirmed so host can coordinate
-        phone: isAcceptedOrConfirmed ? (p?.phone || b.passengerPhone || '') : undefined
+        // Expose passenger contact (prioritize WhatsApp) once booking is accepted/confirmed so host can coordinate
+        phone: isAcceptedOrConfirmed ? (p?.whatsappNumber || p?.phone || b.passengerPhone || '') : undefined
       };
+      obj.timeline = buildBookingTimeline(obj);
       return obj;
     });
 
@@ -259,7 +288,7 @@ export async function getMyBookings(req, res) {
     const ownerIds = [...new Set(bookings.map((b) => b.ownerId))];
     const owners = await Student.find(
       { clerkId: { $in: ownerIds } },
-      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, phone: 1, clerkId: 1, _id: 0 }
+      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, phone: 1, whatsappNumber: 1, clerkId: 1, _id: 0 }
     );
 
     const ownerMap = new Map();
@@ -276,9 +305,10 @@ export async function getMyBookings(req, res) {
         isVerified: o?.isVerified ?? true,
         avatarId: o?.avatarId || null,
         imageUrl: o?.imageUrl || null,
-        // Expose owner contact phone once booking is accepted/confirmed
-        phone: isAcceptedOrConfirmed ? (o?.phone || '') : undefined
+        // Expose owner contact (prioritize WhatsApp) once booking is accepted/confirmed
+        phone: isAcceptedOrConfirmed ? (o?.whatsappNumber || o?.phone || '') : undefined
       };
+      obj.timeline = buildBookingTimeline(obj);
       return obj;
     });
 
@@ -299,62 +329,73 @@ export async function getMyBookings(req, res) {
 
 /**
  * @route   PATCH /api/bookings/:id/respond
- * @desc    Owner accept or reject a pending booking request
- * @access  Protected
+ * @desc    Owner accept or reject a pending booking request with atomic seat decrement
+ * @access  Protected (Post Owner only)
  */
 export async function respondToBookingRequest(req, res) {
-  try {
-    const { id } = req.params;
-    const { action } = req.body;
-    const ownerId = req.userId;
+  const { id } = req.params;
+  const { action } = req.body;
+  const ownerId = req.userId;
 
-    // 1. Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking ID format'
-      });
-    }
+  // 1. Validate MongoDB ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid booking ID format'
+    });
+  }
 
-    // 2. Validate action (accept or reject only)
-    if (!action || !['accept', 'reject'].includes(action)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid action. Must be either "accept" or "reject"'
-      });
-    }
+  // 2. Validate action (accept or reject only)
+  if (!action || !['accept', 'reject'].includes(action)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid action. Must be either "accept" or "reject"'
+    });
+  }
 
-    // 3. Find booking document
-    const booking = await Booking.findById(id);
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking request not found'
-      });
-    }
-
-    // 4. Authorization check: Only the owner of the travel post can respond
-    if (booking.ownerId !== ownerId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: You are not authorized to respond to this booking request'
-      });
-    }
-
-    // 5. Only pending bookings can be accepted or rejected
-    if (booking.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot respond to a booking request that is already ${booking.status}`
-      });
-    }
-
-    // 6. Update status based on action inside transaction with Outbox event
-    // When owner accepts, atomically reserve seats on Travel and transition to 'confirmed'
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
+      // 3. Find booking document with session
+      const booking = await Booking.findById(id).session(session);
+      if (!booking) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: 'Booking request not found'
+        });
+      }
+
+      // 4. Authorization check: Only the owner of the travel post can respond
+      if (booking.ownerId !== ownerId) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: You are not authorized to respond to this booking request'
+        });
+      }
+
+      // 5. Only pending bookings can be accepted or rejected
+      if (booking.status !== 'pending') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Cannot respond to a booking request that is already ${booking.status}`
+        });
+      }
+
+      // 6. Validate requestedSeats
+      if (!booking.requestedSeats || typeof booking.requestedSeats !== 'number' || booking.requestedSeats < 1) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid requested seats on booking request'
+        });
+      }
+
       const travel = await Travel.findById(booking.travelId).session(session);
       if (!travel) {
         await session.abortTransaction();
@@ -364,49 +405,120 @@ export async function respondToBookingRequest(req, res) {
         });
       }
 
-      if (action === 'accept') {
-        const currentBookedSeats = travel.bookedSeats || 0;
-        const availableSeats = travel.seats - currentBookedSeats;
+      // 7. If booking belongs to a Request post, identify the actual Offer post providing seats.
+      // Never decrement seats from a Request post.
+      let targetOffer = null;
+      if (travel.type === 'offer') {
+        targetOffer = travel;
+      } else if (travel.type === 'request') {
+        if (booking.offerTravelId) {
+          targetOffer = await Travel.findById(booking.offerTravelId).session(session);
+        } else if (booking.offerId) {
+          targetOffer = await Travel.findById(booking.offerId).session(session);
+        } else {
+          targetOffer = await Travel.findOne({
+            userId: booking.passengerId,
+            type: 'offer',
+            status: 'active',
+            source: travel.source,
+            destination: travel.destination
+          }).session(session);
+        }
+      }
 
-        if (booking.requestedSeats > availableSeats) {
-          await session.abortTransaction();
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient seats available. Requested: ${booking.requestedSeats}, Available: ${Math.max(0, availableSeats)}`
-          });
+      let reservedTravel = targetOffer;
+
+      if (action === 'accept') {
+        // Decrease available seats only at approval time on the Offer post
+        if (targetOffer) {
+          const currentBookedSeats = targetOffer.bookedSeats || 0;
+          const availableSeats = targetOffer.seats - currentBookedSeats;
+
+          if (booking.requestedSeats > availableSeats) {
+            await session.abortTransaction();
+            return res.status(400).json({
+              success: false,
+              code: 'INSUFFICIENT_SEATS',
+              message: `Insufficient seats available. Requested: ${booking.requestedSeats}, Available: ${Math.max(0, availableSeats)}`
+            });
+          }
+
+          // Atomically reserve seats using conditional MongoDB update: ensures bookedSeats + requested <= seats
+          // Available seats can never become negative, safely handling simultaneous approvals
+          reservedTravel = await Travel.findOneAndUpdate(
+            {
+              _id: targetOffer._id,
+              $expr: {
+                $lte: [
+                  { $add: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] },
+                  '$seats'
+                ]
+              }
+            },
+            {
+              $inc: { bookedSeats: booking.requestedSeats }
+            },
+            { returnDocument: 'after', session }
+          );
+
+          if (!reservedTravel) {
+            await session.abortTransaction();
+            return res.status(400).json({
+              success: false,
+              code: 'INSUFFICIENT_SEATS',
+              message: 'Failed to reserve seats: insufficient seats available'
+            });
+          }
         }
 
-        // Atomically reserve seats on Travel
-        const reservedTravel = await Travel.findOneAndUpdate(
+        // Atomically update booking status from 'pending' to 'confirmed' with approvedAt timestamp
+        const now = new Date();
+        const updatedBooking = await Booking.findOneAndUpdate(
           {
-            _id: travel._id,
-            $expr: {
-              $lte: [
-                { $add: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] },
-                '$seats'
-              ]
-            }
+            _id: booking._id,
+            status: 'pending'
           },
           {
-            $inc: { bookedSeats: booking.requestedSeats }
+            $set: { status: 'confirmed', approvedAt: now }
           },
           { returnDocument: 'after', session }
         );
 
-        if (!reservedTravel) {
+        if (!updatedBooking) {
           await session.abortTransaction();
           return res.status(400).json({
             success: false,
-            message: 'Failed to reserve seats: insufficient seats or travel post has expired'
+            message: 'Booking request is no longer in pending status'
           });
         }
 
         booking.status = 'confirmed';
+        booking.approvedAt = now;
       } else {
-        booking.status = 'rejected';
-      }
+        // Rejection must NOT decrease seats - set status to 'rejected' with rejectedAt timestamp
+        const now = new Date();
+        const updatedBooking = await Booking.findOneAndUpdate(
+          {
+            _id: booking._id,
+            status: 'pending'
+          },
+          {
+            $set: { status: 'rejected', rejectedAt: now }
+          },
+          { returnDocument: 'after', session }
+        );
 
-      await booking.save({ session });
+        if (!updatedBooking) {
+          await session.abortTransaction();
+          return res.status(400).json({
+            success: false,
+            message: 'Booking request is no longer in pending status'
+          });
+        }
+
+        booking.status = 'rejected';
+        booking.rejectedAt = now;
+      }
 
       const eventType =
         action === 'accept'
@@ -435,21 +547,37 @@ export async function respondToBookingRequest(req, res) {
       return res.status(200).json({
         success: true,
         message: `Booking request ${action === 'accept' ? 'accepted and confirmed' : 'rejected'} successfully`,
-        data: booking
+        data: {
+          booking,
+          travel: reservedTravel ? {
+            id: reservedTravel._id,
+            seats: reservedTravel.seats,
+            bookedSeats: reservedTravel.bookedSeats,
+            availableSeats: reservedTravel.seats - (reservedTravel.bookedSeats || 0)
+          } : undefined
+        }
       });
     } catch (txErr) {
       await session.abortTransaction();
-      throw txErr;
+      const isTransient =
+        (txErr.errorLabels && txErr.errorLabels.includes('TransientTransactionError')) ||
+        (txErr.hasErrorLabel && txErr.hasErrorLabel('TransientTransactionError')) ||
+        txErr.code === 112;
+
+      if (isTransient && attempt < maxRetries) {
+        await session.endSession().catch(() => {});
+        await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+        continue;
+      }
+      console.error('Error in respondToBookingRequest:', txErr);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error while responding to booking request',
+        error: txErr.message
+      });
     } finally {
       await session.endSession().catch(() => {});
     }
-  } catch (error) {
-    console.error('Error in respondToBookingRequest:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error while responding to booking request',
-      error: error.message
-    });
   }
 }
 
@@ -532,8 +660,9 @@ export async function getWhatsAppDetails(req, res) {
       Travel.findById(booking.travelId).lean()
     ]);
 
-    const passengerPhone = (passengerStudent?.phone || booking.passengerPhone || '').trim();
-    const ownerPhone = (ownerStudent?.phone || '').trim();
+    // Prioritize whatsappNumber, fallback to phone field
+    const passengerPhone = (passengerStudent?.whatsappNumber || passengerStudent?.phone || booking.passengerPhone || '').trim();
+    const ownerPhone = (ownerStudent?.whatsappNumber || ownerStudent?.phone || '').trim();
 
     const otherRole = isOwner ? 'passenger' : 'owner';
     const targetPhone = isOwner ? passengerPhone : ownerPhone;
@@ -681,42 +810,67 @@ export async function confirmBooking(req, res) {
         });
       }
 
-      // 7. Immediate available seats pre-check
-      const currentBookedSeats = travel.bookedSeats || 0;
-      const availableSeats = travel.seats - currentBookedSeats;
-      if (booking.requestedSeats > availableSeats) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient seats available. Requested: ${booking.requestedSeats}, Available: ${Math.max(0, availableSeats)}`
-        });
+      // 7. If booking belongs to a Request post, identify the actual Offer post providing seats
+      let targetOffer = null;
+      if (travel.type === 'offer') {
+        targetOffer = travel;
+      } else if (travel.type === 'request') {
+        if (booking.offerTravelId) {
+          targetOffer = await Travel.findById(booking.offerTravelId).session(session);
+        } else if (booking.offerId) {
+          targetOffer = await Travel.findById(booking.offerId).session(session);
+        } else {
+          targetOffer = await Travel.findOne({
+            userId: booking.passengerId,
+            type: 'offer',
+            status: 'active',
+            source: travel.source,
+            destination: travel.destination
+          }).session(session);
+        }
       }
 
-      // 8. Atomically reserve seats on Travel within the transaction
-      const reservedTravel = await Travel.findOneAndUpdate(
-        {
-          _id: travel._id,
-          status: 'active',
-          expiresAt: { $gt: now },
-          $expr: {
-            $lte: [
-              { $add: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] },
-              '$seats'
-            ]
-          }
-        },
-        {
-          $inc: { bookedSeats: booking.requestedSeats }
-        },
-        { returnDocument: 'after', session }
-      );
+      let reservedTravel = targetOffer || travel;
 
-      if (!reservedTravel) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: 'Failed to reserve seats: insufficient seats or travel post has expired/become inactive'
-        });
+      if (targetOffer) {
+        const currentBookedSeats = targetOffer.bookedSeats || 0;
+        const availableSeats = targetOffer.seats - currentBookedSeats;
+        if (booking.requestedSeats > availableSeats) {
+          await session.abortTransaction();
+          return res.status(400).json({
+            success: false,
+            code: 'INSUFFICIENT_SEATS',
+            message: `Insufficient seats available. Requested: ${booking.requestedSeats}, Available: ${Math.max(0, availableSeats)}`
+          });
+        }
+
+        // 8. Atomically reserve seats on Travel within the transaction
+        reservedTravel = await Travel.findOneAndUpdate(
+          {
+            _id: targetOffer._id,
+            status: 'active',
+            expiresAt: { $gt: now },
+            $expr: {
+              $lte: [
+                { $add: [{ $ifNull: ['$bookedSeats', 0] }, booking.requestedSeats] },
+                '$seats'
+              ]
+            }
+          },
+          {
+            $inc: { bookedSeats: booking.requestedSeats }
+          },
+          { returnDocument: 'after', session }
+        );
+
+        if (!reservedTravel) {
+          await session.abortTransaction();
+          return res.status(400).json({
+            success: false,
+            code: 'INSUFFICIENT_SEATS',
+            message: 'Failed to reserve seats: insufficient seats or travel post has expired/become inactive'
+          });
+        }
       }
 
       // 9. Atomically update booking status from 'accepted' to 'confirmed' within the transaction
@@ -726,7 +880,7 @@ export async function confirmBooking(req, res) {
           status: 'accepted'
         },
         {
-          $set: { status: 'confirmed' }
+          $set: { status: 'confirmed', approvedAt: now }
         },
         { returnDocument: 'after', session }
       );
@@ -847,7 +1001,15 @@ export async function cancelBooking(req, res) {
         });
       }
 
-      // 4. Status check: Allow cancelling pending, accepted, or confirmed bookings
+      // 4. Status check: Prevent completed, rejected, or already cancelled bookings from being cancelled
+      if (booking.status === 'completed') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot cancel a completed booking'
+        });
+      }
+
       if (!['pending', 'accepted', 'confirmed'].includes(booking.status)) {
         await session.abortTransaction();
         return res.status(400).json({
@@ -856,10 +1018,29 @@ export async function cancelBooking(req, res) {
         });
       }
 
-      // If pending, no seats were reserved on Travel yet - cancel immediately
+      const now = new Date();
+
+      // If pending, no seats were reserved on Travel yet - cancel atomically and return
       if (booking.status === 'pending') {
-        booking.status = 'cancelled';
-        const cancelledBooking = await booking.save({ session });
+        const cancelledBooking = await Booking.findOneAndUpdate(
+          {
+            _id: booking._id,
+            status: 'pending'
+          },
+          {
+            $set: { status: 'cancelled', cancelledAt: now }
+          },
+          { returnDocument: 'after', session }
+        );
+
+        if (!cancelledBooking) {
+          await session.abortTransaction();
+          return res.status(400).json({
+            success: false,
+            message: 'Booking request is no longer in pending status'
+          });
+        }
+
         await session.commitTransaction();
         return res.status(200).json({
           success: true,
@@ -878,14 +1059,15 @@ export async function cancelBooking(req, res) {
         });
       }
 
-      // 6. Atomically transition booking status from 'confirmed' to 'cancelled' within the transaction
+      // 6. Atomically transition booking status from accepted/confirmed to cancelled within the transaction
+      // This ensures repeated cancellation requests cannot restore seats more than once
       const cancelledBooking = await Booking.findOneAndUpdate(
         {
           _id: booking._id,
-          status: 'confirmed'
+          status: { $in: ['accepted', 'confirmed'] }
         },
         {
-          $set: { status: 'cancelled' }
+          $set: { status: 'cancelled', cancelledAt: now }
         },
         { returnDocument: 'after', session }
       );
@@ -894,28 +1076,52 @@ export async function cancelBooking(req, res) {
         await session.abortTransaction();
         return res.status(400).json({
           success: false,
-          message: 'Booking is no longer in confirmed status or was already cancelled'
+          message: 'Booking is no longer in confirmed or accepted status or was already cancelled'
         });
       }
 
-      // 7. Atomically decrement bookedSeats on Travel within the transaction
-      const updatedTravel = await Travel.findOneAndUpdate(
-        {
-          _id: travel._id,
-          bookedSeats: { $gte: booking.requestedSeats }
-        },
-        {
-          $inc: { bookedSeats: -booking.requestedSeats }
-        },
-        { returnDocument: 'after', session }
-      );
+      // 7. If booking belongs to a Request post, identify the actual Offer post providing seats.
+      // Never decrement or restore seats on a Request post.
+      let targetOfferTravel = null;
+      if (travel.type === 'offer') {
+        targetOfferTravel = travel;
+      } else if (travel.type === 'request') {
+        if (booking.offerTravelId) {
+          targetOfferTravel = await Travel.findById(booking.offerTravelId).session(session);
+        } else if (booking.offerId) {
+          targetOfferTravel = await Travel.findById(booking.offerId).session(session);
+        } else {
+          targetOfferTravel = await Travel.findOne({
+            userId: booking.passengerId,
+            type: 'offer',
+            source: travel.source,
+            destination: travel.destination
+          }).session(session);
+        }
+      }
 
-      if (!updatedTravel) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: 'Cannot release seats: Travel bookedSeats is less than requested seats'
-        });
+      let updatedTravel = travel;
+      if (targetOfferTravel) {
+        // Atomically decrement bookedSeats (restoring exact reserved seats) on the Offer post
+        updatedTravel = await Travel.findOneAndUpdate(
+          {
+            _id: targetOfferTravel._id,
+            bookedSeats: { $gte: booking.requestedSeats }
+          },
+          {
+            $inc: { bookedSeats: -booking.requestedSeats }
+          },
+          { returnDocument: 'after', session }
+        );
+
+        if (!updatedTravel) {
+          // Fallback safe adjustment to ensure bookedSeats never becomes negative
+          updatedTravel = await Travel.findOneAndUpdate(
+            { _id: targetOfferTravel._id },
+            { $set: { bookedSeats: 0 } },
+            { returnDocument: 'after', session }
+          );
+        }
       }
 
       // 8. Create Outbox event for cancellation inside transaction
@@ -991,8 +1197,165 @@ export async function cancelBooking(req, res) {
 }
 
 /**
+ * Helper to build a comprehensive, ordered booking status timeline
+ */
+export function buildBookingTimeline(booking) {
+  if (!booking) return [];
+  const timeline = [];
+
+  // 1. Request Created
+  if (booking.createdAt) {
+    timeline.push({
+      status: 'pending',
+      title: 'Booking Requested',
+      description: `Requested ${booking.requestedSeats || 1} seat(s) by ${booking.passengerName || 'passenger'}.`,
+      timestamp: booking.createdAt,
+      isCompleted: true
+    });
+  }
+
+  // 2. Approved or Rejected
+  if (booking.approvedAt || ['accepted', 'confirmed', 'completed'].includes(booking.status)) {
+    timeline.push({
+      status: 'confirmed',
+      title: 'Booking Approved',
+      description: 'Ride host accepted and confirmed the seat reservation.',
+      timestamp: booking.approvedAt || booking.updatedAt || booking.createdAt,
+      isCompleted: true
+    });
+  } else if (booking.rejectedAt || booking.status === 'rejected') {
+    timeline.push({
+      status: 'rejected',
+      title: 'Booking Declined',
+      description: 'Ride host declined this booking request.',
+      timestamp: booking.rejectedAt || booking.updatedAt || booking.createdAt,
+      isCompleted: true
+    });
+  }
+
+  // 3. Cancelled (if applicable)
+  if (booking.cancelledAt || booking.status === 'cancelled') {
+    timeline.push({
+      status: 'cancelled',
+      title: 'Booking Cancelled',
+      description: 'Booking reservation was cancelled.',
+      timestamp: booking.cancelledAt || booking.updatedAt || booking.createdAt,
+      isCompleted: true
+    });
+  }
+
+  // 4. Completed (if applicable)
+  if (booking.completedAt || booking.status === 'completed') {
+    timeline.push({
+      status: 'completed',
+      title: 'Ride Completed',
+      description: 'Journey finished successfully.',
+      timestamp: booking.completedAt || booking.updatedAt || booking.createdAt,
+      isCompleted: true
+    });
+  }
+
+  return timeline;
+}
+
+/**
+ * @route   PATCH /api/bookings/:id/complete
+ * @desc    Owner or passenger marks a confirmed booking as completed
+ * @access  Protected (Booking Owner or Passenger only)
+ */
+export async function completeBooking(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid booking ID format'
+      });
+    }
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    // Authorization check: Only booking owner or passenger can complete
+    if (booking.ownerId !== userId && booking.passengerId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You are not authorized to complete this booking'
+      });
+    }
+
+    // If already completed, idempotent 200 response
+    if (booking.status === 'completed') {
+      const bObj = booking.toObject();
+      return res.status(200).json({
+        success: true,
+        message: 'Booking is already completed',
+        data: {
+          ...bObj,
+          timeline: buildBookingTimeline(bObj)
+        }
+      });
+    }
+
+    // Only confirmed or accepted bookings can be transitioned to completed
+    if (!['accepted', 'confirmed'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot complete a booking with status "${booking.status}". Only confirmed bookings can be completed.`
+      });
+    }
+
+    const now = new Date();
+    const updatedBooking = await Booking.findOneAndUpdate(
+      {
+        _id: booking._id,
+        status: { $in: ['accepted', 'confirmed'] }
+      },
+      {
+        $set: {
+          status: 'completed',
+          completedAt: now
+        }
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedBooking) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking is no longer in confirmed or accepted status'
+      });
+    }
+
+    const bObj = updatedBooking.toObject();
+    return res.status(200).json({
+      success: true,
+      message: 'Booking marked as completed successfully',
+      data: {
+        ...bObj,
+        timeline: buildBookingTimeline(bObj)
+      }
+    });
+  } catch (error) {
+    console.error('Error in completeBooking:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while completing booking',
+      error: error.message
+    });
+  }
+}
+
+/**
  * @route   GET /api/bookings/:id
- * @desc    Get booking details by ID
+ * @desc    Get booking details by ID with populated students, travel post and full status timeline
  * @access  Protected (Owner or Passenger)
  */
 export async function getBookingById(req, res) {
@@ -1016,12 +1379,15 @@ export async function getBookingById(req, res) {
       Student.findOne({ clerkId: booking.passengerId }).lean()
     ]);
 
+    const timeline = buildBookingTimeline(booking);
+
     return res.status(200).json({
       success: true,
       data: {
         ...booking,
         ownerStudent,
-        passengerStudent
+        passengerStudent,
+        timeline
       }
     });
   } catch (error) {

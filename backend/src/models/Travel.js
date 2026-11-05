@@ -97,8 +97,8 @@ const travelSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['active', 'completed', 'cancelled'],
-        message: 'Status must be "active", "completed", or "cancelled"'
+        values: ['active', 'expired', 'completed', 'cancelled'],
+        message: 'Status must be "active", "expired", "completed", or "cancelled"'
       },
       default: 'active'
     },
@@ -119,8 +119,9 @@ travelSchema.pre('validate', function () {
   }
 });
 
-// MongoDB TTL Index for automatic background deletion
-travelSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Standard indexes for fast lookup and sorting (No TTL background deletion - historical rides are permanently preserved)
+travelSchema.index({ expiresAt: 1 });
+travelSchema.index({ userId: 1, status: 1 });
 
 const Travel = mongoose.model('Travel', travelSchema);
 
