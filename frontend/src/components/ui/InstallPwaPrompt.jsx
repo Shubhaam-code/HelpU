@@ -198,3 +198,4 @@ function IosInstallModal({ isOpen, onClose }) {
     </div>
   );
 }
+
