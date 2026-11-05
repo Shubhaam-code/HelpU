@@ -5,11 +5,13 @@ import { useUser } from '@clerk/clerk-react';
 import { 
   Car, Calendar, Clock, MapPin, Plus, 
   Eye, RefreshCw, AlertCircle, ArrowRight, Check,
-  ChevronRight, MoreVertical, ShieldCheck, Sparkles, Filter
+  ChevronRight, MoreVertical, ShieldCheck, Sparkles, Filter,
+  Users, IndianRupee, Inbox, CheckCircle2, Ticket
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
+import { Avatar } from '../components/ui/Avatar';
 import { getMyTravels } from '../lib/api';
 
 /**
@@ -126,36 +128,33 @@ export default function MyPostsPage() {
         {/* ========================================================================= */}
         {/* PAGE HEADER & PRIMARY ACTION                                              */}
         {/* ========================================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[11px] font-black text-[#FF572E] uppercase tracking-wide">
-                <Sparkles className="w-3.5 h-3.5" />
-                Student Mobility Hub
-              </span>
+        <div className="bg-gradient-to-r from-[#FFF0E6] via-[#FFF6EE] to-[#FFFBF8] rounded-[28px] sm:rounded-[32px] p-6 sm:p-7 border border-[#F4E3D8] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 border border-[#F4E3D8] text-[11px] font-black text-[#FF572E] uppercase tracking-wider mb-2.5 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Campus Mobility Hub</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#17233C] tracking-tight">
-              My Posts
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#17233C] tracking-tight leading-tight">
+              My <span className="text-[#FF572E]">Posts</span>
             </h1>
-            <p className="text-xs sm:text-sm text-[#6E7587] mt-0.5">
-              All your published rides, together in one place.
+            <p className="text-xs sm:text-sm text-[#6E7587] font-medium mt-1.5 leading-relaxed">
+              Track your published ride offers, passenger travel requests, and manage passenger bookings.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={fetchPosts}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] text-[#17233C] text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="w-11 h-11 rounded-2xl bg-white border border-[#F4E3D8] text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2] flex items-center justify-center shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
               title="Refresh your posts"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#FF572E]' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#FF572E]' : ''}`} />
             </button>
 
             <button
               onClick={() => navigate('/rides/offer')}
-              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-black rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 sm:px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Create New Post</span>
@@ -167,14 +166,14 @@ export default function MyPostsPage() {
         {/* FILTER BAR                                                                */}
         {/* ========================================================================= */}
         <div className="bg-white rounded-2xl p-2 sm:p-2.5 border border-[#F4E3D8]/90 shadow-2xs overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1.5 min-w-max">
+          <div className="flex items-center gap-2 min-w-max">
             {filterTabs.map((tab) => {
               const isSelected = activeFilter === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveFilter(tab.id)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-[#17233C] text-white shadow-xs font-black'
                       : 'bg-transparent text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFFBF8]'
@@ -182,7 +181,7 @@ export default function MyPostsPage() {
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-colors ${
                       isSelected
                         ? 'bg-white/20 text-white'
                         : 'bg-[#FFF4ED] text-[#FF572E]'
@@ -204,10 +203,13 @@ export default function MyPostsPage() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white rounded-[24px] p-5 border border-[#F4E3D8] animate-pulse space-y-4"
+                className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8] animate-pulse space-y-4"
               >
-                <div className="h-5 bg-gray-200 rounded-md w-1/4" />
-                <div className="h-12 bg-gray-100 rounded-xl" />
+                <div className="flex justify-between items-center">
+                  <div className="h-5 bg-gray-200 rounded-md w-1/4" />
+                  <div className="h-5 bg-gray-200 rounded-md w-1/6" />
+                </div>
+                <div className="h-16 bg-gray-100 rounded-2xl" />
                 <div className="h-8 bg-gray-200 rounded-xl" />
               </div>
             ))}
@@ -223,7 +225,7 @@ export default function MyPostsPage() {
             </div>
             <button
               onClick={fetchPosts}
-              className="px-5 py-2 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+              className="px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry</span>
@@ -232,7 +234,7 @@ export default function MyPostsPage() {
         ) : filteredTravels.length === 0 ? (
           /* Empty state */
           <div className="bg-white rounded-[28px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
+            <div className="w-16 h-16 rounded-3xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl shadow-2xs">
               <Car className="w-8 h-8 text-[#FF572E]" />
             </div>
             <div>
@@ -241,7 +243,7 @@ export default function MyPostsPage() {
               </h3>
               <p className="text-xs sm:text-sm text-[#6E7587] mt-1.5 max-w-sm mx-auto leading-relaxed">
                 {activeFilter === 'all'
-                  ? 'Your published offers and requests will appear here.'
+                  ? 'Your published ride offers and requests will appear here.'
                   : `You currently have no ${activeFilter} rides in this category.`}
               </p>
             </div>
@@ -257,7 +259,7 @@ export default function MyPostsPage() {
           </div>
         ) : (
           /* Cards Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
             {filteredTravels.map((travel) => {
               const isOffer = travel.type === 'offer';
               const booked = travel.bookedSeats || 0;
@@ -274,127 +276,177 @@ export default function MyPostsPage() {
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-[24px] border border-[#F4E3D8] p-5 shadow-xs hover:shadow-md hover:border-[#FF572E]/40 transition-all flex flex-col justify-between gap-4"
+                  className="bg-white rounded-[26px] border border-[#F4E3D8] p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-[#FF572E]/40 transition-all duration-300 flex flex-col justify-between gap-4.5 group"
                 >
-                  <div className="space-y-3.5">
-                    {/* Top Header: Badges & Status */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Offer / Request Type Badge */}
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                            isOffer
-                              ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
-                              : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
-                          }`}
-                        >
+                  <div className="space-y-4">
+                    
+                    {/* Top Row: Student Profile, Verification Badge, Campus & Type Badge */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar
+                          avatarId={travel.authorAvatar || 'm1'}
+                          src={user?.imageUrl}
+                          name={user?.fullName || travel.authorName}
+                          size="md"
+                          ring
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-black text-sm sm:text-base text-[#17233C] truncate leading-tight">
+                            {user?.fullName || travel.authorName || 'Campus Student'}
+                          </h4>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-[#16A34A] font-bold">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                            <span className="truncate">{travel.college || 'VIT, Bhopal'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Type Badge & Active Status */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                          isOffer
+                            ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
+                            : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
+                        }`}>
                           {isOffer ? 'Ride Offer' : 'Passenger Request'}
                         </span>
-
-                        {/* Status Badge */}
                         {isActive && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
-                            <span>Active</span>
-                          </span>
+                          <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" title="Active" />
                         )}
                         {isCompleted && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#475569] border border-[#CBD5E1]">
-                            Completed
-                          </span>
-                        )}
-                        {isCancelled && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA]">
-                            Cancelled
-                          </span>
-                        )}
-                        {!isActive && !isCompleted && !isCancelled && isExpired && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]">
-                            Expired
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#475569]">
+                            Done
                           </span>
                         )}
                       </div>
+                    </div>
 
-                      {/* Price per seat if offer */}
-                      {isOffer && travel.pricePerSeat > 0 && (
-                        <span className="text-[#FF572E] font-black text-sm font-mono">
-                          ₹{travel.pricePerSeat}/seat
+                    {/* Highlighted Co-Travel or Request Information Strip */}
+                    <div className="px-3.5 py-2 bg-[#FFF4ED] rounded-xl text-xs font-bold text-[#FF572E] border border-[#FDE0D0] flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm">🎯</span>
+                        <span className="truncate">
+                          {isOffer
+                            ? `Co-travel offer on your route (${travel.source} → ${travel.destination})`
+                            : `Passenger travel request (${travel.source} → ${travel.destination})`}
+                        </span>
+                      </div>
+                      {travel.requestsCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-white text-[#FF572E] text-[10px] font-black border border-[#FDE0D0] shrink-0">
+                          {travel.requestsCount} {travel.requestsCount === 1 ? 'Request' : 'Requests'}
                         </span>
                       )}
                     </div>
 
-                    {/* Route Typography */}
-                    <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/80 text-xs space-y-1.5">
-                      <div className="flex items-center gap-2 font-black text-[#17233C] text-sm sm:text-base">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
-                        <span className="truncate">{travel.source}</span>
+                    {/* Pickup & Drop Section with Centered Arrow & Compact Schedule Info */}
+                    <div className="bg-[#FFFBF8] rounded-2xl p-3.5 sm:p-4 border border-[#F4E3D8]/80 space-y-3">
+                      {/* Pickup & Drop with Route Arrow */}
+                      <div className="flex items-center justify-between gap-3">
+                        {/* Pickup */}
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block mb-1">
+                            Pickup
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                            <span className="font-extrabold text-[#17233C] text-sm sm:text-base truncate capitalize" title={travel.source}>
+                              {travel.source}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Centered Route Arrow */}
+                        <div className="flex flex-col items-center justify-center shrink-0 px-2">
+                          <div className="w-8 h-8 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] flex items-center justify-center shadow-2xs group-hover:scale-105 group-hover:border-[#FF572E]/40 transition-all">
+                            <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                          </div>
+                        </div>
+
+                        {/* Drop */}
+                        <div className="min-w-0 flex-1 text-right">
+                          <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block mb-1">
+                            Drop
+                          </span>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className="font-extrabold text-[#17233C] text-sm sm:text-base truncate capitalize" title={travel.destination}>
+                              {travel.destination}
+                            </span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="pl-1 border-l-2 border-dashed border-[#F4E3D8] ml-1 my-0.5 py-0.5">
-                        <span className="text-[10px] text-[#FF572E] font-bold">Direction</span>
-                      </div>
-                      <div className="flex items-center gap-2 font-black text-[#17233C] text-sm sm:text-base">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
-                        <span className="truncate">{travel.destination}</span>
+
+                      {/* Divider & Date/Time/Seats Row */}
+                      <div className="border-t border-[#F4E3D8]/60 pt-2.5 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 font-bold text-[#6E7587] min-w-0">
+                          <Calendar className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
+                          <span className="truncate">
+                            {formatTravelDate(travel.travelDate)} • {formatMinutesToTime(travel.departureTime) || 'Flexible'}
+                          </span>
+                        </div>
+
+                        <div className={`font-bold shrink-0 text-xs ${isOffer ? 'text-[#16A34A]' : 'text-[#FF572E]'}`}>
+                          {isOffer ? `${availableSeats} seat(s) left` : `${travel.seats || 1} seat(s) needed`}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Schedule & Metadata */}
-                    <div className="grid grid-cols-2 gap-2 text-xs text-[#6E7587] pt-1 border-t border-[#F4E3D8]/60">
+                    {/* Vehicle Information & Price Row */}
+                    <div className="flex items-center justify-between text-xs px-1 font-semibold text-[#6E7587]">
                       <div className="flex items-center gap-1.5 truncate">
-                        <Calendar className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                        <span className="font-bold text-[#17233C]">
-                          {formatTravelDate(travel.travelDate)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Clock className="w-3.5 h-3.5 text-[#6E7587] shrink-0" />
-                        <span>{formatMinutesToTime(travel.departureTime)}</span>
-                      </div>
-                    </div>
-
-                    {/* Seat & Vehicle Details */}
-                    <div className="flex items-center justify-between text-xs text-[#6E7587] font-semibold pt-0.5">
-                      <div>
-                        {isOffer ? (
-                          <span className="text-[#16A34A]">
-                            🟢 <strong>{availableSeats}</strong> of {travel.seats} seats available
-                          </span>
-                        ) : (
-                          <span className="text-[#FF572E]">
-                            🟣 <strong>{travel.seats || 1}</strong> seat(s) requested
-                          </span>
-                        )}
+                        <Car className="w-4 h-4 text-[#8C93A4] shrink-0" />
+                        <span className="truncate">{travel.carModel || (isOffer ? 'Campus Carpool' : 'Passenger Request')}</span>
                       </div>
 
-                      {travel.createdAt && (
-                        <span className="text-[11px] text-[#A0A6B5]">
-                          Posted {formatCreatedDate(travel.createdAt)}
-                        </span>
+                      {isOffer && (
+                        <div className="text-right shrink-0">
+                          <span className="text-[#FF572E] font-black text-base sm:text-lg font-mono">
+                            ₹{travel.pricePerSeat || 350}
+                          </span>
+                          <span className="text-xs text-[#8C93A4] font-medium font-sans">/seat</span>
+                        </div>
                       )}
                     </div>
-
-                    {/* Requests info badge if any */}
-                    {travel.requestsCount > 0 && (
-                      <div className="px-3 py-1.5 bg-[#FFF4ED] rounded-xl border border-[#FDE0D0] text-xs font-bold text-[#17233C] flex items-center justify-between">
-                        <span>Requests Received:</span>
-                        <span className="text-[#FF572E] font-black">
-                          {travel.requestsCount} ({travel.pendingRequestsCount || 0} pending)
-                        </span>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Actions Row */}
-                  <div className="pt-3 border-t border-[#F4E3D8]/70">
+                  {/* Actions Row: View Details and Book Seat (Where applicable) */}
+                  <div className="pt-3 border-t border-[#F4E3D8]/70 flex items-center gap-2.5">
                     {/* View Details */}
                     <button
                       type="button"
                       onClick={() => navigate(`/rides/${travel._id}`)}
-                      className="w-full py-2.5 px-4 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2.5 px-4 bg-[#FFFBF8] hover:bg-[#FFF4ED] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] font-bold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <Eye className="w-3.5 h-3.5 text-[#6E7587]" />
+                      <Eye className="w-3.5 h-3.5 text-[#8C93A4]" />
                       <span>View Details</span>
                     </button>
+
+                    {/* Book Seat / Review Requests */}
+                    {isOffer ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (travel.pendingRequestsCount > 0) {
+                            navigate('/bookings?tab=received');
+                          } else {
+                            navigate(`/rides/${travel._id}`);
+                          }
+                        }}
+                        className="flex-1 py-2.5 px-4 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs rounded-xl shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Ticket className="w-3.5 h-3.5" />
+                        <span>{travel.pendingRequestsCount > 0 ? `Review (${travel.pendingRequestsCount})` : 'Book Seat'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/rides/${travel._id}`)}
+                        className="flex-1 py-2.5 px-4 bg-[#17233C] hover:bg-[#233252] text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>View Request</span>
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               );
