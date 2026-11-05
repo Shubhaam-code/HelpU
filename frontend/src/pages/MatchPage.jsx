@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@clerk/clerk-react';
 import { 
-  Users, MapPin, Clock, Calendar, ShieldCheck, Car, 
+  Users, MapPin, Clock, Calendar, ShieldCheck, Car, MessageSquare,
   Sparkles, RefreshCw, AlertCircle, Send, Check, Ticket, ChevronRight,
   Heart, TrendingUp, ArrowRight, ArrowLeft, CheckCircle2, GraduationCap,
   Search, Info
@@ -12,6 +12,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { openWhatsAppChat } from '../lib/whatsapp';
 import { 
   getMyTravels, 
   getTravelMatches, 
@@ -65,6 +66,65 @@ export default function MatchPage() {
   // Global activity stats
   const [myBookings, setMyBookings] = useState([]);
   const [receivedBookings, setReceivedBookings] = useState([]);
+  const [toastMsg, setToastMsg] = useState(null);
+
+  // Lookup map for active booking status per travel post
+  const activeBookingStatusByTravelId = useMemo(() => {
+    const map = {};
+    if (Array.isArray(myBookings)) {
+      for (const b of myBookings) {
+        const tId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
+        if (tId && ['pending', 'accepted', 'confirmed'].includes(b.status)) {
+          map[String(tId)] = b.status;
+        }
+      }
+    }
+    return map;
+  }, [myBookings]);
+
+  // Auto-dismiss toast message
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
+
+  // Handle WhatsApp contact
+  const handleContactWhatsApp = (match) => {
+    const rawPhone = match?.student?.phone || match?.creator?.phone || match?.phone || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const peerName = match?.student?.name || match?.creator?.name || match?.authorName || 'Campus Peer';
+    const fromCity = match?.source || 'Origin';
+    const toCity = match?.destination || 'Destination';
+    const isOffer = match?.type === 'offer';
+
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setToastMsg({
+        type: 'error',
+        text: `${peerName} has not provided a valid WhatsApp contact number.`
+      });
+      return;
+    }
+
+    const defaultMsg = isOffer
+      ? `Hi ${peerName}! I saw your ride offer on HelpU from ${fromCity} to ${toCity}. I'd like to coordinate and travel together!`
+      : `Hi ${peerName}! I saw your ride request on HelpU from ${fromCity} to ${toCity}. I am traveling the same way and can offer a ride!`;
+
+    const opened = openWhatsAppChat({
+      phone: cleanPhone,
+      name: peerName,
+      route: `${fromCity} → ${toCity}`,
+      message: defaultMsg,
+      isOwn: false
+    });
+
+    if (!opened) {
+      setToastMsg({
+        type: 'error',
+        text: 'Could not open WhatsApp. Please check the contact number.'
+      });
+    }
+  };
 
   // Fetch logged-in user's active travel posts (without aggregating matches across all posts)
   const fetchMyActivePosts = useCallback(async () => {
@@ -315,7 +375,7 @@ export default function MatchPage() {
                 </div>
 
                 <div 
-                  onClick={() => navigate('/bookings')}
+                  onClick={() => navigate('/posts')}
                   className="bg-[#EDFAF3] hover:bg-[#DDF6E8] border border-[#BCECD4] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center cursor-pointer transition-colors"
                 >
                   <div className="flex items-center justify-center gap-1.5 text-[#16A34A] mb-1">
@@ -328,7 +388,7 @@ export default function MatchPage() {
                 </div>
 
                 <div 
-                  onClick={() => navigate('/bookings?tab=received')}
+                  onClick={() => navigate('/posts')}
                   className="bg-[#FEF9E7] hover:bg-[#FDF3CC] border border-[#FDEBB2] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center cursor-pointer transition-colors"
                 >
                   <div className="flex items-center justify-center gap-1.5 text-[#CA8A04] mb-1">
@@ -615,6 +675,34 @@ export default function MatchPage() {
                 </div>
               </div>
 
+              {/* Toast Alert */}
+              <AnimatePresence>
+                {toastMsg && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className={`p-3.5 sm:p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold border shadow-xs ${
+                      toastMsg.type === 'error'
+                        ? 'bg-red-50 text-red-600 border-red-200'
+                        : 'bg-[#EDFAF3] text-[#16A34A] border-[#BCECD4]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                      <span>{toastMsg.text}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setToastMsg(null)}
+                      className="text-[#6E7587] hover:text-[#17233C] text-xs font-bold px-2 py-0.5 rounded cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Matching Results Header */}
               <div className="flex items-center justify-between px-1">
                 <div>
@@ -803,31 +891,83 @@ export default function MatchPage() {
                           </div>
                         </div>
 
-                        {/* Appropriate Existing Booking or Coordination Action */}
-                        <div className="pt-2 border-t border-[#F4E3D8]/70">
+                        {/* Appropriate Existing Booking or WhatsApp Action */}
+                        <div className="pt-2 border-t border-[#F4E3D8]/70 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleContactWhatsApp(match)}
+                            className="flex-1 py-2.5 px-3 bg-[#EDFAF3] hover:bg-[#25D366] text-[#15803D] hover:text-white border border-[#BCECD4] hover:border-[#25D366] font-bold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 group/wa"
+                            title="Contact on WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-[#25D366] group-hover/wa:text-white transition-colors" />
+                            <span className="truncate">Contact on WhatsApp</span>
+                          </button>
+
                           {isOffer ? (
+                            (() => {
+                              const activeStatus = activeBookingStatusByTravelId[String(travelId)];
+                              const isPending = activeStatus === 'pending';
+                              const isConfirmed = activeStatus === 'confirmed' || activeStatus === 'accepted';
+
+                              if (isPending) {
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="flex-1 py-2.5 px-3 bg-amber-500 text-white font-bold text-xs rounded-xl shadow-xs opacity-90 cursor-not-allowed flex items-center justify-center gap-1.5"
+                                    title="Booking request pending host response"
+                                  >
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <span className="truncate">Request Pending</span>
+                                  </button>
+                                );
+                              }
+
+                              if (isConfirmed) {
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="flex-1 py-2.5 px-3 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs opacity-90 cursor-not-allowed flex items-center justify-center gap-1.5"
+                                    title="Seat reservation already confirmed"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span className="truncate">Already Confirmed</span>
+                                  </button>
+                                );
+                              }
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
+                                      navigate(`/book/${travelId}`);
+                                    } else {
+                                      navigate('/rides/offer');
+                                    }
+                                  }}
+                                  className="flex-1 py-2.5 px-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <Ticket className="w-3.5 h-3.5" />
+                                  <span className="truncate">Book Seat</span>
+                                </button>
+                              );
+                            })()
+                          ) : (
                             <button
                               type="button"
                               onClick={() => {
                                 if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
-                                  navigate(`/book/${travelId}`);
+                                  navigate(`/rides/${travelId}`);
                                 } else {
-                                  navigate('/rides/offer');
+                                  navigate('/posts');
                                 }
                               }}
-                              className="w-full py-2.5 px-4 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                            >
-                              <Ticket className="w-3.5 h-3.5" />
-                              <span>Book Seat</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => navigate('/bookings?tab=received')}
-                              className="w-full py-2.5 px-4 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                              className="flex-1 py-2.5 px-3 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
                             >
                               <Users className="w-3.5 h-3.5" />
-                              <span>View Requests</span>
+                              <span className="truncate">View Details</span>
                             </button>
                           )}
                         </div>

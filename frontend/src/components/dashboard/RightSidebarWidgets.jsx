@@ -86,7 +86,7 @@ export function UpcomingBookingWidget({ booking }) {
           Upcoming Booking
         </h3>
         <button 
-          onClick={() => navigate('/bookings')}
+          onClick={() => navigate('/posts')}
           className="text-xs font-bold text-coral hover:underline flex items-center gap-1 cursor-pointer"
         >
           <span>View All</span>
@@ -96,7 +96,7 @@ export function UpcomingBookingWidget({ booking }) {
 
       {booking ? (
         <div 
-          onClick={() => navigate(`/bookings/${booking._id || '1'}`)}
+          onClick={() => navigate('/posts')}
           className="flex items-center justify-between p-3 rounded-2xl hover:bg-cream/50 transition-colors border border-gray-50 cursor-pointer"
         >
           <div className="flex items-center gap-3">

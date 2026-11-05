@@ -12,7 +12,7 @@ import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { openWhatsAppChat } from '../lib/whatsapp';
-import { getUserMatches, getMyTravels } from '../lib/api';
+import { getUserMatches, getMyTravels, getMyBookings } from '../lib/api';
 
 /**
  * Format minutes from midnight (0..1439) into 12-hour AM/PM format
@@ -40,26 +40,99 @@ function formatTravelDate(dateStr) {
   });
 }
 
+/**
+ * Normalize city names (trim spaces and lowercase)
+ */
+function normalizeCity(city) {
+  if (!city || typeof city !== 'string') return '';
+  return city.trim().toLowerCase();
+}
+
+/**
+ * Generate normalized route key (directional: source->destination)
+ */
+function getRouteKey(source, destination) {
+  const s = normalizeCity(source);
+  const d = normalizeCity(destination);
+  return `${s}->${d}`;
+}
+
+/**
+ * Format route for display (e.g. "patna → gaya")
+ */
+function formatRouteDisplay(source, destination) {
+  const s = normalizeCity(source);
+  const d = normalizeCity(destination);
+  return `${s} → ${d}`;
+}
+
 export default function MyMatchesPage() {
   const navigate = useNavigate();
   const { user } = useUser();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null); // { type: 'error' | 'success', text: string }
   const [userMatches, setUserMatches] = useState([]);
   const [myTravels, setMyTravels] = useState([]);
+  const [myBookings, setMyBookings] = useState([]);
   const [hasPostedTravel, setHasPostedTravel] = useState(false);
-  const [selectedTravelFilter, setSelectedTravelFilter] = useState('all');
+  const [selectedRouteFilter, setSelectedRouteFilter] = useState('all');
 
-  // Fetch actual matches from backend
+  // Auto-dismiss toast message
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
+
+  // Handle direct WhatsApp coordination
+  const handleContactWhatsApp = (match) => {
+    const rawPhone = match?.student?.phone || match?.creator?.phone || match?.phone || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const peerName = match?.student?.name || match?.creator?.name || match?.authorName || 'Campus Peer';
+    const fromCity = match?.source || 'Origin';
+    const toCity = match?.destination || 'Destination';
+    const isOffer = match?.type === 'offer';
+
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setToastMsg({
+        type: 'error',
+        text: `${peerName} has not provided a valid WhatsApp contact number.`
+      });
+      return;
+    }
+
+    const defaultMsg = isOffer
+      ? `Hi ${peerName}! I saw your ride offer on HelpU from ${fromCity} to ${toCity}. I'd like to coordinate and travel together!`
+      : `Hi ${peerName}! I saw your ride request on HelpU from ${fromCity} to ${toCity}. I am traveling the same way and can offer a ride!`;
+
+    const opened = openWhatsAppChat({
+      phone: cleanPhone,
+      name: peerName,
+      route: `${fromCity} → ${toCity}`,
+      message: defaultMsg,
+      isOwn: false
+    });
+
+    if (!opened) {
+      setToastMsg({
+        type: 'error',
+        text: 'Could not open WhatsApp. Please check the contact number.'
+      });
+    }
+  };
+
+  // Fetch actual matches and current user's bookings from backend
   const fetchMatches = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [matchesRes, travelsRes] = await Promise.allSettled([
+      const [matchesRes, travelsRes, bookingsRes] = await Promise.allSettled([
         getUserMatches(),
-        getMyTravels()
+        getMyTravels(),
+        getMyBookings()
       ]);
 
       if (matchesRes.status === 'fulfilled') {
@@ -83,6 +156,11 @@ export default function MyMatchesPage() {
           }
         }
       }
+
+      if (bookingsRes.status === 'fulfilled') {
+        const bList = bookingsRes.value?.data?.data || bookingsRes.value?.data?.bookings || bookingsRes.value?.data || [];
+        setMyBookings(Array.isArray(bList) ? bList : []);
+      }
     } catch (err) {
       console.error('Error fetching matches:', err);
       setError(err.message || 'Unable to retrieve matches from the campus network.');
@@ -95,15 +173,85 @@ export default function MyMatchesPage() {
     fetchMatches();
   }, [fetchMatches]);
 
-  // Filter matches based on selected active travel post
+  // Lookup map for active booking status per travel post
+  const activeBookingStatusByTravelId = useMemo(() => {
+    const map = {};
+    if (Array.isArray(myBookings)) {
+      for (const b of myBookings) {
+        const tId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
+        if (tId && ['pending', 'accepted', 'confirmed'].includes(b.status)) {
+          map[String(tId)] = b.status;
+        }
+      }
+    }
+    return map;
+  }, [myBookings]);
+
+  // Group user's active travel posts by normalized route direction
+  // ("patna -> gaya" and "Patna -> Gaya" are unified into a single route filter)
+  const uniqueRouteFilters = useMemo(() => {
+    const routeMap = new Map();
+
+    for (const travel of myTravels) {
+      const s = travel.source;
+      const d = travel.destination;
+      const key = getRouteKey(s, d);
+      if (!key || key === '->') continue;
+
+      if (!routeMap.has(key)) {
+        routeMap.set(key, {
+          routeKey: key,
+          source: s,
+          destination: d,
+          displayRoute: formatRouteDisplay(s, d),
+          postIds: new Set()
+        });
+      }
+      if (travel._id) {
+        routeMap.get(key).postIds.add(travel._id.toString());
+      }
+    }
+
+    return Array.from(routeMap.values()).map((route) => {
+      // Find matches corresponding to any post ID of this route, or matching normalized route key
+      const routeMatches = userMatches.filter((m) => {
+        const matchedPostId = m.matchedWithPostId?.toString() || m.matchingUserPostId?.toString();
+        if (matchedPostId && route.postIds.has(matchedPostId)) {
+          return true;
+        }
+        return getRouteKey(m.source, m.destination) === route.routeKey;
+      });
+
+      // Combine count of unique matches for this route
+      const uniqueIds = new Set(routeMatches.map((m) => m._id?.toString() || m.id?.toString()));
+
+      return {
+        ...route,
+        matchCount: uniqueIds.size
+      };
+    });
+  }, [myTravels, userMatches]);
+
+  // Filter matches based on selected route filter
   const filteredMatches = useMemo(() => {
-    if (selectedTravelFilter === 'all') {
+    if (selectedRouteFilter === 'all') {
       return userMatches;
     }
-    return userMatches.filter(
-      (m) => m.matchedWithPostId?.toString() === selectedTravelFilter
-    );
-  }, [userMatches, selectedTravelFilter]);
+    const targetRoute = uniqueRouteFilters.find((r) => r.routeKey === selectedRouteFilter);
+    if (!targetRoute) {
+      return userMatches.filter(
+        (m) => (m.matchedWithPostId?.toString() === selectedRouteFilter) ||
+               (getRouteKey(m.source, m.destination) === selectedRouteFilter)
+      );
+    }
+    return userMatches.filter((m) => {
+      const matchedPostId = m.matchedWithPostId?.toString() || m.matchingUserPostId?.toString();
+      if (matchedPostId && targetRoute.postIds.has(matchedPostId)) {
+        return true;
+      }
+      return getRouteKey(m.source, m.destination) === targetRoute.routeKey;
+    });
+  }, [userMatches, selectedRouteFilter, uniqueRouteFilters]);
 
   return (
     <ResponsiveShell
@@ -178,6 +326,34 @@ export default function MyMatchesPage() {
           </div>
         </div>
 
+        {/* WhatsApp Error / Notification Toast */}
+        <AnimatePresence>
+          {toastMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className={`p-3.5 sm:p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold border shadow-xs ${
+                toastMsg.type === 'error'
+                  ? 'bg-red-50 text-red-600 border-red-200'
+                  : 'bg-[#EDFAF3] text-[#16A34A] border-[#BCECD4]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{toastMsg.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToastMsg(null)}
+                className="text-[#6E7587] hover:text-[#17233C] text-xs font-bold px-2 py-0.5 rounded cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ========================================================================= */}
         {/* ACTIVE TRAVELS CONTEXT & FILTER BAR                                       */}
         {/* ========================================================================= */}
@@ -193,69 +369,42 @@ export default function MyMatchesPage() {
               </span>
             </div>
 
-            {/* Filter Pills if multiple active rides */}
-            {myTravels.length > 1 ? (
-              <div className="flex flex-wrap gap-2 pt-1">
-                <button
-                  onClick={() => setSelectedTravelFilter('all')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    selectedTravelFilter === 'all'
-                      ? 'bg-[#17233C] text-white shadow-xs font-black'
-                      : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
-                  }`}
-                >
-                  All Matches ({userMatches.length})
-                </button>
-                {myTravels.map((travel) => {
-                  const tid = travel._id?.toString();
-                  const isSel = selectedTravelFilter === tid;
-                  const rideMatchesCount = userMatches.filter(
-                    (m) => m.matchedWithPostId?.toString() === tid
-                  ).length;
-
-                  return (
-                    <button
-                      key={tid}
-                      onClick={() => setSelectedTravelFilter(tid)}
-                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer truncate max-w-[280px] ${
-                        isSel
-                          ? 'bg-[#FF572E] text-white shadow-xs font-black'
-                          : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
-                      }`}
-                    >
-                      <span className="truncate">{travel.source} → {travel.destination}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        isSel ? 'bg-white text-[#FF572E]' : 'bg-[#FFF4ED] text-[#FF572E]'
-                      }`}>
-                        {rideMatchesCount}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-xs text-[#17233C] font-semibold bg-[#FFFBF8] p-3.5 rounded-2xl border border-[#F4E3D8]/80 flex flex-wrap items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2">
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                    myTravels[0].type === 'offer'
-                      ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
-                      : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
-                  }`}>
-                    {myTravels[0].type === 'offer' ? 'Your Offer' : 'Your Request'}
-                  </span>
-                  <span className="font-black text-[#17233C] text-xs sm:text-sm">
-                    {myTravels[0].source} → {myTravels[0].destination}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-[#6E7587] text-[11px] font-medium">
-                  <span>{formatTravelDate(myTravels[0].travelDate)}</span>
-                  {myTravels[0].departureTime !== undefined && (
-                    <span>• {formatMinutesToTime(myTravels[0].departureTime)}</span>
-                  )}
-                  <span>• {myTravels[0].seats || 1} seat(s)</span>
-                </div>
-              </div>
-            )}
+            {/* Filter Pills with Normalized Unique Routes */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setSelectedRouteFilter('all')}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  selectedRouteFilter === 'all'
+                    ? 'bg-[#17233C] text-white shadow-xs font-black'
+                    : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
+                }`}
+              >
+                All Matches ({userMatches.length})
+              </button>
+              {uniqueRouteFilters.map((route) => {
+                const isSel = selectedRouteFilter === route.routeKey;
+                return (
+                  <button
+                    key={route.routeKey}
+                    type="button"
+                    onClick={() => setSelectedRouteFilter(route.routeKey)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer truncate max-w-[280px] ${
+                      isSel
+                        ? 'bg-[#FF572E] text-white shadow-xs font-black'
+                        : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
+                    }`}
+                  >
+                    <span className="truncate capitalize">{route.displayRoute}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      isSel ? 'bg-white text-[#FF572E]' : 'bg-[#FFF4ED] text-[#FF572E]'
+                    }`}>
+                      {route.matchCount}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -535,55 +684,84 @@ export default function MyMatchesPage() {
                       </div>
                     </div>
 
-                    {/* Actions Row (Matching Post Card Action Layout) */}
+                    {/* Actions Row: Contact on WhatsApp & Primary Action */}
                     <div className="pt-3 border-t border-[#F4E3D8]/70 flex items-center gap-2.5">
-                      {phone ? (
-                        <button
-                          type="button"
-                          onClick={() => openWhatsAppChat({
-                            phone,
-                            name: student.name || 'Campus Peer',
-                            route: `${fromCity} → ${toCity}`
-                          })}
-                          className="flex-1 py-2.5 px-3 bg-[#FFFBF8] hover:bg-[#25D366] hover:text-white border border-[#25D366]/40 text-[#128C7E] font-black text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 group/wa"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-[#25D366] group-hover/wa:text-white transition-colors" />
-                          <span>WhatsApp</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/rides/${travelId}`)}
-                          className="flex-1 py-2.5 px-3 bg-[#FFFBF8] hover:bg-[#FFF4ED] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-[#8C93A4]" />
-                          <span>View Details</span>
-                        </button>
-                      )}
+                      {/* Contact on WhatsApp (Both Ride Offer and Passenger Request matches) */}
+                      <button
+                        type="button"
+                        onClick={() => handleContactWhatsApp(match)}
+                        className="flex-1 py-2.5 px-3 bg-[#EDFAF3] hover:bg-[#25D366] text-[#15803D] hover:text-white border border-[#BCECD4] hover:border-[#25D366] font-extrabold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 group/wa"
+                        title="Contact on WhatsApp"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-[#25D366] group-hover/wa:text-white transition-colors" />
+                        <span className="truncate">Contact on WhatsApp</span>
+                      </button>
 
                       {isOffer ? (
+                        (() => {
+                          const activeStatus = activeBookingStatusByTravelId[String(travelId)];
+                          const isPending = activeStatus === 'pending';
+                          const isConfirmed = activeStatus === 'confirmed' || activeStatus === 'accepted';
+
+                          if (isPending) {
+                            return (
+                              <button
+                                type="button"
+                                disabled
+                                className="flex-1 py-2.5 px-3 bg-amber-500 text-white font-black text-xs rounded-xl shadow-xs opacity-90 cursor-not-allowed flex items-center justify-center gap-1.5"
+                                title="Booking request is pending host approval"
+                              >
+                                <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="truncate">Request Pending</span>
+                              </button>
+                            );
+                          }
+
+                          if (isConfirmed) {
+                            return (
+                              <button
+                                type="button"
+                                disabled
+                                className="flex-1 py-2.5 px-3 bg-emerald-600 text-white font-black text-xs rounded-xl shadow-xs opacity-90 cursor-not-allowed flex items-center justify-center gap-1.5"
+                                title="Booking already confirmed"
+                              >
+                                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="truncate">Already Confirmed</span>
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
+                                  navigate(`/book/${travelId}`);
+                                } else {
+                                  navigate('/rides/offer');
+                                }
+                              }}
+                              className="flex-1 py-2.5 px-4 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs rounded-xl shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              <Ticket className="w-3.5 h-3.5" />
+                              <span>Book Seat</span>
+                            </button>
+                          );
+                        })()
+                      ) : (
                         <button
                           type="button"
                           onClick={() => {
                             if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
-                              navigate(`/book/${travelId}`);
+                              navigate(`/rides/${travelId}`);
                             } else {
-                              navigate('/rides/offer');
+                              navigate('/posts');
                             }
                           }}
-                          className="flex-1 py-2.5 px-4 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs rounded-xl shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <Ticket className="w-3.5 h-3.5" />
-                          <span>Book Seat</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => navigate('/bookings?tab=received')}
                           className="flex-1 py-2.5 px-4 bg-[#17233C] hover:bg-[#233252] text-white font-black text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
                         >
                           <Users className="w-3.5 h-3.5" />
-                          <span>View Requests</span>
+                          <span>View Details</span>
                         </button>
                       )}
                     </div>

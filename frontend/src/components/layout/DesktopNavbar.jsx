@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, Settings, FileText, Calendar, Download
+  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, FileText, Calendar, Download
 } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { Avatar } from '../ui/Avatar';
@@ -222,20 +222,6 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
                   >
                     <User className="w-4 h-4 text-text-secondary" />
                     My Profile
-                  </button>
-                  <button
-                    onClick={() => { navigate('/bookings'); setProfileDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                  >
-                    <Car className="w-4 h-4 text-text-secondary" />
-                    My Bookings
-                  </button>
-                  <button
-                    onClick={() => { navigate('/settings'); setProfileDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-navy hover:bg-cream transition-colors"
-                  >
-                    <Settings className="w-4 h-4 text-text-secondary" />
-                    Settings
                   </button>
                   <button
                     onClick={() => { 
