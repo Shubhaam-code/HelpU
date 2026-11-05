@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@clerk/clerk-react';
 import {
   MapPin, Calendar, Clock, Users, ArrowUpDown,
   Search, Check, Sparkles, Car as CarIcon,
-  MoreHorizontal, ShieldCheck, ArrowRight, IndianRupee
+  MoreHorizontal, ShieldCheck, ArrowRight, IndianRupee,
+  CheckCircle2, X, FileText
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -104,6 +105,8 @@ export default function OfferRidePage() {
   const [pricePerSeat, setPricePerSeat] = useState('350');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdSummary, setCreatedSummary] = useState(null);
 
   // Swap From & To locations
   const handleSwapLocations = () => {
@@ -137,7 +140,7 @@ export default function OfferRidePage() {
 
       if (mode === 'offer') {
         // POST to backend — use correct field names matching Travel schema
-        await createTravel({
+        const res = await createTravel({
           source: fromLoc.trim(),
           destination: toLoc.trim(),
           travelDate: date,
@@ -151,10 +154,23 @@ export default function OfferRidePage() {
           authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
           authorEmail: user?.primaryEmailAddress?.emailAddress || null,
         });
-        navigate('/rides?tab=offers', { replace: true });
+
+        const createdPost = res.data?.data || res.data;
+        setCreatedSummary({
+          id: createdPost?._id,
+          type: 'offer',
+          source: fromLoc.trim(),
+          destination: toLoc.trim(),
+          travelDate: date,
+          time: time || '08:00',
+          seats: travellers,
+          pricePerSeat: Number(pricePerSeat) || 350,
+          carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
+        });
+        setShowSuccessModal(true);
       } else {
         // For "request" mode — post a travel request
-        await createTravel({
+        const res = await createTravel({
           source: fromLoc.trim(),
           destination: toLoc.trim(),
           travelDate: date,
@@ -168,7 +184,20 @@ export default function OfferRidePage() {
           authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
           authorEmail: user?.primaryEmailAddress?.emailAddress || null,
         });
-        navigate('/rides?tab=requests', { replace: true });
+
+        const createdPost = res.data?.data || res.data;
+        setCreatedSummary({
+          id: createdPost?._id,
+          type: 'request',
+          source: fromLoc.trim(),
+          destination: toLoc.trim(),
+          travelDate: date,
+          time: time || '08:00',
+          seats: travellers,
+          pricePerSeat: 0,
+          carModel: 'Ride Request',
+        });
+        setShowSuccessModal(true);
       }
     } catch (err) {
       console.error('Ride post error:', err);
@@ -630,6 +659,132 @@ export default function OfferRidePage() {
         </motion.div>
 
       </div>
+
+      {/* ========================================================================= */}
+      {/* POST SUCCESS CONFIRMATION POPUP / MODAL                                   */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showSuccessModal && createdSummary && (
+          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full border border-[#F4E3D8] shadow-2xl relative overflow-hidden"
+            >
+              {/* Close 'X' Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  navigate('/posts');
+                }}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#FFFBF8] border border-[#F4E3D8] text-[#8C93A4] hover:text-[#17233C] hover:bg-[#F4E3D8]/50 flex items-center justify-center cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Animated Celebration Icon & Header */}
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-[#EDFAF3] border-2 border-[#BCECD4] text-[#16A34A] flex items-center justify-center mx-auto mb-3.5 shadow-sm">
+                  <CheckCircle2 className="w-9 h-9 stroke-[2.4]" />
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EDFAF3] border border-[#BCECD4] text-[10px] font-black uppercase tracking-wider text-[#16A34A] mb-2 shadow-2xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Successfully Published</span>
+                </div>
+
+                <h3 className="font-black text-xl sm:text-2xl text-[#17233C] tracking-tight">
+                  {createdSummary.type === 'offer'
+                    ? 'Ride Offer Successfully Posted!'
+                    : 'Ride Request Successfully Posted!'}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-[#6E7587] font-medium mt-1.5 leading-relaxed">
+                  Aapki ride live publish ho chuki hai. Verified campus peers traveling on this route can now discover and connect with you!
+                </p>
+              </div>
+
+              {/* Post Details Card */}
+              <div className="mt-5 bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8]/90 space-y-3">
+                {/* Route */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                    <span className="font-extrabold text-[#17233C] truncate">{createdSummary.source}</span>
+                  </div>
+                  <div className="px-2 text-[#FF572E] font-bold">➔</div>
+                  <div className="flex items-center justify-end gap-2 min-w-0 flex-1 text-right">
+                    <span className="font-extrabold text-[#17233C] truncate">{createdSummary.destination}</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                  </div>
+                </div>
+
+                {/* Date & Time Divider */}
+                <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between text-[11px] font-bold text-[#6E7587]">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                    <span>{createdSummary.travelDate} • {createdSummary.time}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[#16A34A]">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{createdSummary.seats} Seat(s)</span>
+                  </div>
+                </div>
+
+                {/* Vehicle & Price */}
+                {createdSummary.type === 'offer' && (
+                  <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-[#6E7587]">Vehicle: {createdSummary.carModel}</span>
+                    <span className="text-[#FF572E] font-black text-sm">₹{createdSummary.pricePerSeat}/seat</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-6 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    navigate('/posts');
+                  }}
+                  className="w-full py-3 px-5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-[#FF572E]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>View in My Posts</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    navigate('/match');
+                  }}
+                  className="w-full py-2.5 px-5 bg-white hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs sm:text-sm rounded-xl border border-[#F4E3D8] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-[#FF572E]" />
+                  <span>Find Campus Matches</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                  }}
+                  className="w-full py-2 text-[#8C93A4] hover:text-[#17233C] font-bold text-xs transition-colors cursor-pointer text-center"
+                >
+                  Post another ride
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </ResponsiveShell>
   );
 }

@@ -148,10 +148,10 @@ export default function RidesPage() {
                 <span>Offer a Ride</span>
               </button>
               <button
-                onClick={() => navigate('/bookings')}
+                onClick={() => navigate('/posts')}
                 className="px-5 py-3 rounded-2xl bg-white hover:bg-[#FFF7F2] text-[#17233C] font-black text-xs sm:text-sm border border-[#F4E3D8] flex items-center gap-2 shadow-xs transition-all cursor-pointer"
               >
-                <span>My Bookings</span>
+                <span>My Posts</span>
               </button>
             </div>
           </div>
@@ -261,10 +261,10 @@ export default function RidesPage() {
                   Offer a Ride
                 </button>
                 <button
-                  onClick={() => navigate('/bookings')}
+                  onClick={() => navigate('/posts')}
                   className="px-6 py-2.5 bg-white hover:bg-[#FFF7F2] text-[#17233C] font-black text-xs sm:text-sm border border-[#F4E3D8] rounded-xl shadow-2xs transition-all cursor-pointer"
                 >
-                  My Bookings
+                  My Posts
                 </button>
               </div>
             </div>
@@ -297,10 +297,10 @@ export default function RidesPage() {
                   Offer a Ride
                 </button>
                 <button
-                  onClick={() => navigate('/bookings')}
+                  onClick={() => navigate('/posts')}
                   className="px-5 py-2.5 bg-white hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs border border-[#F4E3D8] rounded-xl cursor-pointer"
                 >
-                  My Bookings
+                  My Posts
                 </button>
               </div>
             </div>

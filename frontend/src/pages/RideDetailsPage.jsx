@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@clerk/clerk-react';
@@ -12,7 +12,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { getTravelById, getProfile, createBooking } from '../lib/api';
+import { getTravelById, getProfile, createBooking, getMyBookings } from '../lib/api';
 import { openWhatsAppChat } from '../lib/whatsapp';
 import { formatCurrency } from '../lib/utils';
 
@@ -24,6 +24,7 @@ export default function RideDetailsPage() {
   // Data states
   const [travel, setTravel] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [existingBooking, setExistingBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
 
@@ -39,17 +40,17 @@ export default function RideDetailsPage() {
   const [submitError, setSubmitError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // 1. Fetch live ride details and passenger profile on mount
-  useEffect(() => {
-    let isMounted = true;
+  // 1. Fetch live ride details, passenger profile, and existing booking on mount
+  const loadData = useCallback(async () => {
     setLoading(true);
     setFetchError('');
 
-    Promise.allSettled([
-      getTravelById(id),
-      getProfile()
-    ]).then(([travelRes, profileRes]) => {
-      if (!isMounted) return;
+    try {
+      const [travelRes, profileRes, bookingsRes] = await Promise.allSettled([
+        getTravelById(id),
+        getProfile(),
+        getMyBookings()
+      ]);
 
       if (travelRes.status === 'fulfilled') {
         const tData = travelRes.value.data?.data || travelRes.value.data?.travel || travelRes.value.data;
@@ -63,16 +64,28 @@ export default function RideDetailsPage() {
         const pData = profileRes.value.data?.data || null;
         setProfile(pData);
       }
-    }).catch((err) => {
-      if (isMounted) {
-        setFetchError('Failed to load ride information. Please try again.');
-      }
-    }).finally(() => {
-      if (isMounted) setLoading(false);
-    });
 
-    return () => { isMounted = false; };
+      if (bookingsRes.status === 'fulfilled') {
+        const rawBookings = bookingsRes.value.data?.data || bookingsRes.value.data?.bookings || bookingsRes.value.data || [];
+        const bookingsList = Array.isArray(rawBookings) ? rawBookings : [];
+        const activeBooking = bookingsList.find((b) => {
+          const bTravelId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
+          const matches = String(bTravelId) === String(id);
+          const isActive = ['pending', 'accepted', 'confirmed'].includes(b.status);
+          return matches && isActive;
+        });
+        setExistingBooking(activeBooking || null);
+      }
+    } catch (err) {
+      setFetchError('Failed to load ride information. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // 2. Auto-fill passenger details from Clerk user and student profile
   useEffect(() => {
@@ -135,6 +148,15 @@ export default function RideDetailsPage() {
     return Boolean(currentUserId && travel.userId === currentUserId);
   }, [travel, user]);
 
+  // Check if current user already has an active request for this travel post
+  const isPending = useMemo(() => {
+    return existingBooking?.status === 'pending';
+  }, [existingBooking]);
+
+  const isConfirmed = useMemo(() => {
+    return existingBooking?.status === 'confirmed' || existingBooking?.status === 'accepted';
+  }, [existingBooking]);
+
   // Date and Time formatting
   const formattedDate = useMemo(() => {
     if (!travel?.travelDate) return 'Upcoming Date';
@@ -194,6 +216,16 @@ export default function RideDetailsPage() {
       return;
     }
 
+    if (isPending) {
+      setSubmitError('You already have a pending booking request for this ride post. Please wait for the host to respond.');
+      return;
+    }
+
+    if (isConfirmed) {
+      setSubmitError('You already have a confirmed booking for this ride post.');
+      return;
+    }
+
     if (isOffer && maxAvailableSeats < 1) {
       setSubmitError('This ride is already fully booked. Please browse other rides.');
       return;
@@ -228,8 +260,8 @@ export default function RideDetailsPage() {
       const res = await createBooking(bookingPayload);
       const createdBooking = res.data?.data || res.data;
 
-      // Navigate to My Bookings page where the new booking is listed
-      navigate('/bookings', {
+      // Navigate to My Posts page with success state
+      navigate('/posts', {
         replace: true,
         state: {
           highlightId: createdBooking?._id,
@@ -240,6 +272,9 @@ export default function RideDetailsPage() {
       console.error('Booking confirmation failed:', err);
       const msg = err.response?.data?.message || err.message || 'Failed to submit booking request. Please try again.';
       setSubmitError(msg);
+      if (err.status === 409 || err.code === 'DUPLICATE_BOOKING_REQUEST' || msg.toLowerCase().includes('already')) {
+        loadData();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -836,6 +871,31 @@ export default function RideDetailsPage() {
                 </div>
               )}
 
+              {/* PENDING REQUEST BANNER */}
+              {isPending && !isOwnRide && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 flex items-start gap-2.5 text-xs">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Booking Request Pending</span>
+                    <p className="mt-0.5">
+                      You already have a pending booking request for this ride post. Please wait for the host to respond.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* CONFIRMED BOOKING BANNER */}
+              {isConfirmed && !isOwnRide && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-start gap-2.5 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Booking Already Confirmed</span>
+                    <p className="mt-0.5">
+                      You already have a confirmed seat reservation for this ride post.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* ACTION BUTTONS */}
               <div className="space-y-3">
@@ -843,13 +903,29 @@ export default function RideDetailsPage() {
                   <button
                     type="button"
                     onClick={handleConfirmBooking}
-                    disabled={isSubmitting || isOwnRide || maxAvailableSeats < 1}
-                    className="w-full py-3.5 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-full font-black text-sm shadow-md shadow-[#FF572E]/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#FF572E]"
+                    disabled={isSubmitting || isOwnRide || isPending || isConfirmed || maxAvailableSeats < 1}
+                    className={`w-full py-3.5 px-6 rounded-full font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
+                      isPending
+                        ? 'bg-amber-500 hover:bg-amber-500 text-white shadow-amber-500/20 opacity-90'
+                        : isConfirmed
+                        ? 'bg-emerald-600 hover:bg-emerald-600 text-white shadow-emerald-600/20 opacity-90'
+                        : 'bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white shadow-[#FF572E]/25 disabled:opacity-50 disabled:hover:bg-[#FF572E]'
+                    }`}
                   >
                     {isSubmitting ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         <span>Submitting Reservation...</span>
+                      </>
+                    ) : isPending ? (
+                      <>
+                        <Clock className="w-4 h-4 stroke-[2.5]" />
+                        <span>Request Pending</span>
+                      </>
+                    ) : isConfirmed ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                        <span>Already Confirmed</span>
                       </>
                     ) : maxAvailableSeats < 1 ? (
                       <span>Ride Fully Booked</span>
@@ -857,7 +933,7 @@ export default function RideDetailsPage() {
                       <span>Cannot Book Own Ride</span>
                     ) : (
                       <>
-                        <span>Confirm Booking • {formatCurrency(totalAmount)}</span>
+                        <span>Book Seat • {formatCurrency(totalAmount)}</span>
                         <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                       </>
                     )}
