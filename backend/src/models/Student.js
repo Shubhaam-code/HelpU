@@ -21,11 +21,13 @@ const studentSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      trim: true
+      trim: true,
+      default: ''
     },
     whatsappNumber: {
       type: String,
-      trim: true
+      trim: true,
+      default: ''
     },
     college: {
       type: String,
@@ -47,6 +49,12 @@ const studentSchema = new mongoose.Schema(
     course: {
       type: String,
       trim: true
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 200
     }
   },
   {
@@ -55,26 +63,38 @@ const studentSchema = new mongoose.Schema(
 );
 
 // Guarantee that phone and whatsappNumber are always 100% synchronized in MongoDB
+function syncPhoneFields(obj) {
+  if (!obj) return;
+  const val = (obj.whatsappNumber !== undefined && obj.whatsappNumber !== null && String(obj.whatsappNumber).trim() !== '')
+    ? String(obj.whatsappNumber).trim()
+    : ((obj.phone !== undefined && obj.phone !== null && String(obj.phone).trim() !== '') ? String(obj.phone).trim() : '');
+  
+  obj.whatsappNumber = val;
+  obj.phone = val;
+}
+
 studentSchema.pre('save', function () {
-  if (this.whatsappNumber && !this.phone) {
-    this.phone = this.whatsappNumber;
-  } else if (this.phone && !this.whatsappNumber) {
-    this.whatsappNumber = this.phone;
-  } else if (this.whatsappNumber && this.phone && this.whatsappNumber !== this.phone) {
-    this.phone = this.whatsappNumber;
+  syncPhoneFields(this);
+});
+
+studentSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function () {
+  const update = typeof this?.getUpdate === 'function' ? this.getUpdate() : null;
+  if (update) {
+    const target = update.$set || update;
+    if (target.whatsappNumber !== undefined || target.phone !== undefined) {
+      syncPhoneFields(target);
+    }
   }
 });
 
-studentSchema.pre('findOneAndUpdate', function () {
-  const update = this.getUpdate();
-  if (update) {
-    const target = update.$set || update;
-    if (target.whatsappNumber && !target.phone) {
-      target.phone = target.whatsappNumber;
-    } else if (target.phone && !target.whatsappNumber) {
-      target.whatsappNumber = target.phone;
-    } else if (target.whatsappNumber && target.phone && target.whatsappNumber !== target.phone) {
-      target.phone = target.whatsappNumber;
+studentSchema.post(['find', 'findOne', 'findOneAndUpdate'], function (docs) {
+  if (!docs) return;
+  const list = Array.isArray(docs) ? docs : [docs];
+  for (const doc of list) {
+    if (doc) {
+      const val = (doc.whatsappNumber || doc.phone || '').trim();
+      doc.whatsappNumber = val;
+      doc.phone = val;
     }
   }
 });

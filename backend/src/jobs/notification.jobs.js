@@ -39,11 +39,13 @@ export function formatNotificationContent(eventType, payload = {}) {
   const dateStr = travelDate ? new Date(travelDate).toLocaleDateString() : '';
 
   switch (eventType) {
-    case NOTIFICATION_JOB_TYPES.BOOKING_REQUESTED:
+    case NOTIFICATION_JOB_TYPES.BOOKING_REQUESTED: {
+      const studentName = payload.passengerName || payload.studentName || 'A student';
       return {
         title: 'New Booking Request',
-        message: `A passenger requested ${requestedSeats} seat(s) for your ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+        message: `${studentName} requested ${requestedSeats} seat(s) for your ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
       };
+    }
 
     case NOTIFICATION_JOB_TYPES.BOOKING_ACCEPTED:
       return {
@@ -60,19 +62,19 @@ export function formatNotificationContent(eventType, payload = {}) {
     case NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED:
       return {
         title: 'Booking Confirmed!',
-        message: `Your seat(s) from ${source} to ${destination} have been confirmed! View ride details in CampusPool.`
+        message: `Your ride booking from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} is confirmed! (${requestedSeats} seat(s) reserved).`
       };
 
     case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_PASSENGER:
       return {
-        title: 'Booking Cancelled by Passenger',
-        message: `A passenger has cancelled their booking for your ride from ${source} to ${destination}. The seats have been released.`
+        title: 'Booking Cancelled',
+        message: `A passenger has cancelled their booking for the ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
       };
 
     case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER:
       return {
-        title: 'Ride Cancelled by Owner',
-        message: `The ride owner has cancelled the booking from ${source} to ${destination}.`
+        title: 'Booking Cancelled',
+        message: `The ride booking from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} has been cancelled.`
       };
 
     case NOTIFICATION_JOB_TYPES.TRAVEL_REMINDER_24H:

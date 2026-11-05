@@ -24,12 +24,14 @@ router.get('/profile', requireAuth, async (req, res) => {
     }
 
     // Auto-heal and sync phone and whatsappNumber for seamless backward compatibility
-    if (!student.whatsappNumber && student.phone) {
-      student.whatsappNumber = student.phone;
-      await Student.updateOne({ _id: student._id }, { $set: { whatsappNumber: student.phone } });
-    } else if (student.whatsappNumber && !student.phone) {
-      student.phone = student.whatsappNumber;
-      await Student.updateOne({ _id: student._id }, { $set: { phone: student.whatsappNumber } });
+    const canonical = (student.whatsappNumber || student.phone || '').trim();
+    if (student.whatsappNumber !== canonical || student.phone !== canonical) {
+      student.whatsappNumber = canonical;
+      student.phone = canonical;
+      await Student.updateOne(
+        { _id: student._id },
+        { $set: { whatsappNumber: canonical, phone: canonical } }
+      );
     }
 
     return res.status(200).json({
@@ -58,7 +60,7 @@ async function handleSaveProfile(req, res) {
       });
     }
 
-    const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode } = req.body;
+    const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio } = req.body;
 
     // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
     const existing = await Student.findOne({ clerkId });
@@ -99,6 +101,10 @@ async function handleSaveProfile(req, res) {
 
     if (course !== undefined) {
       updateData.course = typeof course === 'string' ? course.trim() : '';
+    }
+
+    if (bio !== undefined) {
+      updateData.bio = typeof bio === 'string' ? bio.trim().substring(0, 200) : '';
     }
 
     if (avatarId !== undefined) {
@@ -143,6 +149,15 @@ async function handleSaveProfile(req, res) {
         updateData.whatsappNumber = '';
         updateData.phone = '';
       }
+    } else if (existing) {
+      // Preserve existing phone/whatsapp number if this was a partial update without phone fields
+      const existingVal = (existing.whatsappNumber || existing.phone || '').trim();
+      updateData.whatsappNumber = existingVal;
+      updateData.phone = existingVal;
+    } else {
+      // Brand new document: ensure both fields are explicitly initialized
+      updateData.whatsappNumber = '';
+      updateData.phone = '';
     }
 
     const student = await Student.findOneAndUpdate(

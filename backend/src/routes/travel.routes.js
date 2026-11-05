@@ -24,7 +24,7 @@ const router = express.Router();
  */
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { source, destination, travelDate, departureTime, timeFlexibility, seats, type, carModel, pricePerSeat, authorImage, authorName, authorEmail } = req.body;
+    const { source, destination, travelDate, departureTime, timeFlexibility, seats, type, carModel, pricePerSeat, authorImage, authorName, authorEmail, notes, description } = req.body;
 
     // 1. Validation for travel type
     if (!type || !['offer', 'request'].includes(type)) {
@@ -115,6 +115,7 @@ router.post('/', requireAuth, async (req, res) => {
       seats: numSeats,
       pricePerSeat: Number(pricePerSeat) || 350,
       carModel: carModel?.trim() || (type === 'offer' ? 'Campus Ride' : 'Co-traveler'),
+      notes: (notes || description || '').trim(),
       authorImage: authorImage ? String(authorImage).trim() : null,
       authorName: authorName ? String(authorName).trim() : null,
       authorEmail: authorEmail ? String(authorEmail).trim() : null,

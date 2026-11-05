@@ -77,6 +77,11 @@ const travelSchema = new mongoose.Schema(
       default: 350,
       min: [0, 'Price per seat cannot be negative']
     },
+    notes: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     carModel: {
       type: String,
       default: 'Campus Ride',

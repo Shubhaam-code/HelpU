@@ -61,7 +61,12 @@ export async function getUnreadNotificationCount(req, res) {
 
     return res.status(200).json({
       success: true,
-      unreadCount
+      unreadCount,
+      count: unreadCount,
+      data: {
+        unreadCount,
+        count: unreadCount
+      }
     });
   } catch (error) {
     console.error('Error in getUnreadNotificationCount:', error);

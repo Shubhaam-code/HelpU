@@ -58,14 +58,7 @@ export async function createBookingRequest(req, res) {
       });
     }
 
-    // 5. Only allow booking requests for active, unexpired OFFER posts
-    if (travel.type !== 'offer') {
-      return res.status(400).json({
-        success: false,
-        message: 'Booking requests can only be made for travel offer posts'
-      });
-    }
-
+    // 5. Allow booking requests for active, unexpired posts (both offer and request)
     if (travel.status !== 'active') {
       return res.status(400).json({
         success: false,
@@ -81,20 +74,25 @@ export async function createBookingRequest(req, res) {
       });
     }
 
-    // 6. Check available seats: availableSeats = total offer seats - confirmed booked seats
-    const confirmedBookings = await Booking.find({
-      travelId: travel._id,
-      status: 'confirmed'
-    });
-    const confirmedSeats = confirmedBookings.reduce((sum, b) => sum + b.requestedSeats, 0);
-    const totalBookedSeats = Math.max(confirmedSeats, travel.bookedSeats || 0);
-    const availableSeats = travel.seats - totalBookedSeats;
-
-    if (numSeats > availableSeats) {
-      return res.status(400).json({
-        success: false,
-        message: `Requested ${numSeats} seat(s), but only ${Math.max(0, availableSeats)} seat(s) are available`
+    // 6. Check available seats:
+    // For Offer posts, availableSeats = total offer seats - confirmed booked seats
+    // For Request posts, seats = requested seats needed by the requester
+    if (travel.type === 'offer') {
+      const confirmedBookings = await Booking.find({
+        travelId: travel._id,
+        status: 'confirmed'
       });
+      const confirmedSeats = confirmedBookings.reduce((sum, b) => sum + b.requestedSeats, 0);
+      const totalBookedSeats = Math.max(confirmedSeats, travel.bookedSeats || 0);
+      const availableSeats = travel.seats - totalBookedSeats;
+
+      if (numSeats > availableSeats) {
+        return res.status(400).json({
+          success: false,
+          code: 'INSUFFICIENT_SEATS',
+          message: `Requested ${numSeats} seat(s), but only ${Math.max(0, availableSeats)} seat(s) are available`
+        });
+      }
     }
 
     // 7. Prevent duplicate pending, accepted, or confirmed booking requests by the same passenger
@@ -160,6 +158,7 @@ export async function createBookingRequest(req, res) {
           relatedBookingId: booking._id,
           relatedTravelId: travel._id,
           payload: {
+            passengerName: booking.passengerName || req.auth?.user?.fullName || 'A student',
             source: travel.source,
             destination: travel.destination,
             travelDate: travel.travelDate,
@@ -238,7 +237,8 @@ export async function getReceivedBookings(req, res) {
     const data = bookings.map((b) => {
       const obj = b.toObject();
       const p = passengerMap.get(b.passengerId);
-      const isAcceptedOrConfirmed = ['accepted', 'confirmed'].includes(b.status);
+      // Expose passenger contact immediately for pending bookings (no need to wait for acceptance)
+      const canCoordinate = ['pending', 'accepted', 'confirmed', 'completed'].includes(b.status);
       obj.passenger = {
         name: p?.name || b.passengerName || 'Campus Student',
         email: p?.email || b.passengerEmail || '',
@@ -246,8 +246,8 @@ export async function getReceivedBookings(req, res) {
         isVerified: p?.isVerified ?? true,
         avatarId: p?.avatarId || null,
         imageUrl: p?.imageUrl || b.passengerImage || null,
-        // Expose passenger contact (prioritize WhatsApp) once booking is accepted/confirmed so host can coordinate
-        phone: isAcceptedOrConfirmed ? (p?.whatsappNumber || p?.phone || b.passengerPhone || '') : undefined
+        // Expose passenger WhatsApp contact immediately for coordination
+        phone: canCoordinate ? (p?.whatsappNumber || p?.phone || b.passengerPhone || '') : undefined
       };
       obj.timeline = buildBookingTimeline(obj);
       return obj;
@@ -297,7 +297,8 @@ export async function getMyBookings(req, res) {
     const data = bookings.map((b) => {
       const obj = b.toObject();
       const o = ownerMap.get(b.ownerId);
-      const isAcceptedOrConfirmed = ['accepted', 'confirmed'].includes(b.status);
+      // Expose owner contact immediately for pending bookings (no need to wait for acceptance)
+      const canCoordinate = ['pending', 'accepted', 'confirmed', 'completed'].includes(b.status);
       obj.owner = {
         name: o?.name || 'Ride Host',
         email: o?.email || '',
@@ -305,8 +306,8 @@ export async function getMyBookings(req, res) {
         isVerified: o?.isVerified ?? true,
         avatarId: o?.avatarId || null,
         imageUrl: o?.imageUrl || null,
-        // Expose owner contact (prioritize WhatsApp) once booking is accepted/confirmed
-        phone: isAcceptedOrConfirmed ? (o?.whatsappNumber || o?.phone || '') : undefined
+        // Expose owner WhatsApp contact immediately for coordination
+        phone: canCoordinate ? (o?.whatsappNumber || o?.phone || '') : undefined
       };
       obj.timeline = buildBookingTimeline(obj);
       return obj;
@@ -645,11 +646,12 @@ export async function getWhatsAppDetails(req, res) {
       });
     }
 
-    // 4. State check: Allow access when booking status is "accepted" or "confirmed"
-    if (!['accepted', 'confirmed'].includes(booking.status)) {
+    // 4. State check: Allow WhatsApp coordination immediately after booking creation (pending status) and for all active statuses
+    // Block only rejected and cancelled bookings
+    if (['rejected', 'cancelled'].includes(booking.status)) {
       return res.status(400).json({
         success: false,
-        message: `WhatsApp coordination details are only available for accepted or confirmed bookings (current status: ${booking.status})`
+        message: `WhatsApp coordination is not available for ${booking.status} bookings`
       });
     }
 
@@ -755,16 +757,17 @@ export async function confirmBooking(req, res) {
         });
       }
 
-      // 3. Authorization check: Only the travel owner can confirm
-      if (booking.ownerId !== ownerId) {
+      // 3. Authorization check: Either the travel owner or passenger can confirm
+      const isParticipant = booking.ownerId === ownerId || booking.passengerId === ownerId;
+      if (!isParticipant) {
         await session.abortTransaction();
         return res.status(403).json({
           success: false,
-          message: 'Forbidden: Only the travel owner can confirm this booking'
+          message: 'Forbidden: Only booking participants can confirm this booking'
         });
       }
 
-      // 4. Status check: Booking must have status "accepted" or "confirmed"
+      // 4. Status check: Booking must have status "pending" or "accepted"
       if (booking.status === 'confirmed') {
         await session.abortTransaction();
         return res.status(200).json({
@@ -774,11 +777,11 @@ export async function confirmBooking(req, res) {
         });
       }
 
-      if (booking.status !== 'accepted') {
+      if (!['pending', 'accepted'].includes(booking.status)) {
         await session.abortTransaction();
         return res.status(400).json({
           success: false,
-          message: `Cannot confirm booking with status "${booking.status}". Only accepted bookings can be confirmed.`
+          message: `Cannot confirm booking with status "${booking.status}". Only pending or accepted bookings can be confirmed.`
         });
       }
 
@@ -873,14 +876,14 @@ export async function confirmBooking(req, res) {
         }
       }
 
-      // 9. Atomically update booking status from 'accepted' to 'confirmed' within the transaction
+      // 9. Atomically update booking status to 'confirmed' within the transaction
       const updatedBooking = await Booking.findOneAndUpdate(
         {
           _id: booking._id,
-          status: 'accepted'
+          status: { $in: ['pending', 'accepted'] }
         },
         {
-          $set: { status: 'confirmed', approvedAt: now }
+          $set: { status: 'confirmed', confirmedAt: now, approvedAt: now }
         },
         { returnDocument: 'after', session }
       );
@@ -889,26 +892,43 @@ export async function confirmBooking(req, res) {
         await session.abortTransaction();
         return res.status(400).json({
           success: false,
-          message: 'Booking could not be confirmed because it is no longer in accepted status'
+          message: 'Booking could not be confirmed because it is no longer in pending or accepted status'
         });
       }
 
-      // 10. Create Outbox event for booking confirmation inside transaction
+      // 10. Create Outbox event for booking confirmation to notify both participants
+      const confirmationPayload = {
+        source: reservedTravel.source,
+        destination: reservedTravel.destination,
+        travelDate: reservedTravel.travelDate,
+        requestedSeats: booking.requestedSeats
+      };
+
+      // Notify passenger
       await createOutboxEvent(
         {
           eventType: NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED,
           recipientId: booking.passengerId,
           relatedBookingId: booking._id,
           relatedTravelId: travel._id,
-          payload: {
-            source: reservedTravel.source,
-            destination: reservedTravel.destination,
-            travelDate: reservedTravel.travelDate,
-            requestedSeats: booking.requestedSeats
-          }
+          payload: confirmationPayload
         },
         session
       );
+
+      // Notify owner if owner is not the sole recipient
+      if (booking.ownerId !== booking.passengerId) {
+        await createOutboxEvent(
+          {
+            eventType: NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED,
+            recipientId: booking.ownerId,
+            relatedBookingId: booking._id,
+            relatedTravelId: travel._id,
+            payload: confirmationPayload
+          },
+          session
+        );
+      }
 
       // Commit operations atomically
       await session.commitTransaction();
@@ -1041,7 +1061,28 @@ export async function cancelBooking(req, res) {
           });
         }
 
+        const recipientId = isOwner ? booking.passengerId : booking.ownerId;
+        const travel = await Travel.findById(booking.travelId).session(session);
+        await createOutboxEvent(
+          {
+            eventType: isOwner
+              ? NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER
+              : NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_PASSENGER,
+            recipientId,
+            relatedBookingId: booking._id,
+            relatedTravelId: booking.travelId,
+            payload: {
+              source: travel?.source || 'Origin',
+              destination: travel?.destination || 'Destination',
+              travelDate: travel?.travelDate,
+              cancelledBy: isOwner ? 'owner' : 'passenger'
+            }
+          },
+          session
+        );
+
         await session.commitTransaction();
+        triggerOutboxSweep();
         return res.status(200).json({
           success: true,
           message: 'Booking request cancelled successfully',
