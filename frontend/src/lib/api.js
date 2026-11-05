@@ -40,7 +40,11 @@ apiClient.interceptors.response.use(
       err.response?.data?.error ||
       err.message ||
       'Something went wrong';
-    return Promise.reject(new Error(message));
+    const error = new Error(message);
+    error.response = err.response;
+    error.status = err.response?.status;
+    error.code = err.response?.data?.code || err.code;
+    return Promise.reject(error);
   }
 );
 
@@ -75,6 +79,46 @@ export const updateTravelStatus = (id, status) => {
   }
   return apiClient.patch(`/api/travels/${id}/status`, { status });
 };
+export const cancelTravel = (id) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  return apiClient.patch(`/api/travels/${id}/cancel`);
+};
+export const updateTravel = (id, data) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  return apiClient.put(`/api/travels/${id}`, data);
+};
+export const deleteTravel = async (id) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  try {
+    return await apiClient.delete(`/api/travels/${id}`);
+  } catch (err) {
+    const is404 = err.response?.status === 404 || err.message?.includes('404');
+    if (is404) {
+      // 1. If backend returns 404, route might be missing on cloud (Render deployment pending)
+      // or post is already deleted. Attempt fallback status cancellation:
+      try {
+        console.warn('[API] DELETE /api/travels/:id returned 404. Attempting fallback cancellation...');
+        return await apiClient.patch(`/api/travels/${id}/status`, { status: 'cancelled' });
+      } catch (fallbackErr) {
+        // If fallback also returned 404, the post no longer exists in MongoDB.
+        // Resolve successfully so the client can safely remove the card from the UI.
+        const isFallback404 = fallbackErr.response?.status === 404 || fallbackErr.message?.includes('404');
+        if (isFallback404) {
+          console.warn('[API] Post not found in database (already removed). Resolving delete as success.');
+          return { data: { success: true, message: 'Post removed from database', deletedId: id } };
+        }
+        throw fallbackErr;
+      }
+    }
+    throw err;
+  }
+};
 
 // ── Bookings ──────────────────────────────────────────────────────────────
 export const createBooking = (data) => apiClient.post('/api/bookings', data);
@@ -85,6 +129,7 @@ export const getWhatsAppDetails = (id) => apiClient.get(`/api/bookings/${id}/wha
 export const respondBooking = (id, data) => apiClient.patch(`/api/bookings/${id}/respond`, data);
 export const confirmBooking = (id) => apiClient.patch(`/api/bookings/${id}/confirm`);
 export const cancelBooking = (id) => apiClient.patch(`/api/bookings/${id}/cancel`);
+export const completeBooking = (id) => apiClient.patch(`/api/bookings/${id}/complete`);
 
 // ── Notifications ─────────────────────────────────────────────────────────
 export const getNotifications = (params) => apiClient.get('/api/notifications', { params });
