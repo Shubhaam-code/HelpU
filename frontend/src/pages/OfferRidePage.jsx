@@ -241,16 +241,16 @@ export default function OfferRidePage() {
           {/* Subtle warm decorative glow */}
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-[#FFF0E7]/50 via-[#FFF5EE]/30 to-transparent pointer-events-none rounded-r-[28px]" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start lg:items-stretch relative z-10">
 
             {/* ------------------------------------------------------------------- */}
-            {/* LEFT COLUMN: HEADING, VALUE PROPS & COMPACT CAR ILLUSTRATION         */}
+            {/* LEFT COLUMN: HEADING, VALUE PROPS & VERIFIED CAMPUS NETWORK         */}
             {/* ------------------------------------------------------------------- */}
-            <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-4">
+            <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-6">
 
-              <div>
+              <div className="space-y-3.5">
                 {/* Small Badge */}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFEBE0] text-[#FF572E] font-bold text-xs mb-2.5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFEBE0] text-[#FF572E] font-bold text-xs">
                   <Sparkles className="w-3.5 h-3.5 fill-[#FF572E]/10 text-[#FF572E]" />
                   <span>{mode === 'offer' ? 'Offer a Ride' : 'Request a Ride'}</span>
                 </div>
@@ -260,14 +260,7 @@ export default function OfferRidePage() {
                   {mode === 'offer' ? (
                     <>
                       Share Your <br />
-                      <span className="text-[#FF572E] relative inline-block">
-                        Ride
-                        <svg className="absolute -top-3 -right-5 w-4 h-4 text-[#FF572E]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <line x1="4" y1="12" x2="1" y2="10" />
-                          <line x1="8" y1="5" x2="7" y2="1" />
-                          <line x1="16" y1="4" x2="18" y2="1" />
-                        </svg>
-                      </span>
+                      <span className="text-[#FF572E]">Ride</span>
                     </>
                   ) : (
                     <>
@@ -278,14 +271,14 @@ export default function OfferRidePage() {
                 </h1>
 
                 {/* Subtitle */}
-                <p className="mt-2 text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-sm">
+                <p className="text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-sm">
                   {mode === 'offer'
                     ? 'Share empty seats, split travel costs, and travel with verified students.'
                     : 'Discover fellow students heading along your route and journey together safely.'}
                 </p>
 
                 {/* Feature Pills */}
-                <div className="flex flex-wrap items-center gap-2 mt-3.5">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
                     <MapPin className="w-3 h-3 text-[#FF572E]" />
                     Same Route
@@ -301,26 +294,30 @@ export default function OfferRidePage() {
                 </div>
               </div>
 
-              {/* Compact Transparent Student-and-Car Illustration */}
-            <div className="w-full flex justify-center items-center -mt-14">
-  <img
-    src="/car.png"
-    alt="Student campus ride illustration"
-    className="w-auto max-h-[220px] sm:max-h-[260px] lg:max-h-[320px] xl:max-h-[360px] object-contain drop-shadow-sm transition-transform"
-    onError={(e) => {
-      e.currentTarget.style.display = 'none';
-    }}
-  />
-</div>
+              {/* Student & Car Illustration (Properly positioned & balanced) */}
+              <div className="w-full flex justify-center items-center py-2 my-auto -translate-y-10">
+                <img
+                  src="/car.png"
+                  alt="Student campus ride illustration"
+                  className="w-full max-w-[360px] scale-110 sm:max-w-[420px] lg:max-w-[460px] h-auto max-h-[320px] sm:max-h-[360px] object-contain drop-shadow-sm select-none pointer-events-none hover:scale-105 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
 
-              {/* Verified Trust Strip */}
-              <div className="bg-[#FFFBF8] rounded-2xl p-3 border border-[#F4E3D8] flex items-center gap-2.5 text-xs text-[#555E70]">
-                <div className="w-7 h-7 rounded-xl bg-[#EAF8F0] text-[#16A34A] flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
+              {/* Verified Campus Network Card aligned to bottom */}
+              <div className="bg-[#FFFBF8] rounded-2xl p-4 sm:p-4.5 border border-[#F4E3D8] flex items-center gap-3.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-[#EAF8F0] border border-[#C6EFD9] text-[#16A34A] flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
                 </div>
-                <div>
-                  <span className="font-extrabold text-[#17233C] block leading-tight">Verified Campus Network</span>
-                  <span className="text-[11px] text-[#6E7587]">Direct WhatsApp connect once matched</span>
+                <div className="min-w-0 flex-1">
+                  <span className="font-extrabold text-[#17233C] text-xs sm:text-sm block leading-snug">
+                    Verified Campus Network
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-[#6E7587] font-medium block mt-0.5 leading-relaxed">
+                    Direct coordination with verified students once matched.
+                  </span>
                 </div>
               </div>
 
@@ -330,7 +327,7 @@ export default function OfferRidePage() {
             {/* ------------------------------------------------------------------- */}
             {/* RIGHT COLUMN: TRAVEL DETAILS FORM                                   */}
             {/* ------------------------------------------------------------------- */}
-            <div className="lg:col-span-7 bg-[#FFFBF8] rounded-[24px] p-4 sm:p-6 border border-[#F4E3D8] shadow-xs">
+            <div className="lg:col-span-7 bg-[#FFFBF8] rounded-[24px] p-4 sm:p-6 border border-[#F4E3D8] shadow-xs lg:mt-4">
 
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#F4E3D8]">
                 <div className="flex items-center gap-2">
