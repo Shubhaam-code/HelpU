@@ -474,12 +474,13 @@ Helpu is a modern, installable PWA that works seamlessly across mobile and deskt
 ## 16. Screenshots
 
 | Home & Campus Discover | Offer a Ride Layout |
-| :---: | :---: |
-| *(Add Home Page Screenshot Here)* | *(Add Offer Ride Screenshot Here)* |
+<img width="1910" height="886" alt="image" src="https://github.com/user-attachments/assets/90fafb63-1561-4a4d-88fe-189717266457" />
+
+
 
 | My Travel Matches | Student Profile & PWA Install |
-| :---: | :---: |
-| *(Add Matches Screenshot Here)* | *(Add Profile Screenshot Here)* |
+<img width="1881" height="897" alt="image" src="https://github.com/user-attachments/assets/0d156bce-5441-44ab-b346-1d8ac5dd16fb" />
+
 
 ---
 
