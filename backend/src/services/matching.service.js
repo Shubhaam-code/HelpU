@@ -223,11 +223,11 @@ export async function findMatchesForTravel(travelPost) {
     return [];
   }
 
-  // 4. Attach public creator details (private phone numbers strictly excluded)
+  // 4. Attach creator details including phone for direct WhatsApp coordination
   const userIds = [...new Set(matchedPosts.map((p) => p.userId))];
   const students = await Student.find(
     { clerkId: { $in: userIds } },
-    { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
+    { name: 1, email: 1, phone: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
   ).lean();
 
   const studentMap = new Map();
@@ -235,9 +235,11 @@ export async function findMatchesForTravel(travelPost) {
 
   return matchedPosts.map((post) => {
     const student = studentMap.get(post.userId);
+    const peerPhone = student?.phone || post.authorPhone || '';
     const publicProfile = {
       name: student?.name || post.authorName || 'Campus Student',
       email: student?.email || post.authorEmail || '',
+      phone: peerPhone,
       imageUrl: student?.imageUrl || post.authorImage || null,
       avatarId: student?.avatarId || 'm1',
       college: student?.college || 'VIT, Bhopal',
@@ -245,6 +247,7 @@ export async function findMatchesForTravel(travelPost) {
     };
     return {
       ...post,
+      phone: peerPhone,
       student: publicProfile,
       creator: publicProfile
     };

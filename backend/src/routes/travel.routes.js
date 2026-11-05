@@ -4,6 +4,8 @@ import { requireAuth } from '../middlewares/auth.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
 import Student from '../models/Student.js';
 import Booking from '../models/Booking.js';
+import { createOutboxEvent, triggerOutboxSweep } from '../services/outbox.service.js';
+import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
 import { 
   findMatchesForTravel, 
   findMatchesForUser,
@@ -151,6 +153,12 @@ function escapeRegex(str) {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const now = new Date();
+
+    // Automatically transition user's active posts that passed expiresAt to 'expired'
+    await Travel.updateMany(
+      { userId: req.userId, status: 'active', expiresAt: { $lte: now } },
+      { $set: { status: 'expired' } }
+    );
 
     // 1. Check if authenticated user has created any active offer or request
     const myActiveTravels = await Travel.find({
@@ -317,22 +325,25 @@ router.get('/', requireAuth, async (req, res) => {
       );
     }
 
-    // Enrich with creator student profile (strictly exclude phone number)
+    // Enrich with creator student profile (including phone for direct WhatsApp contact)
     const userIds = [...new Set(matchedList.map(t => t.userId))];
     const students = await Student.find(
       { clerkId: { $in: userIds } },
-      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
+      { name: 1, email: 1, phone: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
     ).lean();
     const studentMap = new Map(students.map(s => [s.clerkId, s]));
 
     const enriched = matchedList.map(t => {
       const s = studentMap.get(t.userId);
+      const peerPhone = s?.phone || t.authorPhone || '';
       return {
         ...t,
+        phone: peerPhone,
         isMine: false,
         student: {
           name: s?.name || t.authorName || 'Campus Student',
           email: s?.email || t.authorEmail || '',
+          phone: peerPhone,
           imageUrl: s?.imageUrl || t.authorImage || null,
           avatarId: s?.avatarId || 'm1',
           college: s?.college || 'VIT, Bhopal',
@@ -341,11 +352,28 @@ router.get('/', requireAuth, async (req, res) => {
       };
     });
 
+    // Normalize active routes so duplicate casing (e.g. "patna -> gaya" and "Patna -> Gaya") are unified
+    const seenRoutes = new Set();
+    const uniqueActiveRoutes = [];
+    for (const t of myActiveTravels) {
+      const normSource = (t.source || '').trim().toLowerCase();
+      const normDest = (t.destination || '').trim().toLowerCase();
+      const key = `${normSource}->${normDest}`;
+      if (!seenRoutes.has(key)) {
+        seenRoutes.add(key);
+        uniqueActiveRoutes.push({
+          source: normSource,
+          destination: normDest,
+          type: t.type
+        });
+      }
+    }
+
     return res.status(200).json({
       success: true,
       count: enriched.length,
       hasPostedTravel: true,
-      activeRoutes: myActiveTravels.map(t => ({ source: t.source, destination: t.destination, type: t.type })),
+      activeRoutes: uniqueActiveRoutes,
       data: enriched
     });
   } catch (error) {
@@ -360,16 +388,37 @@ router.get('/', requireAuth, async (req, res) => {
 
 /**
  * @route   GET /api/travels/my
- * @desc    Get all travel posts created by the logged-in user (excluding expired posts)
+ * @desc    Get all travel posts created by the logged-in user with status filtering
  * @access  Protected
  */
 router.get('/my', requireAuth, async (req, res) => {
   try {
     const now = new Date();
-    const travels = await Travel.find({
-      userId: req.userId,
-      expiresAt: { $gt: now }
-    }).sort({ createdAt: -1 }).lean();
+
+    // 1. Auto-transition user's active posts that passed expiresAt to 'expired'
+    await Travel.updateMany(
+      { userId: req.userId, status: 'active', expiresAt: { $lte: now } },
+      { $set: { status: 'expired' } }
+    );
+
+    // 2. Build status filter if requested
+    const filter = { userId: req.userId };
+    if (req.query.status) {
+      const s = String(req.query.status).toLowerCase();
+      if (s === 'active') {
+        filter.status = 'active';
+        filter.expiresAt = { $gt: now };
+      } else if (s === 'expired') {
+        filter.$or = [
+          { status: 'expired' },
+          { status: 'active', expiresAt: { $lte: now } }
+        ];
+      } else if (['cancelled', 'completed'].includes(s)) {
+        filter.status = s;
+      }
+    }
+
+    const travels = await Travel.find(filter).sort({ createdAt: -1 }).lean();
 
     const travelIds = travels.map(t => t._id);
     const bookings = await Booking.find({ travelId: { $in: travelIds } }).lean();
@@ -383,11 +432,16 @@ router.get('/my', requireAuth, async (req, res) => {
 
     const enriched = travels.map(t => {
       const reqs = bookingsByTravel.get(t._id.toString()) || [];
+      const isExpired = t.status === 'expired' || (t.status === 'active' && new Date(t.expiresAt) <= now);
+      const effectiveStatus = isExpired ? 'expired' : t.status;
       return {
         ...t,
+        status: effectiveStatus,
         requestsCount: reqs.length,
         pendingRequestsCount: reqs.filter(r => r.status === 'pending').length,
-        acceptedRequestsCount: reqs.filter(r => ['accepted', 'confirmed'].includes(r.status)).length
+        acceptedRequestsCount: reqs.filter(r => ['accepted', 'confirmed'].includes(r.status)).length,
+        confirmedBookingsCount: reqs.filter(r => ['accepted', 'confirmed'].includes(r.status)).length,
+        cancelledBookingsCount: reqs.filter(r => r.status === 'cancelled').length
       };
     });
 
@@ -459,6 +513,13 @@ router.get('/:id', requireAuth, async (req, res) => {
       });
     }
 
+    const now = new Date();
+    const isExpired = travel.status === 'expired' || (travel.status === 'active' && new Date(travel.expiresAt) <= now);
+    const effectiveStatus = isExpired ? 'expired' : travel.status;
+    if (travel.status === 'active' && isExpired) {
+      await Travel.updateOne({ _id: travel._id }, { $set: { status: 'expired' } });
+    }
+
     const isMine = travel.userId === req.userId;
     const student = await Student.findOne({ clerkId: travel.userId }).lean();
 
@@ -475,6 +536,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       success: true,
       data: {
         ...travel,
+        status: effectiveStatus,
         bookedSeats,
         availableSeats,
         pricePerSeat: travel.pricePerSeat || 350,
@@ -495,6 +557,112 @@ router.get('/:id', requireAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error while fetching travel post details',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Safely cancels a travel post and all associated active bookings,
+ * notifying all passengers and preventing orphaned or double-restored bookings.
+ */
+export async function cancelTravelPost(travelId, userId) {
+  if (!mongoose.Types.ObjectId.isValid(travelId)) {
+    return { status: 400, message: 'Invalid travel ID format' };
+  }
+
+  const travel = await Travel.findById(travelId);
+  if (!travel) {
+    return { status: 404, message: 'Travel post not found' };
+  }
+
+  // 1. Authorization: Only post owner can cancel
+  if (travel.userId !== userId) {
+    return { status: 403, message: 'Forbidden: You are not authorized to cancel this travel post' };
+  }
+
+  // 2. Lifecycle validation
+  if (travel.status === 'cancelled') {
+    return { status: 400, message: 'This ride is already cancelled' };
+  }
+  if (travel.status === 'completed') {
+    return { status: 400, message: 'Cannot cancel a completed ride' };
+  }
+  const now = new Date();
+  if (travel.status === 'expired' || travel.expiresAt <= now) {
+    return { status: 400, message: 'Cannot cancel an expired ride' };
+  }
+
+  // 3. Mark travel status as cancelled
+  travel.status = 'cancelled';
+  await travel.save();
+
+  // 4. Find all active bookings (pending, accepted, confirmed)
+  const activeBookings = await Booking.find({
+    travelId: travel._id,
+    status: { $in: ['pending', 'accepted', 'confirmed'] }
+  });
+
+  // 5. Safely transition each booking to cancelled and notify passenger
+  for (const b of activeBookings) {
+    b.status = 'cancelled';
+    b.cancelledAt = now;
+    b.cancellationReason = 'Ride cancelled by host';
+    await b.save();
+
+    // Create outbox notification for passenger
+    try {
+      await createOutboxEvent({
+        eventType: NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER,
+        recipientId: b.passengerId,
+        relatedBookingId: b._id,
+        relatedTravelId: travel._id,
+        payload: {
+          source: travel.source,
+          destination: travel.destination,
+          travelDate: travel.travelDate,
+          requestedSeats: b.requestedSeats || 1
+        }
+      });
+    } catch (notifErr) {
+      console.warn(`Could not create cancellation outbox event for booking ${b._id}:`, notifErr.message);
+    }
+  }
+
+  // Trigger outbox sweep to deliver notifications
+  try {
+    triggerOutboxSweep();
+  } catch (sweepErr) {
+    console.warn('Outbox sweep error during ride cancellation:', sweepErr.message);
+  }
+
+  return {
+    status: 200,
+    message: 'Ride cancelled successfully. All passenger bookings have been cancelled and passengers notified.',
+    data: travel,
+    affectedBookingsCount: activeBookings.length
+  };
+}
+
+/**
+ * @route   PATCH /api/travels/:id/cancel
+ * @desc    Owner cancels an active travel post and safely cancels all passenger bookings
+ * @access  Protected (Owner only)
+ */
+router.patch('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    const result = await cancelTravelPost(req.params.id, req.userId);
+    return res.status(result.status).json({
+      success: result.status === 200,
+      message: result.message,
+      data: result.data,
+      affectedBookingsCount: result.affectedBookingsCount
+    });
+  } catch (error) {
+    console.error('Error in PATCH /api/travels/:id/cancel:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while cancelling travel post',
       error: error.message
     });
   }
@@ -527,6 +695,17 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
       });
     }
 
+    // If cancelled, delegate to safe cancellation logic
+    if (status === 'cancelled') {
+      const result = await cancelTravelPost(id, req.userId);
+      return res.status(result.status).json({
+        success: result.status === 200,
+        message: result.message,
+        data: result.data,
+        affectedBookingsCount: result.affectedBookingsCount
+      });
+    }
+
     // 3. Find travel post
     const travel = await Travel.findById(id);
     if (!travel) {
@@ -541,6 +720,14 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: You are not authorized to update this travel post'
+      });
+    }
+
+    // Only active rides can transition to completed
+    if (travel.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot complete a ride with status "${travel.status}"`
       });
     }
 
@@ -610,6 +797,282 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error while finding travel matches',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/travels/:id
+ * @desc    Update existing travel post details (owner only) and safely handle bookings
+ * @access  Protected
+ */
+router.put('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid travel ID format'
+      });
+    }
+
+    // 2. Find target travel post
+    const travel = await Travel.findById(id);
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Travel post not found'
+      });
+    }
+
+    // 3. Ownership verification: Only post owner can edit
+    if (travel.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You are not authorized to edit this travel post'
+      });
+    }
+
+    const now = new Date();
+    const isExpired = travel.status === 'expired' || (travel.status === 'active' && new Date(travel.expiresAt) <= now);
+
+    // Lifecycle check: Cannot edit cancelled, completed, or expired rides
+    if (travel.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot edit a cancelled ride'
+      });
+    }
+    if (travel.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot edit a completed ride'
+      });
+    }
+    if (isExpired) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot edit an expired ride'
+      });
+    }
+
+    const {
+      source,
+      destination,
+      travelDate,
+      departureTime,
+      timeFlexibility,
+      seats,
+      pricePerSeat,
+      carModel,
+      status
+    } = req.body;
+
+    // Do not allow reactivating an inactive ride through edit
+    if (status && status === 'active' && travel.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot reactivate a non-active ride'
+      });
+    }
+
+    // If requested status is cancelled, route to safe cancellation
+    if (status === 'cancelled') {
+      const cancelResult = await cancelTravelPost(id, req.userId);
+      return res.status(cancelResult.status).json({
+        success: cancelResult.status === 200,
+        message: cancelResult.message,
+        data: cancelResult.data
+      });
+    }
+
+    const bookedSeats = travel.bookedSeats || 0;
+
+    // 4. Validate and handle seats safely: cannot reduce below bookedSeats
+    if (seats !== undefined && seats !== null) {
+      const numSeats = Number(seats);
+      if (isNaN(numSeats) || !Number.isInteger(numSeats) || numSeats < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Seats must be a positive integer of at least 1'
+        });
+      }
+      if (numSeats < bookedSeats) {
+        return res.status(400).json({
+          success: false,
+          message: `Total seats cannot be reduced below already confirmed booked seats (${bookedSeats})`
+        });
+      }
+      travel.seats = numSeats;
+    }
+
+    // 5. Handle route and date modifications safely with respect to existing bookings
+    const isSourceChanged = source && typeof source === 'string' && source.trim() !== travel.source;
+    const isDestChanged = destination && typeof destination === 'string' && destination.trim() !== travel.destination;
+    let isDateChanged = false;
+    let newParsedDate = null;
+
+    if (travelDate) {
+      newParsedDate = new Date(travelDate);
+      if (isNaN(newParsedDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid travel date format'
+        });
+      }
+      const newExpiresAt = calculateExpiresAt(newParsedDate);
+      if (newExpiresAt <= now) {
+        return res.status(400).json({
+          success: false,
+          message: 'Travel date cannot be in the past or expired'
+        });
+      }
+      const existingDateStr = travel.travelDate ? new Date(travel.travelDate).toISOString().split('T')[0] : '';
+      const newDateStr = newParsedDate.toISOString().split('T')[0];
+      if (newDateStr !== existingDateStr) {
+        isDateChanged = true;
+      }
+    }
+
+    // If there are already booked/confirmed seats, prevent changing route/date to avoid stranding confirmed passengers
+    if (bookedSeats > 0 && (isSourceChanged || isDestChanged || isDateChanged)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot change route or date for a ride with confirmed bookings. Please coordinate or cancel those bookings first.'
+      });
+    }
+
+    // If route or date changed (and no confirmed bookings), cancel pending requests so they don't remain orphaned
+    if (isSourceChanged || isDestChanged || isDateChanged) {
+      await Booking.updateMany(
+        { travelId: travel._id, status: 'pending' },
+        { $set: { status: 'cancelled', cancellationReason: 'Ride details updated by host' } }
+      );
+    }
+
+    if (source && typeof source === 'string' && source.trim()) {
+      travel.source = source.trim();
+    }
+    if (destination && typeof destination === 'string' && destination.trim()) {
+      travel.destination = destination.trim();
+    }
+    if (newParsedDate) {
+      travel.travelDate = newParsedDate;
+      travel.expiresAt = calculateExpiresAt(newParsedDate);
+    }
+
+    // 6. Departure time validation
+    if (departureTime !== undefined && departureTime !== null) {
+      const numDepartureTime = Number(departureTime);
+      if (!Number.isInteger(numDepartureTime) || numDepartureTime < 0 || numDepartureTime > 1439) {
+        return res.status(400).json({
+          success: false,
+          message: 'Departure time must be an integer between 0 and 1439 minutes from midnight'
+        });
+      }
+      travel.departureTime = numDepartureTime;
+    }
+
+    // 7. Time flexibility validation
+    if (timeFlexibility !== undefined && timeFlexibility !== null) {
+      const numFlex = Number(timeFlexibility);
+      if ([30, 60, 180, 300].includes(numFlex)) {
+        travel.timeFlexibility = numFlex;
+      }
+    }
+
+    // 8. Price per seat
+    if (pricePerSeat !== undefined && pricePerSeat !== null) {
+      const numPrice = Number(pricePerSeat);
+      if (!isNaN(numPrice) && numPrice >= 0) {
+        travel.pricePerSeat = numPrice;
+      }
+    }
+
+    // 9. Vehicle / Car Model
+    if (carModel !== undefined && carModel !== null) {
+      travel.carModel = String(carModel).trim();
+    }
+
+    // 10. Status change (e.g. completed)
+    if (status && status === 'completed') {
+      travel.status = 'completed';
+    }
+
+    await travel.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Travel post updated successfully',
+      data: travel
+    });
+  } catch (error) {
+    console.error('Error updating travel post:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while updating travel post',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route   DELETE /api/travels/:id
+ * @desc    Permanently delete a travel post (owner only) and safely cancel associated bookings
+ * @access  Protected
+ */
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid travel ID format'
+      });
+    }
+
+    // 2. Find target travel post
+    const travel = await Travel.findById(id);
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Travel post not found'
+      });
+    }
+
+    // 3. Ownership verification: Only post owner can delete
+    if (travel.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You are not authorized to delete this travel post'
+      });
+    }
+
+    // 4. Safely handle associated bookings:
+    // Mark any active, pending, or accepted bookings as cancelled so passengers are not left stranded
+    await Booking.updateMany(
+      { travelId: travel._id, status: { $in: ['pending', 'accepted', 'confirmed'] } },
+      { $set: { status: 'cancelled', cancellationReason: 'Travel post deleted by host' } }
+    );
+
+    // 5. Permanently remove the travel post from database
+    await Travel.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Travel post successfully deleted',
+      deletedId: id
+    });
+  } catch (error) {
+    console.error('Error deleting travel post:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while deleting travel post',
       error: error.message
     });
   }
