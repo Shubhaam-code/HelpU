@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import Student from '../models/Student.js';
+import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 
 const router = express.Router();
 
@@ -20,6 +21,15 @@ router.get('/profile', requireAuth, async (req, res) => {
         data: null,
         message: 'Profile not created yet'
       });
+    }
+
+    // Auto-heal and sync phone and whatsappNumber for seamless backward compatibility
+    if (!student.whatsappNumber && student.phone) {
+      student.whatsappNumber = student.phone;
+      await Student.updateOne({ _id: student._id }, { $set: { whatsappNumber: student.phone } });
+    } else if (student.whatsappNumber && !student.phone) {
+      student.phone = student.whatsappNumber;
+      await Student.updateOne({ _id: student._id }, { $set: { phone: student.whatsappNumber } });
     }
 
     return res.status(200).json({
@@ -48,16 +58,22 @@ async function handleSaveProfile(req, res) {
       });
     }
 
-    const { name, email, phone, college, course, avatarId, imageUrl } = req.body;
+    const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode } = req.body;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
+    // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
+    const existing = await Student.findOne({ clerkId });
+
+    const finalName = (name && typeof name === 'string' && name.trim()) ? name.trim() : existing?.name;
+    const finalEmail = (email && typeof email === 'string' && email.trim()) ? email.trim().toLowerCase() : existing?.email;
+
+    if (!finalName) {
       return res.status(400).json({
         success: false,
         message: 'Name is required'
       });
     }
 
-    if (!email || typeof email !== 'string' || !email.trim()) {
+    if (!finalEmail) {
       return res.status(400).json({
         success: false,
         message: 'Email is required'
@@ -65,7 +81,7 @@ async function handleSaveProfile(req, res) {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(finalEmail)) {
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid email address'
@@ -73,13 +89,9 @@ async function handleSaveProfile(req, res) {
     }
 
     const updateData = {
-      name: name.trim(),
-      email: email.trim().toLowerCase()
+      name: finalName,
+      email: finalEmail
     };
-
-    if (phone !== undefined) {
-      updateData.phone = typeof phone === 'string' ? phone.trim() : '';
-    }
 
     if (college !== undefined) {
       updateData.college = typeof college === 'string' ? college.trim() : '';
@@ -95,6 +107,42 @@ async function handleSaveProfile(req, res) {
 
     if (imageUrl !== undefined) {
       updateData.imageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+    }
+
+    // Canonical WhatsApp / Phone Number Resolution:
+    // Accept either whatsappNumber or phone, prioritizing whatsappNumber if both are supplied.
+    // Keeps both fields in MongoDB 100% synchronized for seamless persistence and compatibility.
+    const incomingNumber = whatsappNumber !== undefined ? whatsappNumber : phone;
+
+    if (incomingNumber !== undefined && incomingNumber !== null) {
+      const numStr = String(incomingNumber).trim();
+      
+      if (numStr) {
+        try {
+          const countryCode = whatsappCountryCode || 'IN';
+          
+          if (!isValidPhoneNumber(numStr, countryCode)) {
+            return res.status(400).json({
+              success: false,
+              message: 'Invalid WhatsApp number format. Please provide a valid phone number.'
+            });
+          }
+
+          const parsed = parsePhoneNumber(numStr, countryCode);
+          const e164Number = parsed.number; // e.g. +919876543210
+          updateData.whatsappNumber = e164Number;
+          updateData.phone = e164Number;
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid WhatsApp number. Please check the number and country code.'
+          });
+        }
+      } else {
+        // Explicitly clearing number
+        updateData.whatsappNumber = '';
+        updateData.phone = '';
+      }
     }
 
     const student = await Student.findOneAndUpdate(

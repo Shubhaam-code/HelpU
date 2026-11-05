@@ -2,21 +2,34 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, useClerk } from '@clerk/clerk-react';
+import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import {
-  Calendar, Car, Heart, HelpCircle, Settings, ChevronRight, LogOut,
+  Calendar, Car, Heart, HelpCircle, ChevronRight, LogOut,
   ShieldCheck, Mail, Phone, GraduationCap, BookOpen, Edit3, CheckCircle2,
-  ArrowRight, Sparkles, X, User as UserIcon, Download
+  ArrowRight, Sparkles, X, User as UserIcon, Download, MessageCircle, ChevronDown
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { getProfile, saveProfile, getMyBookings, getMyTravels } from '../lib/api';
+import { useAuthProfile } from '../context/AuthProfileContext';
+
+const COUNTRIES = [
+  { code: 'IN', name: 'India', dial: '+91', flag: '🇮🇳' },
+  { code: 'US', name: 'United States', dial: '+1', flag: '🇺🇸' },
+  { code: 'GB', name: 'United Kingdom', dial: '+44', flag: '🇬🇧' },
+  { code: 'CA', name: 'Canada', dial: '+1', flag: '🇨🇦' },
+  { code: 'AU', name: 'Australia', dial: '+61', flag: '🇦🇺' },
+  { code: 'AE', name: 'UAE', dial: '+971', flag: '🇦🇪' },
+  { code: 'SG', name: 'Singapore', dial: '+65', flag: '🇸🇬' },
+];
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const { setWhatsAppNumber: setContextWhatsAppNumber } = useAuthProfile();
 
   // Data states
   const [profile, setProfile] = useState(null);
@@ -27,7 +40,9 @@ export default function ProfilePage() {
   // Edit profile modal state
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+  const [editWhatsAppNumber, setEditWhatsAppNumber] = useState('');
+  const [editWhatsAppCountry, setEditWhatsAppCountry] = useState('IN');
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [editCollege, setEditCollege] = useState('');
   const [editCourse, setEditCourse] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -47,7 +62,34 @@ export default function ProfilePage() {
         const p = profRes.value.data?.data;
         setProfile(p);
         setEditName(p?.name || user?.fullName || '');
-        setEditPhone(p?.phone || user?.primaryPhoneNumber?.phoneNumber || '');
+        
+        // Resolve canonical saved number from whatsappNumber or phone
+        const savedNumber = (p?.whatsappNumber || p?.phone || user?.primaryPhoneNumber?.phoneNumber || '').trim();
+        if (savedNumber) {
+          try {
+            const parsed = parsePhoneNumber(savedNumber);
+            if (parsed && parsed.nationalNumber) {
+              setEditWhatsAppNumber(parsed.nationalNumber);
+              setEditWhatsAppCountry(parsed.country || 'IN');
+            } else {
+              setEditWhatsAppNumber(savedNumber.replace(/[^\d]/g, ''));
+              setEditWhatsAppCountry('IN');
+            }
+          } catch {
+            try {
+              const parsedIN = parsePhoneNumber(savedNumber, 'IN');
+              setEditWhatsAppNumber(parsedIN?.nationalNumber || savedNumber.replace(/[^\d]/g, ''));
+              setEditWhatsAppCountry(parsedIN?.country || 'IN');
+            } catch {
+              setEditWhatsAppNumber(savedNumber.replace(/[^\d]/g, ''));
+              setEditWhatsAppCountry('IN');
+            }
+          }
+        } else {
+          setEditWhatsAppNumber('');
+          setEditWhatsAppCountry('IN');
+        }
+        
         setEditCollege(p?.college || 'VIT, Bhopal');
         setEditCourse(p?.course || 'B.Tech Computer Science');
       }
@@ -81,20 +123,44 @@ export default function ProfilePage() {
       const payload = {
         name: editName.trim() || user?.fullName || 'Campus Student',
         email: profile?.email || user?.primaryEmailAddress?.emailAddress || '',
-        phone: editPhone.trim(),
         college: editCollege.trim(),
         course: editCourse.trim(),
         imageUrl: user?.imageUrl || profile?.imageUrl || ''
       };
 
+      // Validate and canonicalize single WhatsApp number
+      const rawNumber = editWhatsAppNumber.trim();
+      if (rawNumber) {
+        if (!isValidPhoneNumber(rawNumber, editWhatsAppCountry)) {
+          const countryName = COUNTRIES.find(c => c.code === editWhatsAppCountry)?.name || 'the selected country';
+          setSaveError(`Please enter a valid phone number for ${countryName}.`);
+          setIsSaving(false);
+          return;
+        }
+        const parsed = parsePhoneNumber(rawNumber, editWhatsAppCountry);
+        const e164 = parsed.number; // e.g. +919876543210
+        payload.whatsappNumber = e164;
+        payload.phone = e164; // Keep both fields 100% in sync in database
+        payload.whatsappCountryCode = editWhatsAppCountry;
+      } else {
+        // Clearing number
+        payload.whatsappNumber = '';
+        payload.phone = '';
+      }
+
       const res = await saveProfile(payload);
       const updated = res.data?.data || payload;
       setProfile(updated);
+      
+      if (setContextWhatsAppNumber) {
+        setContextWhatsAppNumber(payload.whatsappNumber || '');
+      }
+
       setSaveSuccess(true);
       setTimeout(() => {
         setIsEditing(false);
         setSaveSuccess(false);
-      }, 1200);
+      }, 1000);
     } catch (err) {
       console.error('Save profile error:', err);
       setSaveError(err.response?.data?.message || err.message || 'Failed to update profile.');
@@ -104,12 +170,10 @@ export default function ProfilePage() {
   };
 
   const navMenuItems = [
-    { icon: Calendar, label: 'My Bookings', subtitle: 'View upcoming and active ride seats', path: '/bookings' },
     { icon: Car, label: 'Offers & Requests', subtitle: 'Manage your campus travel posts', path: '/rides/offer' },
     { icon: Download, label: 'Install Helpu App', subtitle: 'Fast offline access & home screen alerts', onClick: () => window.dispatchEvent(new CustomEvent('pwa-prompt-install')) },
     { icon: Heart, label: 'Saved Rides', subtitle: 'Frequently used routes & bookmarks', path: '/saved' },
     { icon: HelpCircle, label: 'Campus Help & Support', subtitle: 'Campus assistance and student FAQs', path: '/help' },
-    { icon: Settings, label: 'Account Settings', subtitle: 'Notifications, privacy & security', path: '/settings' },
   ];
 
   return (
@@ -299,11 +363,18 @@ export default function ProfilePage() {
 
             <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
-                Contact Phone / WhatsApp
+                WhatsApp Number
               </span>
-              <span className="font-extrabold text-[#17233C] text-sm block">
-                {profile?.phone || user?.primaryPhoneNumber?.phoneNumber || 'Not added yet'}
-              </span>
+              <div className="flex items-center gap-2">
+                <img
+                  src="/whatsapp.svg"
+                  alt="WhatsApp"
+                  className="w-4 h-4 object-contain shrink-0"
+                />
+                <span className="font-extrabold text-[#17233C] text-sm block">
+                  {profile?.whatsappNumber || profile?.phone || 'Not added yet'}
+                </span>
+              </div>
             </div>
 
             <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
@@ -435,17 +506,76 @@ export default function ProfilePage() {
                   />
                 </div>
 
+                {/* Single Canonical WhatsApp Number Field */}
                 <div>
-                  <label className="block text-xs font-bold text-[#17233C] mb-1.5">
-                    WhatsApp / Phone Number
+                  <label className="block text-xs font-bold text-[#17233C] mb-1.5 flex items-center gap-1.5">
+                    <img
+                      src="/whatsapp.svg"
+                      alt="WhatsApp"
+                      className="w-4 h-4 object-contain"
+                    />
+                    <span>WhatsApp Number</span>
                   </label>
-                  <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
-                  />
+                  
+                  {/* Country Selector */}
+                  <div className="relative mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 bg-[#FFFBF8] border border-[#F4E3D8] rounded-xl text-left text-xs font-semibold text-[#17233C] hover:bg-white hover:border-[#FF572E]/40 transition-all focus:outline-none"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="text-base">{COUNTRIES.find(c => c.code === editWhatsAppCountry)?.flag || '🇮🇳'}</span>
+                        <span className="font-bold">{COUNTRIES.find(c => c.code === editWhatsAppCountry)?.name || 'India'}</span>
+                        <span className="text-[#6E7587]">({COUNTRIES.find(c => c.code === editWhatsAppCountry)?.dial || '+91'})</span>
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-[#6E7587] transition-transform ${showCountryDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Dropdown */}
+                    {showCountryDropdown && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-[#F4E3D8] rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                        {COUNTRIES.map((country) => (
+                          <button
+                            key={country.code}
+                            type="button"
+                            onClick={() => {
+                              setEditWhatsAppCountry(country.code);
+                              setShowCountryDropdown(false);
+                              setSaveError('');
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-semibold text-[#17233C] hover:bg-[#FFF7F2] transition-colors text-left"
+                          >
+                            <span className="text-base">{country.flag}</span>
+                            <span className="flex-1 font-bold">{country.name}</span>
+                            <span className="text-[#6E7587]">{country.dial}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* WhatsApp Number Input */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FFF2EB] border border-[#FCD8C5] rounded-xl text-xs font-black text-[#17233C] select-none shrink-0">
+                      <span>{COUNTRIES.find(c => c.code === editWhatsAppCountry)?.dial || '+91'}</span>
+                    </div>
+                    <input
+                      type="tel"
+                      value={editWhatsAppNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d]/g, '');
+                        setEditWhatsAppNumber(value);
+                        setSaveError('');
+                      }}
+                      placeholder="9876543210"
+                      className="flex-1 bg-[#FFFBF8] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-semibold text-[#17233C] border border-[#F4E3D8] focus:border-[#FF572E] focus:outline-none focus:ring-2 focus:ring-[#FF572E]/15 transition-all"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#6E7587] mt-1.5 flex items-center gap-1.5">
+                    <span>🔒</span>
+                    <span>Used for instant ride coordination with confirmed students.</span>
+                  </p>
                 </div>
 
                 <div>
