@@ -1,19 +1,19 @@
 import React, { Component, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useUser, SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
 import { AnimatePresence } from 'framer-motion';
 
 import { setTokenGetter, getProfile, saveProfile } from './lib/api';
+import { AuthProfileProvider, useAuthProfile } from './context/AuthProfileContext';
 
 // Pages
 import OnboardingPage from './pages/OnboardingPage';
 import AuthPage from './pages/AuthPage';
+import WhatsAppOnboardingPage from './pages/WhatsAppOnboardingPage';
 import HomePage from './pages/HomePage';
 import OfferRidePage from './pages/OfferRidePage';
 import RideDetailsPage from './pages/RideDetailsPage';
 import BookSeatPage from './pages/BookSeatPage';
-import BookingDetailsPage from './pages/BookingDetailsPage';
-import BookingsListPage from './pages/BookingsListPage';
 import MatchPage from './pages/MatchPage';
 import MyMatchesPage from './pages/MyMatchesPage';
 import MatchPreferencesPage from './pages/MatchPreferencesPage';
@@ -32,6 +32,7 @@ import StaticInfoPage from './pages/StaticInfoPage';
 // PWA Utilities & Banners
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
+import { WhatsAppOnboardingCheck } from './components/auth/WhatsAppOnboardingCheck';
 
 // Top-level Error Boundary to catch any child component crashes
 class ErrorBoundary extends Component {
@@ -99,16 +100,21 @@ function TokenInjector() {
           const currentImg = user.imageUrl || '';
           const email = p?.email || user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '';
           const name = p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Campus Student';
-          const phone = p?.phone || user.primaryPhoneNumber?.phoneNumber || user.phoneNumbers?.[0]?.phoneNumber || '';
+          const canonicalNumber = p?.whatsappNumber || p?.phone || user.primaryPhoneNumber?.phoneNumber || user.phoneNumbers?.[0]?.phoneNumber || '';
 
           if ((!p || !p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email) {
-            saveProfile({
+            const syncPayload = {
               name,
               email,
-              phone,
               college: p?.college || 'VIT, Bhopal',
               imageUrl: currentImg
-            }).catch((err) => console.warn('Failed to sync profile image:', err));
+            };
+            // Never pass blank phone numbers during background image sync
+            if (canonicalNumber) {
+              syncPayload.phone = canonicalNumber;
+              syncPayload.whatsappNumber = canonicalNumber;
+            }
+            saveProfile(syncPayload).catch((err) => console.warn('Failed to sync profile image:', err));
           }
         })
         .catch(() => {});
@@ -118,76 +124,113 @@ function TokenInjector() {
   return null;
 }
 
-// Protected route wrapper
+// Protected route wrapper:
+// Seamlessly verifies Clerk authentication AND WhatsApp onboarding status
+// BEFORE rendering any protected page, completely eliminating Home page flicker.
 function ProtectedRoute({ children }) {
   const { isLoaded, isSignedIn } = useUser();
-  if (!isLoaded) {
+  const { isProfileLoading, hasWhatsApp, isSkipped } = useAuthProfile();
+  const location = useLocation();
+
+  // 1. Show clean Helpu loading screen while Clerk or Profile status is resolving
+  if (!isLoaded || (isSignedIn && isProfileLoading)) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-cream">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 bg-navy rounded-2xl flex items-center justify-center">
-            <span className="text-white font-black text-xl">H</span>
-          </div>
+        <div className="flex flex-col items-center gap-5">
+          <img
+            src="/logo.png"
+            alt="Helpu"
+            className="h-10 sm:h-12 w-auto object-contain select-none"
+            draggable="false"
+          />
           <div className="w-6 h-6 border-2 border-coral border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
     );
   }
+
+  // 2. Unauthenticated users redirected to /auth
   if (!isSignedIn) {
     return <Navigate to="/auth" replace />;
   }
+
+  const isOnWhatsAppSetup = location.pathname === '/whatsapp-setup';
+
+  // 3. User does NOT have WhatsApp number and has NOT skipped:
+  // Redirect IMMEDIATELY to /whatsapp-setup BEFORE Home or any protected page ever mounts!
+  if (!hasWhatsApp && !isSkipped) {
+    if (isOnWhatsAppSetup) {
+      return children;
+    }
+    return <Navigate to="/whatsapp-setup" replace />;
+  }
+
+  // 4. User ALREADY has WhatsApp number and attempts to open /whatsapp-setup:
+  if (isOnWhatsAppSetup && hasWhatsApp) {
+    return <Navigate to="/home" replace />;
+  }
+
+  // 5. User has completed setup or skipped: render requested protected route
   return children;
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <OfflineBanner />
-      <InstallPwaPrompt />
-      <TokenInjector />
-      <Routes>
-        {/* Public Landing & Authentication */}
-        <Route path="/" element={<OnboardingPage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/login" element={<AuthPage initialMode="signIn" />} />
-        <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
-        <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
-        <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
+      <AuthProfileProvider>
+        <OfflineBanner />
+        <InstallPwaPrompt />
+        <TokenInjector />
+        <WhatsAppOnboardingCheck />
+        <Routes>
+          {/* Public Landing & Authentication */}
+          <Route path="/" element={<OnboardingPage />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/login" element={<AuthPage initialMode="signIn" />} />
+          <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
+          <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
+          <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
 
-        {/* Protected */}
-        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/rides" element={<ProtectedRoute><Navigate to="/rides/offer" replace /></ProtectedRoute>} />
-        <Route path="/rides/offer" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
-        <Route path="/rides/request" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
-        <Route path="/rides/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
-        <Route path="/book/:id" element={<ProtectedRoute><BookSeatPage /></ProtectedRoute>} />
-        <Route path="/bookings" element={<ProtectedRoute><BookingsListPage /></ProtectedRoute>} />
-        <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
-        <Route path="/match" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
-        <Route path="/matches" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
-        <Route path="/match/my" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
-        <Route path="/match/explore" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
-        <Route path="/match/preferences" element={<ProtectedRoute><MatchPreferencesPage /></ProtectedRoute>} />
-        <Route path="/match/success" element={<ProtectedRoute><MatchSuccessPage /></ProtectedRoute>} />
-        <Route path="/match/:id" element={<ProtectedRoute><MatchDetailsPage /></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
-        <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-        <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
+          {/* WhatsApp Onboarding */}
+          <Route path="/whatsapp-setup" element={<ProtectedRoute><WhatsAppOnboardingPage /></ProtectedRoute>} />
 
-        {/* Posts, Help & About dedicated pages */}
-        <Route path="/posts" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
-        <Route path="/community" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
-        <Route path="/help" element={<ProtectedRoute><GetHelpPage /></ProtectedRoute>} />
-        <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
-        <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><StaticInfoPage title="Account Settings" subtitle="Manage notification preferences, privacy, verified student IDs, and security." icon="⚙️" /></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
+          {/* Protected */}
+          <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+          <Route path="/rides" element={<ProtectedRoute><Navigate to="/rides/offer" replace /></ProtectedRoute>} />
+          <Route path="/rides/offer" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
+          <Route path="/rides/request" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
+          <Route path="/rides/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
+          <Route path="/book/:id" element={<ProtectedRoute><BookSeatPage /></ProtectedRoute>} />
+          {/* Bookings route removed as per request: gracefully redirected to /posts */}
+          <Route path="/bookings" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
+          <Route path="/bookings/:id" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
+          <Route path="/match" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
+          <Route path="/matches" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
+          <Route path="/match/my" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
+          <Route path="/match/explore" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
+          <Route path="/match/preferences" element={<ProtectedRoute><MatchPreferencesPage /></ProtectedRoute>} />
+          <Route path="/match/success" element={<ProtectedRoute><MatchSuccessPage /></ProtectedRoute>} />
+          <Route path="/match/:id" element={<ProtectedRoute><MatchDetailsPage /></ProtectedRoute>} />
+          <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
+          <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Posts, Help & About dedicated pages */}
+          <Route path="/posts" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+          <Route path="/my-rides" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+          <Route path="/rides/my" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+          <Route path="/community" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+          <Route path="/help" element={<ProtectedRoute><GetHelpPage /></ProtectedRoute>} />
+          <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
+          <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
+          <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProfileProvider>
     </ErrorBoundary>
   );
 }

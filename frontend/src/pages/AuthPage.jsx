@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, SignIn, SignUp } from '@clerk/clerk-react';
 import { ArrowLeft, ShieldCheck, Sparkles, Car } from 'lucide-react';
+import { useAuthProfile } from '../context/AuthProfileContext';
 
 export default function AuthPage({ initialMode = 'signIn' }) {
   const { isSignedIn, isLoaded } = useUser();
+  const { hasWhatsApp, isProfileLoading, isSkipped } = useAuthProfile();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -20,12 +22,17 @@ export default function AuthPage({ initialMode = 'signIn' }) {
     }
   }, [modeParam]);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated:
+  // If WhatsApp number is missing, directly open /whatsapp-setup BEFORE home!
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      navigate('/home', { replace: true });
+    if (isLoaded && isSignedIn && !isProfileLoading) {
+      if (!hasWhatsApp && !isSkipped) {
+        navigate('/whatsapp-setup', { replace: true });
+      } else {
+        navigate('/home', { replace: true });
+      }
     }
-  }, [isLoaded, isSignedIn, navigate]);
+  }, [isLoaded, isSignedIn, isProfileLoading, hasWhatsApp, isSkipped, navigate]);
 
   const switchMode = (newMode) => {
     setMode(newMode);
