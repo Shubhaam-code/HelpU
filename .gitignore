@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*service-account*.json
+*firebase*.json
+serviceAccountKey.json
+
+# Build and dist outputs
+dist/
+dist-ssr/
+build/
+.gradle/
+*.apk
+*.aab
+
+# Editor & OS files
+.idea/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+
+
