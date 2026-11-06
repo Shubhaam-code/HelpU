@@ -7,33 +7,35 @@ import Travel from '../src/models/Travel.js';
 import Booking from '../src/models/Booking.js';
 import Student from '../src/models/Student.js';
 
-// Setup RSA key pair for testing Clerk JWT token verification
-const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-  modulusLength: 2048,
-  publicKeyEncoding: { type: 'spki', format: 'pem' },
-  privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
-});
+import { setMockAuth } from '../src/config/firebase.js';
 
-process.env.CLERK_PUBLISHABLE_KEY = 'pk_test_bWludC1zZWFndWxsLTkzNTIuY2xlcmsuYWNjb3VudHMuZGV2JA';
-process.env.CLERK_SECRET_KEY = 'sk_test_gMb6su0ewLT3mJhj9hlubhxGD7Iv7HLH0vj6sO4qAl';
-process.env.CLERK_JWT_KEY = publicKey;
+setMockAuth({
+  verifyIdToken: async (token) => {
+    try {
+      const parts = token.split('.');
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      return {
+        uid: payload.sub,
+        email: `${payload.sub}@vitbhopal.ac.in`,
+        email_verified: true
+      };
+    } catch {
+      throw new Error('Invalid test token');
+    }
+  }
+});
 
 function generateTestToken(userId) {
   const header = { alg: 'RS256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
   const payload = {
     sub: userId,
-    iat: now,
-    exp: now + 3600,
-    nbf: now - 5,
-    sid: 'sess_test_p3_' + userId
+    uid: userId,
+    email: `${userId}@vitbhopal.ac.in`,
+    email_verified: true
   };
   const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(encodedHeader + '.' + encodedPayload);
-  const signature = sign.sign(privateKey, 'base64url');
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
+  return `${encodedHeader}.${encodedPayload}.test_sig`;
 }
 
 const ownerId = 'user_p3_owner_101';

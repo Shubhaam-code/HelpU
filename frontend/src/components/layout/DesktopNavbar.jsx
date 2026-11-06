@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, FileText, Calendar, Download
 } from 'lucide-react';
-import { useUser, useClerk } from '../../context/FirebaseAuthContext';
+import { useUser, useFirebaseAuth } from '../../context/FirebaseAuthContext';
 import { Avatar } from '../ui/Avatar';
 import { getUnreadCount } from '../../lib/api';
 
@@ -11,7 +11,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useFirebaseAuth();
   
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

@@ -1,7 +1,7 @@
 /**
  * Helpu Progressive Web App Service Worker
  * Robust caching for static assets, network-first for navigation,
- * strict network-only bypass for APIs, Clerk auth, and mutating requests.
+ * strict network-only bypass for APIs, Firebase auth, and mutating requests.
  */
 
 const CACHE_VERSION = 'helpu-v1.0.0';
@@ -56,11 +56,9 @@ self.addEventListener('activate', (event) => {
 function isApiOrAuth(url) {
   return (
     url.pathname.startsWith('/api') ||
-    url.hostname.includes('clerk') ||
-    url.hostname.includes('accounts.dev') ||
+    url.hostname.includes('firebaseapp.com') ||
     url.hostname.includes('googleapis.com') ||
-    url.pathname.includes('/api/') ||
-    url.searchParams.has('__clerk_handshake')
+    url.pathname.includes('/api/')
   );
 }
 
@@ -91,7 +89,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Rule 2: NEVER cache sensitive API endpoints, Clerk authentication or database calls
+  // Rule 2: NEVER cache sensitive API endpoints, Firebase authentication or database calls
   if (isApiOrAuth(url)) {
     event.respondWith(
       fetch(request).catch(() => {

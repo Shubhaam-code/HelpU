@@ -28,7 +28,7 @@ export function AuthProfileProvider({ children }) {
       const p = res?.data?.data || null;
       setProfile(p);
 
-      // Auto-sync basic Clerk image/name if missing
+      // Auto-sync basic auth image/name if missing
       const currentImg = user.imageUrl || '';
       const email = p?.email || user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '';
       const name = p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Campus Student';

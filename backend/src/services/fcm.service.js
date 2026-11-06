@@ -242,9 +242,9 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
 }
 
 /**
- * Sends a push notification to all active registered devices belonging to one or more Clerk user IDs.
+ * Sends a push notification to all active registered devices belonging to one or more user IDs.
  *
- * @param {string|string[]} userIds - Single Clerk user ID or array of user IDs
+ * @param {string|string[]} userIds - Single user ID or array of user IDs
  * @param {Object} notification - Notification content { title, body, imageUrl }
  * @param {Object} [data] - Custom data payload { bookingId, travelId, type, route, ... }
  * @param {Object} [options] - Optional overrides
@@ -309,7 +309,7 @@ export async function sendPushToUsers(userIds, notification = {}, data = {}, opt
 /**
  * Convenience helper to send a push notification to a single user's devices.
  *
- * @param {string} userId - Target Clerk user ID
+ * @param {string} userId - Target user ID
  * @param {Object} notification - Notification content { title, body, imageUrl }
  * @param {Object} [data] - Custom data payload { bookingId, travelId, type, route, ... }
  * @param {Object} [options] - Optional overrides

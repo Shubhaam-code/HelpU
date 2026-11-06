@@ -16,7 +16,7 @@ export function WhatsAppOnboardingCheck() {
   const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    // Wait for Clerk to load and user to be signed in
+    // Wait for auth to load and user to be signed in
     if (!isLoaded || !isSignedIn) {
       return;
     }

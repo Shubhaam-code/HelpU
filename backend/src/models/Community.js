@@ -50,7 +50,7 @@ const communityPostSchema = new mongoose.Schema(
       default: 'General'
     },
     likes: {
-      type: [String], // array of Clerk userIds who liked
+      type: [String], // array of userIds who liked
       default: []
     },
     comments: {

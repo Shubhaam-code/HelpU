@@ -9,7 +9,7 @@ import { registerFcmToken, unregisterFcmToken } from '../lib/api';
 let cachedFcmToken = null;
 
 /**
- * Current authenticated Clerk user
+ * Current authenticated user
  */
 let currentAuthUser = null;
 
@@ -30,7 +30,7 @@ export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_high_importance';
  * Synchronize the current device FCM token with the backend for the authenticated user.
  * Safe to call repeatedly: deduplicates requests using an in-memory sync key.
  *
- * @param {Object} [user] - Clerk user object (defaults to current active user)
+ * @param {Object} [user] - User object (defaults to current active user)
  * @returns {Promise<{ synced: boolean, reason?: string, error?: string }>}
  */
 export async function syncDeviceTokenWithBackend(user = currentAuthUser) {
@@ -111,7 +111,7 @@ export async function unregisterDeviceTokenFromBackend() {
  * Sets or updates the active authenticated user for FCM synchronization.
  * Handles login, token arrival, and logout transitions.
  *
- * @param {Object|null} user - Clerk user object or null on logout
+ * @param {Object|null} user - User object or null on logout
  */
 export function setActiveAuthUser(user) {
   if (user && user.id) {

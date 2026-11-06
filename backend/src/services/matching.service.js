@@ -257,7 +257,7 @@ export async function findMatchesForTravel(travelPost) {
 /**
  * Finds all matching travel posts across all active unexpired travels of a given user.
  * 
- * @param {string} userId - The Clerk ID of the user
+ * @param {string} userId - The user ID
  * @returns {Promise<Object>} Object containing myTravels and matched travel posts
  */
 export async function findMatchesForUser(userId) {

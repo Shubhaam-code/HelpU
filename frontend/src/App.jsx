@@ -1,6 +1,5 @@
 import React, { Component, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import { useAuth, useUser } from './context/FirebaseAuthContext';
 import { AnimatePresence } from 'framer-motion';
 
@@ -10,7 +9,6 @@ import { AuthProfileProvider, useAuthProfile } from './context/AuthProfileContex
 // Pages
 import OnboardingPage from './pages/OnboardingPage';
 import AuthPage from './pages/AuthPage';
-import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import WhatsAppOnboardingPage from './pages/WhatsAppOnboardingPage';
 import HomePage from './pages/HomePage';
 import OfferRidePage from './pages/OfferRidePage';
@@ -156,14 +154,14 @@ function MobileBridgeInitializer() {
 }
 
 // Protected route wrapper:
-// Seamlessly verifies Clerk authentication AND WhatsApp onboarding status
+// Seamlessly verifies Firebase authentication AND WhatsApp onboarding status
 // BEFORE rendering any protected page, completely eliminating Home page flicker.
 function ProtectedRoute({ children }) {
   const { isLoaded, isSignedIn } = useUser();
   const { isProfileLoading, hasWhatsApp } = useAuthProfile();
   const location = useLocation();
 
-  // 1. Show clean Helpu loading screen while Clerk or Profile status is resolving
+  // 1. Show clean Helpu loading screen while Auth or Profile status is resolving
   if (!isLoaded || (isSignedIn && isProfileLoading)) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-cream">
@@ -222,8 +220,8 @@ export default function App() {
           <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
           <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
           <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
-          <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
-          <Route path="/callback" element={<AuthenticateWithRedirectCallback signInForceRedirectUrl="/home" signUpForceRedirectUrl="/home" />} />
+          <Route path="/oauth-callback" element={<Navigate to="/home" replace />} />
+          <Route path="/callback" element={<Navigate to="/home" replace />} />
 
           {/* WhatsApp Onboarding */}
           <Route path="/whatsapp-setup" element={<ProtectedRoute><WhatsAppOnboardingPage /></ProtectedRoute>} />

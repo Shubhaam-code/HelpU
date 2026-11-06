@@ -7,16 +7,16 @@ const router = express.Router();
 
 /**
  * @route   GET /api/students/profile
- * @desc    Get student profile for the authenticated Clerk user
+ * @desc    Get student profile for the authenticated user
  * @access  Protected
  */
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const clerkId = req.userId;
+    const canonicalUserId = req.userId;
     const student = await Student.findOne(
       req.firebaseUid
-        ? { $or: [{ clerkId }, { firebaseUid: req.firebaseUid }] }
-        : { clerkId }
+        ? { $or: [{ clerkId: canonicalUserId }, { firebaseUid: req.firebaseUid }] }
+        : { clerkId: canonicalUserId }
     );
 
     if (!student) {
@@ -61,9 +61,9 @@ router.get('/profile', requireAuth, async (req, res) => {
 // Helper for save/update profile
 async function handleSaveProfile(req, res) {
   try {
-    const clerkId = req.userId;
+    const canonicalUserId = req.userId;
 
-    if (!clerkId) {
+    if (!canonicalUserId) {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized: Unable to identify user from authentication token'
@@ -75,8 +75,8 @@ async function handleSaveProfile(req, res) {
     // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
     const existing = await Student.findOne(
       req.firebaseUid
-        ? { $or: [{ clerkId }, { firebaseUid: req.firebaseUid }] }
-        : { clerkId }
+        ? { $or: [{ clerkId: canonicalUserId }, { firebaseUid: req.firebaseUid }] }
+        : { clerkId: canonicalUserId }
     );
 
     const finalName = (name && typeof name === 'string' && name.trim()) ? name.trim() : existing?.name;
@@ -179,10 +179,10 @@ async function handleSaveProfile(req, res) {
     }
 
     const student = await Student.findOneAndUpdate(
-      existing ? { _id: existing._id } : { clerkId },
+      existing ? { _id: existing._id } : { clerkId: canonicalUserId },
       {
         $set: updateData,
-        $setOnInsert: { clerkId }
+        $setOnInsert: { clerkId: canonicalUserId }
       },
       {
         returnDocument: 'after',
@@ -217,14 +217,14 @@ async function handleSaveProfile(req, res) {
 
 /**
  * @route   POST /api/students/profile
- * @desc    Create or update student profile for the authenticated Clerk user
+ * @desc    Create or update student profile for the authenticated user
  * @access  Protected
  */
 router.post('/profile', requireAuth, handleSaveProfile);
 
 /**
  * @route   PUT /api/students/profile
- * @desc    Update student profile for the authenticated Clerk user
+ * @desc    Update student profile for the authenticated user
  * @access  Protected
  */
 router.put('/profile', requireAuth, handleSaveProfile);

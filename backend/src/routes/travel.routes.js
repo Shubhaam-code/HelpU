@@ -103,7 +103,7 @@ router.post('/', requireAuth, async (req, res) => {
     // 7. Calculate expiry date in Asia/Kolkata timezone
     const expiresAt = calculateExpiresAt(parsedDate);
 
-    // 8. Save document (userId obtained strictly from verified Clerk authentication)
+    // 8. Save document (userId obtained strictly from verified authentication)
     const travel = await Travel.create({
       userId: req.userId,
       type,

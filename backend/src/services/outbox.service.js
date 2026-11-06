@@ -15,7 +15,7 @@ let isProcessing = false;
  * @param {Object} params
  * @param {string} [params.eventId] - Unique event ID (generated if not provided)
  * @param {string} params.eventType - e.g. BOOKING_REQUESTED, BOOKING_CONFIRMED, etc.
- * @param {string} params.recipientId - Clerk ID of recipient
+ * @param {string} params.recipientId - Canonical user ID of recipient
  * @param {string|mongoose.Types.ObjectId} [params.relatedBookingId]
  * @param {string|mongoose.Types.ObjectId} [params.relatedTravelId]
  * @param {Object} params.payload - Notification payload

@@ -3,10 +3,6 @@
   "outputDirectory": "frontend/dist",
   "routes": [
     {
-      "src": "/oauth-callback.*",
-      "dest": "/oauth-callback.html"
-    },
-    {
       "handle": "filesystem"
     },
     {

@@ -99,7 +99,7 @@ export default function RideDetailsPage() {
     loadData();
   }, [loadData]);
 
-  // 2. Auto-fill passenger details from Clerk user and student profile
+  // 2. Auto-fill passenger details from authenticated user and student profile
   useEffect(() => {
     if (profile?.name) {
       setFullName(profile.name);

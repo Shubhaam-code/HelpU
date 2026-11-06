@@ -135,7 +135,7 @@ export default function BookingDetailsPage() {
   const isCancelled = booking?.status === 'cancelled';
   const isCompleted = booking?.status === 'completed';
 
-  // Role Resolution: Strictly identify viewing user vs counterpart using Clerk IDs
+  // Role Resolution: Strictly identify viewing user vs counterpart using canonical IDs
   const currentUserId = user?.id;
   const isOwner = Boolean(currentUserId && booking?.ownerId === currentUserId);
   const isPassenger = Boolean(currentUserId && booking?.passengerId === currentUserId);

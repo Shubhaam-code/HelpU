@@ -96,51 +96,30 @@ export function initMobileNativeBridge({ navigate }) {
     console.warn('[Helpu Native] Push notification bridge error:', err);
   });
 
-  // 6. Deep link listener (OAuth & custom scheme callbacks)
+  // 6. Deep link listener (App custom schemes & universal links)
   let appUrlRemove = null;
   try {
     CapApp.addListener('appUrlOpen', (event) => {
-      console.log('[Helpu Native] appUrlOpen received:', event.url);
+      console.log('[Helpu Native] appUrlOpen received:', event?.url);
       if (!event?.url) return;
 
       try {
         const rawUrl = event.url;
+        // Close any in-app browser if open
+        Browser.close().catch(() => {});
 
-        // Custom scheme OAuth callback from Clerk (e.g. com.helpu.app://callback?...)
+        // Handle custom scheme deep links
         if (rawUrl.startsWith('com.helpu.app') || rawUrl.startsWith('helpu')) {
-          // Immediately close in-app browser
-          Browser.close().catch(() => {});
-
-          const queryStartIndex = rawUrl.indexOf('?');
-          const hashStartIndex = rawUrl.indexOf('#');
-          let queryAndHash = '';
-          if (queryStartIndex !== -1) {
-            queryAndHash = rawUrl.substring(queryStartIndex);
-          } else if (hashStartIndex !== -1) {
-            queryAndHash = rawUrl.substring(hashStartIndex);
-          }
-          const targetUrl = '/callback' + queryAndHash;
-          console.log('[Helpu Native] Routing OAuth callback to:', targetUrl);
-          window.history.replaceState({}, '', targetUrl);
           if (navigate) {
-            navigate(targetUrl, { replace: true });
+            navigate('/home', { replace: true });
           }
           return;
         }
 
         const parsedUrl = new URL(event.url);
-        const search = parsedUrl.search || '';
-        const hash = parsedUrl.hash || '';
         const pathname = parsedUrl.pathname || '/home';
-
-        if (search && search.includes('__clerk_handshake')) {
-          console.log('[Helpu Native] Handshake query param detected in deep link URL.');
-          window.history.replaceState({}, '', pathname + search + hash);
-          if (navigate) {
-            navigate(pathname + search, { replace: true });
-          }
-        } else if (navigate) {
-          navigate(pathname || '/home');
+        if (navigate) {
+          navigate(pathname);
         }
       } catch (e) {
         console.warn('[Helpu Native] Error parsing appUrlOpen URL:', e);
@@ -150,22 +129,12 @@ export function initMobileNativeBridge({ navigate }) {
     console.warn('[Helpu Native] appUrlOpen listener warning:', err);
   }
 
-  // 7. App resume & state change listener (re-evaluates auth when returning from external browser)
+  // 7. App resume & state change listener
   let stateChangeRemove = null;
   try {
     CapApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
         console.log('[Helpu Native] App resumed to foreground.');
-        try {
-          const authPaths = ['/auth', '/login', '/signup', '/'];
-          if (authPaths.includes(window.location.pathname) && (window.Clerk?.session || window.Clerk?.user)) {
-            console.log('[Helpu Native] Active Clerk session on resume, navigating to /home');
-            Browser.close().catch(() => {});
-            if (navigate) {
-              navigate('/home', { replace: true });
-            }
-          }
-        } catch (_) {}
       }
     }).then((l) => { stateChangeRemove = () => l.remove(); });
   } catch (err) {

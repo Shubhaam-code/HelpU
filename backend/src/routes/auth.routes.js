@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * @route   GET /api/auth/me
- * @desc    Get currently authenticated Clerk user ID
+ * @desc    Get currently authenticated canonical user ID
  * @access  Protected
  */
 router.get('/me', requireAuth, (req, res) => {
