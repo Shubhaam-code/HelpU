@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, useSignIn, useSignUp, SignIn, SignUp } from '@clerk/clerk-react';
 import { ArrowLeft, ShieldCheck, Sparkles, Car } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { useAuthProfile } from '../context/AuthProfileContext';
 
 export default function AuthPage({ initialMode = 'signIn' }) {
@@ -25,16 +26,44 @@ export default function AuthPage({ initialMode = 'signIn' }) {
   const handleNativeGoogleAuth = async () => {
     try {
       setIsGoogleLoading(true);
-      if (mode === 'signUp') {
-        if (!signUp || !isSignUpLoaded) return;
-        await signUp.authenticateWithRedirect({
-          strategy: 'oauth_google',
-          redirectUrl: 'https://helpu.vercel.app/oauth-callback',
-          redirectUrlComplete: 'https://helpu.vercel.app/oauth-callback',
+
+      const target = mode === 'signUp' ? signUp : signIn;
+      if (!target) return;
+
+      // Create OAuth attempt and get direct verification URL
+      const res = await target.create({
+        strategy: 'oauth_google',
+        redirectUrl: 'https://helpu.vercel.app/oauth-callback',
+        actionCompleteRedirectUrl: 'https://helpu.vercel.app/oauth-callback',
+      });
+
+      const verificationUrl =
+        res?.firstFactorVerification?.externalVerificationRedirectURL ||
+        res?.verifications?.externalAccount?.externalVerificationRedirectURL;
+
+      if (verificationUrl) {
+        try {
+          await Browser.removeAllListeners();
+        } catch (_) {}
+
+        Browser.addListener('browserFinished', () => {
+          setIsGoogleLoading(false);
+          // If in-app browser is closed or finishes, auto-transition if session active
+          setTimeout(() => {
+            if (window.Clerk?.session || window.Clerk?.user) {
+              navigate('/home', { replace: true });
+            }
+          }, 300);
+        }).catch(() => {});
+
+        // Open in sleek In-App Chrome Custom Tab inside Helpu App
+        await Browser.open({
+          url: verificationUrl.toString(),
+          toolbarColor: '#FFF8F3',
         });
       } else {
-        if (!signIn || !isSignInLoaded) return;
-        await signIn.authenticateWithRedirect({
+        // Fallback to authenticateWithRedirect
+        await target.authenticateWithRedirect({
           strategy: 'oauth_google',
           redirectUrl: 'https://helpu.vercel.app/oauth-callback',
           redirectUrlComplete: 'https://helpu.vercel.app/oauth-callback',

@@ -3,6 +3,7 @@ import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Keyboard } from '@capacitor/keyboard';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { Browser } from '@capacitor/browser';
 import { initPushNotifications } from './pushNotifications';
 
 /**
@@ -106,7 +107,10 @@ export function initMobileNativeBridge({ navigate }) {
         const rawUrl = event.url;
 
         // Custom scheme OAuth callback from Clerk (e.g. com.helpu.app://callback?...)
-        if (rawUrl.startsWith('com.helpu.app://callback') || rawUrl.startsWith('helpu://callback')) {
+        if (rawUrl.startsWith('com.helpu.app') || rawUrl.startsWith('helpu')) {
+          // Immediately close in-app browser
+          Browser.close().catch(() => {});
+
           const queryStartIndex = rawUrl.indexOf('?');
           const hashStartIndex = rawUrl.indexOf('#');
           let queryAndHash = '';
@@ -156,6 +160,7 @@ export function initMobileNativeBridge({ navigate }) {
           const authPaths = ['/auth', '/login', '/signup', '/'];
           if (authPaths.includes(window.location.pathname) && (window.Clerk?.session || window.Clerk?.user)) {
             console.log('[Helpu Native] Active Clerk session on resume, navigating to /home');
+            Browser.close().catch(() => {});
             if (navigate) {
               navigate('/home', { replace: true });
             }
