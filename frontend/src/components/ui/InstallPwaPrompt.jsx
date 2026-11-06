@@ -5,11 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { usePwaInstall } from '../../pwa/usePwaInstall';
 
 export function InstallPwaPrompt() {
-  // If running inside native iOS/Android Capacitor app, never show PWA install prompt
-  if (Capacitor.isNativePlatform()) {
-    return null;
-  }
-
+  // Always call hooks first, before any conditional returns
   const { isInstallable, isInstalled, isIOS, installApp } = usePwaInstall();
   const [dismissed, setDismissed] = useState(false);
   const [showIosModal, setShowIosModal] = useState(false);
@@ -34,6 +30,11 @@ export function InstallPwaPrompt() {
     window.addEventListener('pwa-prompt-install', handleTrigger);
     return () => window.removeEventListener('pwa-prompt-install', handleTrigger);
   }, [isInstallable, isIOS, isInstalled, installApp]);
+
+  // If running inside native iOS/Android Capacitor app, never show PWA install prompt
+  if (Capacitor.isNativePlatform()) {
+    return null;
+  }
 
   if (isInstalled || dismissed) {
     return (
