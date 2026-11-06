@@ -3,6 +3,7 @@ import Outbox from '../models/Outbox.js';
 import Notification from '../models/Notification.js';
 import { formatNotificationContent } from '../jobs/notification.jobs.js';
 import { emitRealtimeNotification } from './socket.service.js';
+import { sendPushToUser } from './fcm.service.js';
 import { addNotificationJob } from '../queues/notification.queue.js';
 import { hasRedisConfigured } from '../config/redis.js';
 
@@ -127,7 +128,45 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
         createdAt: notificationDoc?.createdAt || new Date()
       });
 
-      // 3. If Redis is configured, also enqueue into BullMQ for background reminder scheduling
+      // 3. Native Mobile FCM Push Notification (idempotent, isolated, non-blocking)
+      if (!event.pushSentAt) {
+        try {
+          const pushPayloadData = {
+            notificationId: notificationDoc?._id ? String(notificationDoc._id) : '',
+            eventId: event.eventId,
+            type: event.eventType,
+            bookingId: event.relatedBookingId ? String(event.relatedBookingId) : '',
+            travelId: event.relatedTravelId ? String(event.relatedTravelId) : '',
+            route: event.relatedBookingId
+              ? `/bookings/${event.relatedBookingId}`
+              : (event.relatedTravelId ? `/rides/${event.relatedTravelId}` : '/notifications')
+          };
+
+          const pushResult = await sendPushToUser(
+            event.recipientId,
+            {
+              title,
+              body: message
+            },
+            pushPayloadData
+          );
+
+          if (!pushResult.skipped) {
+            // Atomically record push dispatch time to prevent duplicates on outbox retries
+            await Outbox.updateOne(
+              { _id: event._id },
+              { $set: { pushSentAt: new Date() } }
+            );
+          }
+        } catch (pushErr) {
+          // FCM failure must never roll back committed transactions or break in-app notifications
+          console.warn(`[Outbox] Non-fatal push delivery error for event ${event.eventId}:`, pushErr.message);
+        }
+      } else {
+        console.log(`[Outbox] Push notification already sent for event ${event.eventId}. Skipping duplicate push.`);
+      }
+
+      // 4. If Redis is configured, also enqueue into BullMQ for background reminder scheduling
       if (hasRedisConfigured()) {
         try {
           await addNotificationJob(
