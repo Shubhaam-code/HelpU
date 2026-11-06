@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../../context/FirebaseAuthContext';
 import { getProfile } from '../../lib/api';
 
 /**

@@ -4,8 +4,16 @@ const studentSchema = new mongoose.Schema(
   {
     clerkId: {
       type: String,
-      required: true,
       unique: true,
+      trim: true,
+      default: function () {
+        return this.firebaseUid ? `firebase_${this.firebaseUid}` : undefined;
+      }
+    },
+    firebaseUid: {
+      type: String,
+      unique: true,
+      sparse: true,
       trim: true
     },
     name: {

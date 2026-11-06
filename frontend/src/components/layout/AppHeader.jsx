@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Bell, ArrowLeft } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../../context/FirebaseAuthContext';
 import { Avatar } from '../ui/Avatar';
 
 export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 0, showLogo = false }) {

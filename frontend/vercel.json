@@ -1,17 +1,15 @@
 {
-  "cleanUrls": true,
-  "rewrites": [
+  "routes": [
     {
-      "source": "/oauth-callback",
-      "destination": "/oauth-callback.html"
+      "src": "/oauth-callback.*",
+      "dest": "/oauth-callback.html"
     },
     {
-      "source": "/oauth-callback/(.*)",
-      "destination": "/oauth-callback.html"
+      "handle": "filesystem"
     },
     {
-      "source": "/((?!oauth-callback|assets|pwa|manifest|favicon|logo).*|$)",
-      "destination": "/index.html"
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }

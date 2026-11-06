@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, FileText, Calendar, Download
 } from 'lucide-react';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useClerk } from '../../context/FirebaseAuthContext';
 import { Avatar } from '../ui/Avatar';
 import { getUnreadCount } from '../../lib/api';
 

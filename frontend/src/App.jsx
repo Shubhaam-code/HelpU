@@ -1,6 +1,7 @@
 import React, { Component, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, useUser, SignedIn, SignedOut, SignIn, AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
+import { AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
+import { useAuth, useUser } from './context/FirebaseAuthContext';
 import { AnimatePresence } from 'framer-motion';
 
 import { setTokenGetter, getProfile, saveProfile } from './lib/api';

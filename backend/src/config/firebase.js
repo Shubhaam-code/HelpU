@@ -1,11 +1,13 @@
 import { initializeApp, getApps, getApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
+import { getAuth } from 'firebase-admin/auth';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 let firebaseAdminApp = null;
 let isConfigured = false;
+let mockAuthInstance = null;
 
 /**
  * Parses raw service account credential string from env
@@ -183,16 +185,46 @@ export function getFirebaseMessaging() {
 }
 
 /**
+ * Testing helper to inject a mock auth instance
+ */
+export function setMockAuth(mock) {
+  mockAuthInstance = mock;
+}
+
+/**
+ * Resets testing mock auth instance
+ */
+export function resetMockAuth() {
+  mockAuthInstance = null;
+}
+
+/**
+ * Returns Firebase Auth instance, or null if unconfigured
+ */
+export function getFirebaseAuth() {
+  if (mockAuthInstance) return mockAuthInstance;
+  const app = getFirebaseAdmin();
+  if (!app) return null;
+  try {
+    return getAuth(app);
+  } catch (err) {
+    console.warn('[FirebaseAdmin] Error getting Firebase Auth service:', err.message);
+    return null;
+  }
+}
+
+/**
  * Returns true if Firebase Admin SDK is successfully authenticated and configured
  */
 export function isFirebaseConfigured() {
-  if (mockMessagingInstance) return true;
+  if (mockMessagingInstance || mockAuthInstance) return true;
   return isConfigured && Boolean(firebaseAdminApp);
 }
 
 export default {
   initFirebaseAdmin,
   getFirebaseAdmin,
+  getFirebaseAuth,
   getFirebaseMessaging,
   isFirebaseConfigured
 };

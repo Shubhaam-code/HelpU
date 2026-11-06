@@ -13,7 +13,11 @@ const router = express.Router();
 router.get('/profile', requireAuth, async (req, res) => {
   try {
     const clerkId = req.userId;
-    const student = await Student.findOne({ clerkId });
+    const student = await Student.findOne(
+      req.firebaseUid
+        ? { $or: [{ clerkId }, { firebaseUid: req.firebaseUid }] }
+        : { clerkId }
+    );
 
     if (!student) {
       return res.status(200).json({
@@ -21,6 +25,12 @@ router.get('/profile', requireAuth, async (req, res) => {
         data: null,
         message: 'Profile not created yet'
       });
+    }
+
+    // Ensure firebaseUid is persisted if user authenticated via Firebase
+    if (req.firebaseUid && !student.firebaseUid) {
+      student.firebaseUid = req.firebaseUid;
+      await Student.updateOne({ _id: student._id }, { $set: { firebaseUid: req.firebaseUid } });
     }
 
     // Auto-heal and sync phone and whatsappNumber for seamless backward compatibility
@@ -63,7 +73,11 @@ async function handleSaveProfile(req, res) {
     const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio } = req.body;
 
     // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
-    const existing = await Student.findOne({ clerkId });
+    const existing = await Student.findOne(
+      req.firebaseUid
+        ? { $or: [{ clerkId }, { firebaseUid: req.firebaseUid }] }
+        : { clerkId }
+    );
 
     const finalName = (name && typeof name === 'string' && name.trim()) ? name.trim() : existing?.name;
     const finalEmail = (email && typeof email === 'string' && email.trim()) ? email.trim().toLowerCase() : existing?.email;
@@ -115,6 +129,10 @@ async function handleSaveProfile(req, res) {
       updateData.imageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : '';
     }
 
+    if (req.firebaseUid) {
+      updateData.firebaseUid = req.firebaseUid;
+    }
+
     // Canonical WhatsApp / Phone Number Resolution:
     // Accept either whatsappNumber or phone, prioritizing whatsappNumber if both are supplied.
     // Keeps both fields in MongoDB 100% synchronized for seamless persistence and compatibility.
@@ -161,7 +179,7 @@ async function handleSaveProfile(req, res) {
     }
 
     const student = await Student.findOneAndUpdate(
-      { clerkId },
+      existing ? { _id: existing._id } : { clerkId },
       {
         $set: updateData,
         $setOnInsert: { clerkId }

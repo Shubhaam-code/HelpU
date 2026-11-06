@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useUser, useAuth } from '@clerk/clerk-react';
+import { useUser, useAuth } from './FirebaseAuthContext';
 import { getProfile, saveProfile, setTokenGetter } from '../lib/api';
 
 const AuthProfileContext = createContext(null);

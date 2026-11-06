@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { FirebaseAuthProvider } from './context/FirebaseAuthContext';
 import './index.css';
 import App from './App.jsx';
 import { registerServiceWorker } from './pwa/registerServiceWorker';
@@ -25,9 +26,11 @@ createRoot(document.getElementById('root')).render(
       allowedRedirectProtocols={['com.helpu.app', 'helpu']}
       allowedRedirectOrigins={['https://helpu.vercel.app']}
     >
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <FirebaseAuthProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </FirebaseAuthProvider>
     </ClerkProvider>
   </StrictMode>
 );
