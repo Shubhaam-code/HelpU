@@ -1,4 +1,5 @@
 {
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/oauth-callback",
@@ -9,7 +10,7 @@
       "destination": "/oauth-callback.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!oauth-callback|assets|pwa|manifest|favicon|logo).*|$)",
       "destination": "/index.html"
     }
   ]
