@@ -33,6 +33,9 @@ import StaticInfoPage from './pages/StaticInfoPage';
 // PWA Utilities & Banners
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
+import { InAppNotificationBanner } from './components/ui/InAppNotificationBanner';
+import { initMobileNativeBridge } from './mobile/mobileBridge';
+import { syncDeviceTokenWithBackend, unregisterDeviceTokenFromBackend } from './mobile/pushNotifications';
 
 // Top-level Error Boundary to catch any child component crashes
 class ErrorBoundary extends Component {
@@ -83,14 +86,28 @@ class ErrorBoundary extends Component {
   }
 }
 
-// Token injector & Profile picture auto-synchronization
+// Token injector & Profile picture auto-synchronization + FCM Token sync
 function TokenInjector() {
   const { getToken } = useAuth();
   const { user, isLoaded, isSignedIn } = useUser();
+  const previousUserIdRef = React.useRef(null);
 
   useEffect(() => {
     setTokenGetter(getToken);
   }, [getToken]);
+
+  // Synchronize FCM device push token with backend on login, refresh, or account switch
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (isSignedIn && user?.id) {
+      previousUserIdRef.current = user.id;
+      syncDeviceTokenWithBackend(user);
+    } else if (!isSignedIn && previousUserIdRef.current) {
+      previousUserIdRef.current = null;
+      unregisterDeviceTokenFromBackend();
+    }
+  }, [isLoaded, isSignedIn, user]);
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
@@ -120,6 +137,18 @@ function TokenInjector() {
         .catch(() => {});
     }
   }, [isLoaded, isSignedIn, user]);
+
+  return null;
+}
+
+// Native mobile runtime bridge initializer (Status Bar, Back Button, Keyboard, Push Notifications)
+function MobileBridgeInitializer() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const cleanup = initMobileNativeBridge({ navigate });
+    return cleanup;
+  }, [navigate]);
 
   return null;
 }
@@ -178,8 +207,10 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProfileProvider>
+        <MobileBridgeInitializer />
         <OfflineBanner />
         <InstallPwaPrompt />
+        <InAppNotificationBanner />
         <TokenInjector />
         <Routes>
           {/* Public Landing & Authentication */}

@@ -9,6 +9,8 @@ import { registerServiceWorker } from './pwa/registerServiceWorker';
 // Register PWA service worker
 registerServiceWorker();
 
+console.log('[HelpuPush] 0. Web app mounted inside Capacitor WebView.');
+
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!PUBLISHABLE_KEY) {

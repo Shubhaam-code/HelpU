@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, X, Share, PlusSquare, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { usePwaInstall } from '../../pwa/usePwaInstall';
 
 export function InstallPwaPrompt() {
+  // If running inside native iOS/Android Capacitor app, never show PWA install prompt
+  if (Capacitor.isNativePlatform()) {
+    return null;
+  }
+
   const { isInstallable, isInstalled, isIOS, installApp } = usePwaInstall();
   const [dismissed, setDismissed] = useState(false);
   const [showIosModal, setShowIosModal] = useState(false);
