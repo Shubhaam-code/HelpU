@@ -4,4 +4,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    dedupe: ['firebase', '@firebase/app', '@firebase/auth', '@firebase/component', '@firebase/util']
+  }
 });
