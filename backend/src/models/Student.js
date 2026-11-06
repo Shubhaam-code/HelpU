@@ -66,9 +66,16 @@ const studentSchema = new mongoose.Schema(
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
+
+// Virtual alias: userId resolves to the canonical user ID (stored in clerkId)
+studentSchema.virtual('userId').get(function () {
+  return this.clerkId;
+});
 
 // Guarantee that phone and whatsappNumber are always 100% synchronized in MongoDB
 function syncPhoneFields(obj) {

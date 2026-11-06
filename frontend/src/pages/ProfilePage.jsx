@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUser, useClerk } from '../context/FirebaseAuthContext';
+import { useUser, useFirebaseAuth } from '../context/FirebaseAuthContext';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import {
   Calendar, Car, Heart, HelpCircle, ChevronRight, LogOut,
@@ -28,7 +28,7 @@ const COUNTRIES = [
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useFirebaseAuth();
   const { setWhatsAppNumber: setContextWhatsAppNumber } = useAuthProfile();
 
   // Data states
