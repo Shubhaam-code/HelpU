@@ -56,6 +56,10 @@ const outboxSchema = new mongoose.Schema(
     },
     processedAt: {
       type: Date
+    },
+    pushSentAt: {
+      type: Date,
+      default: null
     }
   },
   {
