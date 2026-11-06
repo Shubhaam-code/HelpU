@@ -5,6 +5,7 @@ import { NOTIFICATION_JOB_TYPES, formatNotificationContent } from '../jobs/notif
 import Notification from '../models/Notification.js';
 import Booking from '../models/Booking.js';
 import Travel from '../models/Travel.js';
+import { sendPushToUser } from '../services/fcm.service.js';
 import {
   scheduleBookingReminders,
   cancelBookingReminders,
@@ -184,6 +185,21 @@ export async function processNotificationJob(job) {
       );
 
       console.log(`[Worker] ${reminderType} reminder delivered to passenger ${booking.passengerId} and owner ${booking.ownerId}`);
+
+      // Deliver push reminders via FCM (non-blocking, safe)
+      try {
+        const reminderData = {
+          type: name,
+          bookingId: String(booking._id),
+          travelId: String(travel._id),
+          route: `/bookings/${booking._id}`
+        };
+        await sendPushToUser(booking.passengerId, { title, body: message }, reminderData);
+        await sendPushToUser(booking.ownerId, { title, body: message }, reminderData);
+      } catch (pushErr) {
+        console.warn(`[Worker] Push delivery failed for reminder ${id}:`, pushErr.message);
+      }
+
       return {
         success: true,
         type: name,
