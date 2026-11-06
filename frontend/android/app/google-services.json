@@ -12,7 +12,20 @@
           "package_name": "com.helpu.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "198271068048-2cedujari6403tatiram62d2fp27omsp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.helpu.app",
+            "certificate_hash": "780d3fe38a05b4c2444b1634829b3dbf3b21015d"
+          }
+        },
+        {
+          "client_id": "198271068048-gmhhiajq3hquvmuuce0oj6fuc2japl0a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAc5CAc65-Fme5p6ViBIiKNr_Qk3EnPtMs"
@@ -20,11 +33,15 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "198271068048-gmhhiajq3hquvmuuce0oj6fuc2japl0a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
   ],
   "configuration_version": "1"
 }
-

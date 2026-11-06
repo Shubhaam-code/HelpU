@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import { 
   Car, Users, ShieldCheck, Coins, ArrowRight, Play, Award, Star
