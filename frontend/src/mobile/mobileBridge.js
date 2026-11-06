@@ -95,11 +95,60 @@ export function initMobileNativeBridge({ navigate }) {
     console.warn('[Helpu Native] Push notification bridge error:', err);
   });
 
+  // 6. Deep link listener (OAuth & custom scheme callbacks)
+  let appUrlRemove = null;
+  try {
+    CapApp.addListener('appUrlOpen', (event) => {
+      console.log('[Helpu Native] appUrlOpen received:', event.url);
+      if (!event?.url) return;
+
+      try {
+        const parsedUrl = new URL(event.url);
+        const search = parsedUrl.search;
+        const hash = parsedUrl.hash;
+        const pathname = parsedUrl.pathname || '/home';
+
+        if (search && search.includes('__clerk_handshake')) {
+          console.log('[Helpu Native] Handshake query param detected in deep link URL.');
+          window.history.replaceState({}, '', pathname + search + hash);
+          if (navigate) {
+            navigate(pathname + search, { replace: true });
+          }
+        } else if (navigate) {
+          navigate(pathname || '/home');
+        }
+      } catch (e) {
+        console.warn('[Helpu Native] Error parsing appUrlOpen URL:', e);
+      }
+    }).then((l) => { appUrlRemove = () => l.remove(); });
+  } catch (err) {
+    console.warn('[Helpu Native] appUrlOpen listener warning:', err);
+  }
+
+  // 7. App resume & state change listener (re-evaluates auth when returning from external browser)
+  let stateChangeRemove = null;
+  try {
+    CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        console.log('[Helpu Native] App resumed to foreground.');
+        try {
+          if (window.Clerk?.client?.sessions?.length) {
+            console.log('[Helpu Native] Active Clerk session detected on resume.');
+          }
+        } catch (_) {}
+      }
+    }).then((l) => { stateChangeRemove = () => l.remove(); });
+  } catch (err) {
+    console.warn('[Helpu Native] appStateChange listener warning:', err);
+  }
+
   return () => {
     if (backListenerRemove) backListenerRemove();
     if (kbShowRemove) kbShowRemove();
     if (kbHideRemove) kbHideRemove();
     if (pushCleanup) pushCleanup();
+    if (appUrlRemove) appUrlRemove();
+    if (stateChangeRemove) stateChangeRemove();
   };
 }
 

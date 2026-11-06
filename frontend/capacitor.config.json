@@ -9,8 +9,12 @@
     "allowNavigation": [
       "*.clerk.accounts.dev",
       "clerk.accounts.dev",
+      "*.accounts.dev",
+      "accounts.dev",
       "*.clerk.com",
-      "clerk.com"
+      "clerk.com",
+      "challenges.cloudflare.com",
+      "*.cloudflare.com"
     ]
   },
   "plugins": {
