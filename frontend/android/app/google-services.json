@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "198271068048",
+    "project_id": "helpu-bae0b",
+    "storage_bucket": "helpu-bae0b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:198271068048:android:eaa198fcc09406831d3515",
+        "android_client_info": {
+          "package_name": "com.helpu.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAc5CAc65-Fme5p6ViBIiKNr_Qk3EnPtMs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
