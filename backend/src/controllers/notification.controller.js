@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Notification from '../models/Notification.js';
+import DeviceToken from '../models/DeviceToken.js';
 
 /**
  * @route   GET /api/notifications
@@ -151,3 +152,127 @@ export async function markAllNotificationsAsRead(req, res) {
     });
   }
 }
+
+/**
+ * @route   POST /api/notifications/fcm-token
+ * @desc    Register or update device FCM token for authenticated user
+ * @access  Protected
+ */
+export async function registerDeviceToken(req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user identity'
+      });
+    }
+
+    const { token, platform } = req.body || {};
+
+    // Validate token
+    if (!token || typeof token !== 'string' || token.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid FCM registration token. Token must be a non-empty string of at least 10 characters.'
+      });
+    }
+
+    const cleanToken = token.trim();
+    const tokenPrefix = cleanToken.slice(0, 8) + '...';
+
+    // Validate platform
+    const validPlatforms = ['android', 'ios', 'web'];
+    const chosenPlatform = (platform && typeof platform === 'string' && validPlatforms.includes(platform.toLowerCase().trim()))
+      ? platform.toLowerCase().trim()
+      : 'android';
+
+    // Atomically upsert token.
+    // If device switched users, updates userId ownership safely.
+    const record = await DeviceToken.findOneAndUpdate(
+      { token: cleanToken },
+      {
+        $set: {
+          userId,
+          platform: chosenPlatform,
+          lastSeenAt: new Date()
+        }
+      },
+      {
+        upsert: true,
+        returnDocument: 'after',
+        runValidators: true,
+        setDefaultsOnInsert: true
+      }
+    );
+
+    console.log(`[HelpuPush] Registered device token prefix ${tokenPrefix} for user ${userId} (${chosenPlatform})`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Device token registered successfully',
+      data: {
+        platform: record.platform,
+        lastSeenAt: record.lastSeenAt
+      }
+    });
+  } catch (error) {
+    console.error('Error in registerDeviceToken:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while registering device token',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * @route   DELETE /api/notifications/fcm-token
+ * @desc    Unregister device FCM token for authenticated user
+ * @access  Protected
+ */
+export async function unregisterDeviceToken(req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user identity'
+      });
+    }
+
+    const token = req.body?.token || req.query?.token;
+
+    if (!token || typeof token !== 'string' || token.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token is required to unregister device'
+      });
+    }
+
+    const cleanToken = token.trim();
+    const tokenPrefix = cleanToken.slice(0, 8) + '...';
+
+    // Only allow unregistering token belonging to this authenticated user
+    const result = await DeviceToken.deleteOne({
+      token: cleanToken,
+      userId
+    });
+
+    console.log(`[HelpuPush] Unregistered device token prefix ${tokenPrefix} for user ${userId} (deleted: ${result.deletedCount > 0})`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Device token unregistered successfully',
+      deleted: result.deletedCount > 0
+    });
+  } catch (error) {
+    console.error('Error in unregisterDeviceToken:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while unregistering device token',
+      error: error.message
+    });
+  }
+}
+
