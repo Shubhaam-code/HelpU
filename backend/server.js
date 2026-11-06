@@ -3,12 +3,16 @@ dotenv.config();
 
 import app from './src/app.js';
 import connectDB from './src/config/db.js';
+import { initFirebaseAdmin } from './src/config/firebase.js';
 
 import mongoose from 'mongoose';
 import { closeNotificationQueue } from './src/queues/notification.queue.js';
 import { startOutboxProcessor, stopOutboxProcessor } from './src/services/outbox.service.js';
 
 const PORT = process.env.PORT || 5000;
+
+// Initialize Firebase Admin SDK safely
+initFirebaseAdmin();
 
 // Connect to Database
 connectDB().then(() => {
