@@ -136,6 +136,10 @@ export const getNotifications = (params) => apiClient.get('/api/notifications', 
 export const getUnreadCount = () => apiClient.get('/api/notifications/unread-count');
 export const markRead = (id) => apiClient.patch(`/api/notifications/${id}/read`);
 export const markAllRead = () => apiClient.patch('/api/notifications/read-all');
+export const registerFcmToken = (token, platform = 'android') =>
+  apiClient.post('/api/notifications/fcm-token', { token, platform });
+export const unregisterFcmToken = (token) =>
+  apiClient.delete('/api/notifications/fcm-token', { data: { token } });
 
 // ── Community ─────────────────────────────────────────────────────────────────
 export const getCommunityPosts = (params) => apiClient.get('/api/community/posts', { params });
