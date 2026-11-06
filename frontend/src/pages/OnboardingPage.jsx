@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useUser, SignIn, SignUp } from '@clerk/clerk-react';
+import { useUser } from '../context/FirebaseAuthContext';
 import { 
-  Car, Users, ShieldCheck, Coins, ArrowRight, X, Play, Award, Star
+  Car, Users, ShieldCheck, Coins, ArrowRight, Play, Award, Star
 } from 'lucide-react';
 
 // 3 decorative accent sparks \ | / matching reference image
@@ -22,9 +21,6 @@ export default function OnboardingPage() {
   const { isSignedIn, isLoaded } = useUser();
   const navigate = useNavigate();
 
-  // Auth modal states: null | 'signIn' | 'signUp'
-  const [authModal, setAuthModal] = useState(null);
-
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       navigate('/home', { replace: true });
@@ -33,10 +29,6 @@ export default function OnboardingPage() {
 
   const openAuth = (mode = 'signUp') => {
     navigate(`/auth?mode=${mode}`);
-  };
-
-  const closeAuth = () => {
-    setAuthModal(null);
   };
 
   const scrollToSection = (id) => {
@@ -395,120 +387,6 @@ export default function OnboardingPage() {
           </div>
         </div>
       </footer>
-
-
-      {/* ========================================================================= */}
-      {/* 6. CLERK AUTHENTICATION MODAL                                             */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {authModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeAuth}
-              className="absolute inset-0 bg-[#17233C]/60 backdrop-blur-sm"
-            />
-
-            {/* Modal Dialog Card */}
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-[#F4E3D8] p-6 sm:p-8 z-10 overflow-hidden"
-            >
-              {/* Close Button */}
-              <button
-                onClick={closeAuth}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#FEF3EF] hover:bg-gray-100 text-[#17233C] flex items-center justify-center transition-colors cursor-pointer"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              {/* Modal Brand Header */}
-              <div className="flex items-center gap-2.5 mb-4">
-                <img 
-                  src="/logo.png" 
-                  alt="Helpu" 
-                  className="h-9 w-auto object-contain"
-                />
-              </div>
-
-              {/* Toggle Tabs: Sign In / Sign Up */}
-              <div className="flex bg-[#FEF3EF] rounded-2xl p-1 mb-6 border border-[#F4E3D8]">
-                <button
-                  onClick={() => setAuthModal('signIn')}
-                  className={`flex-1 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                    authModal === 'signIn'
-                      ? 'bg-white text-[#17233C] shadow-xs'
-                      : 'text-[#6E7587] hover:text-[#17233C]'
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => setAuthModal('signUp')}
-                  className={`flex-1 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                    authModal === 'signUp'
-                      ? 'bg-white text-[#17233C] shadow-xs'
-                      : 'text-[#6E7587] hover:text-[#17233C]'
-                  }`}
-                >
-                  Create Account
-                </button>
-              </div>
-
-              {/* Clerk Auth Component */}
-              <div className="w-full">
-                {authModal === 'signIn' ? (
-                  <SignIn
-                    routing="hash"
-                    appearance={{
-                      elements: {
-                        rootBox: 'w-full',
-                        card: 'shadow-none border-none p-0 bg-transparent',
-                        headerTitle: 'font-extrabold text-[#17233C] text-xl',
-                        headerSubtitle: 'text-[#6E7587] text-xs',
-                        formButtonPrimary: 'bg-[#FF5B37] hover:bg-[#F04F2B] text-white rounded-2xl font-bold py-3 text-sm shadow-sm shadow-[#FF5B37]/30',
-                        socialButtonsBlockButton: 'border border-gray-200 rounded-2xl font-semibold text-[#17233C] hover:bg-[#FEF3EF]',
-                        formFieldInput: 'rounded-2xl border-gray-200 focus:border-[#FF5B37] focus:ring-[#FF5B37]/20 text-[#17233C] text-sm',
-                        footer: 'hidden',
-                      },
-                    }}
-                  />
-                ) : (
-                  <SignUp
-                    routing="hash"
-                    appearance={{
-                      elements: {
-                        rootBox: 'w-full',
-                        card: 'shadow-none border-none p-0 bg-transparent',
-                        headerTitle: 'font-extrabold text-[#17233C] text-xl',
-                        headerSubtitle: 'text-[#6E7587] text-xs',
-                        formButtonPrimary: 'bg-[#FF5B37] hover:bg-[#F04F2B] text-white rounded-2xl font-bold py-3 text-sm shadow-sm shadow-[#FF5B37]/30',
-                        socialButtonsBlockButton: 'border border-gray-200 rounded-2xl font-semibold text-[#17233C] hover:bg-[#FEF3EF]',
-                        formFieldInput: 'rounded-2xl border-gray-200 focus:border-[#FF5B37] focus:ring-[#FF5B37]/20 text-[#17233C] text-sm',
-                        footer: 'hidden',
-                      },
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Note */}
-              <p className="text-center text-[11px] text-[#6E7587] mt-5">
-                Campus-verified platform. Only verified students are allowed.
-              </p>
-            </motion.div>
-
-          </div>
-        )}
-      </AnimatePresence>
 
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useClerk } from '../context/FirebaseAuthContext';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import {
   Calendar, Car, Heart, HelpCircle, ChevronRight, LogOut,

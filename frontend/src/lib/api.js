@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { auth } from './firebase';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -16,17 +17,22 @@ export const setTokenGetter = (fn) => {
   _getToken = fn;
 };
 
-// Request interceptor: attach Clerk token
+// Request interceptor: attach Firebase Auth ID token
 apiClient.interceptors.request.use(async (config) => {
-  if (_getToken) {
-    try {
-      const token = await _getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (e) {
-      console.warn('[API] Could not get auth token:', e.message);
+  try {
+    let token = null;
+    if (_getToken) {
+      token = await _getToken();
     }
+    // Direct fallback: obtain fresh token from Firebase Auth currentUser
+    if (!token && auth?.currentUser) {
+      token = await auth.currentUser.getIdToken(false);
+    }
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (e) {
+    console.warn('[API] Could not get auth token:', e.message);
   }
   return config;
 });

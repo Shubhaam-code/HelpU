@@ -94,15 +94,28 @@ export function initFirebaseAdmin() {
 
   // Strategy 3: Standard default service account file location
   if (!credentials) {
-    const defaultLocalPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-    if (fs.existsSync(defaultLocalPath)) {
-      try {
-        const fileContent = fs.readFileSync(defaultLocalPath, 'utf-8');
-        credentials = JSON.parse(fileContent);
-        console.log('[FirebaseAdmin] Loaded credentials from default local ./serviceAccountKey.json');
-      } catch (err) {
-        console.warn('[FirebaseAdmin] Error reading default local serviceAccountKey.json:', err.message);
+    const defaultFilenames = ['firebase-service-account.json', 'serviceAccountKey.json'];
+    const searchDirs = [
+      process.cwd(),
+      path.resolve(process.cwd(), 'backend'),
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../')
+    ];
+
+    for (const filename of defaultFilenames) {
+      for (const dir of searchDirs) {
+        const candidatePath = path.resolve(dir, filename);
+        if (fs.existsSync(candidatePath)) {
+          try {
+            const fileContent = fs.readFileSync(candidatePath, 'utf-8');
+            credentials = JSON.parse(fileContent);
+            console.log(`[FirebaseAdmin] Loaded credentials from default local file: ${candidatePath}`);
+            break;
+          } catch (err) {
+            console.warn(`[FirebaseAdmin] Error reading credentials from ${candidatePath}:`, err.message);
+          }
+        }
       }
+      if (credentials) break;
     }
   }
 
@@ -120,7 +133,20 @@ export function initFirebaseAdmin() {
     }
   }
 
-  // Initialize if credentials found
+  // Strategy 5: Cloud Project Initialization without private cert (enables public key token verification)
+  if (!credentials) {
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'helpu-bae0b';
+    try {
+      firebaseAdminApp = initializeApp({ projectId });
+      isConfigured = true;
+      console.log(`[FirebaseAdmin] Initialized Firebase Admin with projectId: "${projectId}" (Auth token verification enabled).`);
+      return firebaseAdminApp;
+    } catch (projErr) {
+      console.warn('[FirebaseAdmin] Failed to initialize Firebase Admin with projectId:', projErr.message);
+    }
+  }
+
+  // Initialize with certificate credentials if found
   if (credentials) {
     try {
       firebaseAdminApp = initializeApp({

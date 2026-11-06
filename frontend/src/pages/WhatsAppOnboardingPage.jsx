@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ShieldCheck, ChevronDown, Check, Phone, Lock, Sparkles } from 'lucide-react';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../context/FirebaseAuthContext';
 import { saveProfile, updateProfile } from '../lib/api';
 import { useAuthProfile } from '../context/AuthProfileContext';
 
@@ -21,7 +21,7 @@ const COUNTRIES = [
 export default function WhatsAppOnboardingPage() {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { profile, setWhatsAppNumber } = useAuthProfile();
+  const { profile, setWhatsAppNumber, refreshProfile } = useAuthProfile();
 
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Default: India
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -83,8 +83,11 @@ export default function WhatsAppOnboardingPage() {
       // Call saveProfile which POSTs to /api/students/profile (ensures both phone and whatsappNumber are saved)
       await saveProfile(payload);
 
-      // Instantly update context profile state
+      // Instantly update context profile state and refresh from MongoDB
       setWhatsAppNumber(normalizedNumber);
+      if (refreshProfile) {
+        await refreshProfile().catch(() => {});
+      }
 
       // Smoothly direct to home page
       navigate('/home', { replace: true });

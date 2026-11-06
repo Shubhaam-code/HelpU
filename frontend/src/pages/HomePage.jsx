@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../context/FirebaseAuthContext';
 import { 
   Search, Car, Users, ArrowRight, Calendar, Clock, 
   ShieldCheck, Sparkles, ChevronRight, RefreshCw, AlertCircle
