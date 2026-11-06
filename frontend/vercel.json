@@ -5,6 +5,10 @@
       "destination": "/oauth-callback.html"
     },
     {
+      "source": "/oauth-callback/(.*)",
+      "destination": "/oauth-callback.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -46,14 +46,16 @@ export default function AuthPage({ initialMode = 'signIn' }) {
           await Browser.removeAllListeners();
         } catch (_) {}
 
-        Browser.addListener('browserFinished', () => {
+        Browser.addListener('browserFinished', async () => {
           setIsGoogleLoading(false);
-          // If in-app browser is closed or finishes, auto-transition if session active
-          setTimeout(() => {
+          try {
+            if (window.Clerk?.client?.reload) {
+              await window.Clerk.client.reload().catch(() => {});
+            }
             if (window.Clerk?.session || window.Clerk?.user) {
               navigate('/home', { replace: true });
             }
-          }, 300);
+          } catch (_) {}
         }).catch(() => {});
 
         // Open in sleek In-App Chrome Custom Tab inside Helpu App

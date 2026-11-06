@@ -10,40 +10,51 @@ export default function OAuthCallbackPage() {
     const search = window.location.search || '';
     const hash = window.location.hash || '';
 
-    // If already running inside native Capacitor app, route internally to /home
+    // If running inside native Capacitor app, route internally to /home
     if (Capacitor.isNativePlatform()) {
       navigate('/home' + search + hash, { replace: true });
       return;
     }
 
-    // Running in external browser (e.g. Chrome on Android after Google login)
-    // Deep-link back into the Helpu native app
-    const intentUrl = `intent://callback${search}${hash}#Intent;scheme=com.helpu.app;package=com.helpu.app;end`;
-    const appDeepLink = `com.helpu.app://callback${search}${hash}`;
-    const fallbackDeepLink = `helpu://callback${search}${hash}`;
+    // Running in external browser / Chrome Custom Tab:
+    const deepLink = `com.helpu.app://callback${search}${hash}`;
+    const intentUrl = `intent://callback${search}${hash}#Intent;scheme=com.helpu.app;package=com.helpu.app;end;`;
 
-    // Attempt automatic return to native app using Chrome Android Intent first, then custom scheme
+    // Safe non-destructive iframe launch
     try {
-      window.location.href = intentUrl;
-    } catch (_) {
-      try {
-        window.location.href = appDeepLink;
-      } catch (_) {}
-    }
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = deepLink;
+      document.body.appendChild(iframe);
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch (_) {}
+      }, 1200);
+    } catch (_) {}
 
-    // Fallback timer if browser doesn't automatically hand off
+    // Fallback intent launch attempt
     const timer = setTimeout(() => {
       try {
-        window.location.href = appDeepLink;
-      } catch (_) {}
-    }, 1200);
+        window.location.href = intentUrl;
+      } catch (_) {
+        window.location.href = deepLink;
+      }
+    }, 700);
 
     return () => clearTimeout(timer);
   }, [navigate]);
 
   const search = typeof window !== 'undefined' ? window.location.search || '' : '';
   const hash = typeof window !== 'undefined' ? window.location.hash || '' : '';
-  const appDeepLink = `com.helpu.app://callback${search}${hash}`;
+  const deepLink = `com.helpu.app://callback${search}${hash}`;
+  const intentUrl = `intent://callback${search}${hash}#Intent;scheme=com.helpu.app;package=com.helpu.app;end;`;
+
+  const handleLaunchClick = (e) => {
+    try {
+      window.location.href = intentUrl;
+    } catch (_) {
+      window.location.href = deepLink;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FFF7F2] text-[#17213D] flex flex-col items-center justify-center p-6 text-center">
@@ -53,15 +64,16 @@ export default function OAuthCallbackPage() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-black text-[#17213D]">Authentication Successful!</h1>
+          <h1 className="text-2xl font-black text-[#17213D]">Authentication Verified!</h1>
           <p className="text-sm text-[#6E7587] mt-2">
-            Returning to the Helpu app. If it doesn't open automatically, tap below.
+            Returning to the Helpu app. Tap below to continue:
           </p>
         </div>
 
         <a
-          href={appDeepLink}
-          className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-2xl bg-[#FF572E] text-white font-extrabold text-base shadow-md hover:bg-[#E64A22] transition-all cursor-pointer"
+          href={deepLink}
+          onClick={handleLaunchClick}
+          className="inline-flex items-center justify-center gap-2 w-full py-4 px-6 rounded-2xl bg-[#FF572E] text-white font-extrabold text-base shadow-md hover:bg-[#E64A22] active:scale-[0.98] transition-all cursor-pointer"
         >
           <span>Open Helpu App</span>
           <ArrowRight className="w-4 h-4" />
@@ -80,4 +92,3 @@ export default function OAuthCallbackPage() {
     </div>
   );
 }
-

@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')).render(
     <ClerkProvider 
       publishableKey={PUBLISHABLE_KEY} 
       afterSignOutUrl="/"
-      allowedRedirectProtocols={['com.helpu.app:', 'com.helpu.app', 'helpu:', 'helpu']}
+      allowedRedirectProtocols={['com.helpu.app', 'helpu']}
       allowedRedirectOrigins={['https://helpu.vercel.app']}
     >
       <BrowserRouter>
