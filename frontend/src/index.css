@@ -170,10 +170,35 @@ html, body {
   padding-bottom: 0.45rem !important;
 }
 
-/* Standalone PWA Notch & Safe Area Inset Support */
+/* Standalone PWA & Native App Notch & Safe Area Inset Support */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --keyboard-height: 0px;
+}
+
 .safe-area-pb {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
 }
 .safe-area-pt {
   padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
 }
+.safe-area-pl {
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0.5rem));
+}
+.safe-area-pr {
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0.5rem));
+}
+
+/* Mobile App Native Touch & Tap Optimizations */
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* When virtual keyboard is open on native devices, adjust fixed bottom nav to avoid visual collision */
+body.keyboard-open nav.fixed.bottom-0 {
+  display: none !important;
+}
+
