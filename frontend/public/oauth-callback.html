@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Authentication Successful — Helpu</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #FFF8F3;
+      color: #17233C;
+      margin: 0;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #F4E3D8;
+      border-radius: 28px;
+      padding: 36px 28px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      background: #FFEBE0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px auto;
+      font-size: 32px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 900;
+      margin: 0 0 10px 0;
+      color: #17233C;
+    }
+    p {
+      font-size: 13px;
+      color: #6E7587;
+      margin: 0 0 24px 0;
+      line-height: 1.5;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      background-color: #FF572E;
+      color: #FFFFFF;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 15px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(255, 87, 46, 0.3);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+      cursor: pointer;
+    }
+    .btn:active {
+      transform: scale(0.98);
+      background-color: #E64A22;
+    }
+    .subtext {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #8B93A7;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>Authentication Successful!</h1>
+    <p>Returning to your Helpu app. If the app doesn't open automatically, tap below.</p>
+    <a id="launch-btn" class="btn" href="#">Open Helpu App</a>
+    <div class="subtext">Secured with campus verified authentication</div>
+  </div>
+
+  <script>
+    (function() {
+      var search = window.location.search || '';
+      var hash = window.location.hash || '';
+
+      // Both callback and home deep links
+      var callbackDeepLink = 'com.helpu.app://callback' + search + hash;
+      var homeDeepLink = 'com.helpu.app://home' + search + hash;
+      var intentUrl = 'intent://callback' + search + hash + '#Intent;scheme=com.helpu.app;package=com.helpu.app;end';
+
+      var btn = document.getElementById('launch-btn');
+      if (btn) {
+        btn.href = callbackDeepLink;
+      }
+
+      // 1. Immediately fire Android Intent (Official Chrome hand-off)
+      try {
+        window.location.href = intentUrl;
+      } catch (e1) {
+        try {
+          window.location.href = callbackDeepLink;
+        } catch (e2) {}
+      }
+
+      // 2. Fallback to custom scheme after 400ms
+      setTimeout(function() {
+        try {
+          window.location.href = callbackDeepLink;
+        } catch (_) {}
+      }, 400);
+
+      // 3. Second fallback directly to home after 1000ms
+      setTimeout(function() {
+        try {
+          window.location.href = homeDeepLink;
+        } catch (_) {}
+      }, 1000);
+    })();
+  </script>
+</body>
+</html>
