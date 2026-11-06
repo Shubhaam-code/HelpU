@@ -18,27 +18,32 @@ export default function OAuthCallbackPage() {
 
     // Running in external browser (e.g. Chrome on Android after Google login)
     // Deep-link back into the Helpu native app
-    const appDeepLink = `com.helpu.app://home${search}${hash}`;
-    const fallbackDeepLink = `helpu://home${search}${hash}`;
+    const intentUrl = `intent://callback${search}${hash}#Intent;scheme=com.helpu.app;package=com.helpu.app;end`;
+    const appDeepLink = `com.helpu.app://callback${search}${hash}`;
+    const fallbackDeepLink = `helpu://callback${search}${hash}`;
 
-    // Attempt automatic return to native app
+    // Attempt automatic return to native app using Chrome Android Intent first, then custom scheme
     try {
-      window.location.href = appDeepLink;
-    } catch (_) {}
+      window.location.href = intentUrl;
+    } catch (_) {
+      try {
+        window.location.href = appDeepLink;
+      } catch (_) {}
+    }
 
     // Fallback timer if browser doesn't automatically hand off
     const timer = setTimeout(() => {
       try {
-        window.location.href = fallbackDeepLink;
+        window.location.href = appDeepLink;
       } catch (_) {}
-    }, 1500);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [navigate]);
 
   const search = typeof window !== 'undefined' ? window.location.search || '' : '';
   const hash = typeof window !== 'undefined' ? window.location.hash || '' : '';
-  const appDeepLink = `com.helpu.app://home${search}${hash}`;
+  const appDeepLink = `com.helpu.app://callback${search}${hash}`;
 
   return (
     <div className="min-h-screen bg-[#FFF7F2] text-[#17213D] flex flex-col items-center justify-center p-6 text-center">

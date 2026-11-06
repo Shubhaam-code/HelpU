@@ -1,6 +1,6 @@
 import React, { Component, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, useUser, SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
+import { useAuth, useUser, SignedIn, SignedOut, SignIn, AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import { AnimatePresence } from 'framer-motion';
 
 import { setTokenGetter, getProfile, saveProfile } from './lib/api';
@@ -222,6 +222,7 @@ export default function App() {
           <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
           <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
           <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
+          <Route path="/callback" element={<AuthenticateWithRedirectCallback signInForceRedirectUrl="/home" signUpForceRedirectUrl="/home" />} />
 
           {/* WhatsApp Onboarding */}
           <Route path="/whatsapp-setup" element={<ProtectedRoute><WhatsAppOnboardingPage /></ProtectedRoute>} />

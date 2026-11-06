@@ -103,9 +103,30 @@ export function initMobileNativeBridge({ navigate }) {
       if (!event?.url) return;
 
       try {
+        const rawUrl = event.url;
+
+        // Custom scheme OAuth callback from Clerk (e.g. com.helpu.app://callback?...)
+        if (rawUrl.startsWith('com.helpu.app://callback') || rawUrl.startsWith('helpu://callback')) {
+          const queryStartIndex = rawUrl.indexOf('?');
+          const hashStartIndex = rawUrl.indexOf('#');
+          let queryAndHash = '';
+          if (queryStartIndex !== -1) {
+            queryAndHash = rawUrl.substring(queryStartIndex);
+          } else if (hashStartIndex !== -1) {
+            queryAndHash = rawUrl.substring(hashStartIndex);
+          }
+          const targetUrl = '/callback' + queryAndHash;
+          console.log('[Helpu Native] Routing OAuth callback to:', targetUrl);
+          window.history.replaceState({}, '', targetUrl);
+          if (navigate) {
+            navigate(targetUrl, { replace: true });
+          }
+          return;
+        }
+
         const parsedUrl = new URL(event.url);
-        const search = parsedUrl.search;
-        const hash = parsedUrl.hash;
+        const search = parsedUrl.search || '';
+        const hash = parsedUrl.hash || '';
         const pathname = parsedUrl.pathname || '/home';
 
         if (search && search.includes('__clerk_handshake')) {
@@ -132,8 +153,12 @@ export function initMobileNativeBridge({ navigate }) {
       if (isActive) {
         console.log('[Helpu Native] App resumed to foreground.');
         try {
-          if (window.Clerk?.client?.sessions?.length) {
-            console.log('[Helpu Native] Active Clerk session detected on resume.');
+          const authPaths = ['/auth', '/login', '/signup', '/'];
+          if (authPaths.includes(window.location.pathname) && (window.Clerk?.session || window.Clerk?.user)) {
+            console.log('[Helpu Native] Active Clerk session on resume, navigating to /home');
+            if (navigate) {
+              navigate('/home', { replace: true });
+            }
           }
         } catch (_) {}
       }
