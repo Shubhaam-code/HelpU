@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, SignIn, SignUp } from '@clerk/clerk-react';
 import { ArrowLeft, ShieldCheck, Sparkles, Car } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useAuthProfile } from '../context/AuthProfileContext';
 
 export default function AuthPage({ initialMode = 'signIn' }) {
@@ -14,6 +15,9 @@ export default function AuthPage({ initialMode = 'signIn' }) {
   // Mode state: 'signIn' | 'signUp'
   const modeParam = searchParams.get('mode');
   const [mode, setMode] = useState(modeParam === 'signUp' ? 'signUp' : initialMode);
+
+  const isNative = Capacitor.isNativePlatform();
+  const redirectTarget = isNative ? '/oauth-callback' : '/home';
 
   // Sync mode state with query params
   useEffect(() => {
@@ -209,8 +213,9 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                     >
                       <SignIn
                         routing="hash"
-                        fallbackRedirectUrl="/home"
-                        signInFallbackRedirectUrl="/home"
+                        fallbackRedirectUrl={redirectTarget}
+                        signInFallbackRedirectUrl={redirectTarget}
+                        forceRedirectUrl={redirectTarget}
                         appearance={{
                           layout: {
                             logoPlacement: 'none',
@@ -252,8 +257,9 @@ export default function AuthPage({ initialMode = 'signIn' }) {
                     >
                       <SignUp
                         routing="hash"
-                        fallbackRedirectUrl="/home"
-                        signUpFallbackRedirectUrl="/home"
+                        fallbackRedirectUrl={redirectTarget}
+                        signUpFallbackRedirectUrl={redirectTarget}
+                        forceRedirectUrl={redirectTarget}
                         appearance={{
                           layout: {
                             logoPlacement: 'none',

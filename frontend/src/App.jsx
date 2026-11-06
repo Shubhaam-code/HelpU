@@ -9,6 +9,7 @@ import { AuthProfileProvider, useAuthProfile } from './context/AuthProfileContex
 // Pages
 import OnboardingPage from './pages/OnboardingPage';
 import AuthPage from './pages/AuthPage';
+import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import WhatsAppOnboardingPage from './pages/WhatsAppOnboardingPage';
 import HomePage from './pages/HomePage';
 import OfferRidePage from './pages/OfferRidePage';
@@ -220,6 +221,7 @@ export default function App() {
           <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
           <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
           <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
+          <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
 
           {/* WhatsApp Onboarding */}
           <Route path="/whatsapp-setup" element={<ProtectedRoute><WhatsAppOnboardingPage /></ProtectedRoute>} />
