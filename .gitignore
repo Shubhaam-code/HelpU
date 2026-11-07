@@ -10,6 +10,7 @@ node_modules/
 *service-account*.json
 *firebase*.json
 serviceAccountKey.json
+*render_fcm_base64*.txt
 
 # Build and dist outputs
 dist/

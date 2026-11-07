@@ -3,6 +3,7 @@ import { createRedisConnection } from '../config/redis.js';
 import { NOTIFICATION_QUEUE_NAME } from '../queues/notification.queue.js';
 import { NOTIFICATION_JOB_TYPES, formatNotificationContent } from '../jobs/notification.jobs.js';
 import Notification from '../models/Notification.js';
+import Outbox from '../models/Outbox.js';
 import Booking from '../models/Booking.js';
 import Travel from '../models/Travel.js';
 import { sendPushToUser } from '../services/fcm.service.js';
@@ -82,6 +83,29 @@ export async function processNotificationJob(job) {
       );
 
       console.log(`[Worker] In-app notification delivered for event ${eventId} to recipient ${recipientId} (${name})`);
+
+      // Ensure push notification is delivered if not already recorded on Outbox
+      if (eventId) {
+        try {
+          const outboxDoc = await Outbox.findOne({ eventId });
+          if (outboxDoc && !outboxDoc.pushSentAt) {
+            const pushData = {
+              type: name,
+              eventId,
+              bookingId: relatedBookingId ? String(relatedBookingId) : '',
+              travelId: relatedTravelId ? String(relatedTravelId) : '',
+              route: relatedBookingId ? `/bookings/${relatedBookingId}` : (relatedTravelId ? `/rides/${relatedTravelId}` : '/notifications')
+            };
+            const pushRes = await sendPushToUser(recipientId, { title, body: message }, pushData);
+            if (pushRes && pushRes.sent > 0) {
+              await Outbox.updateOne({ _id: outboxDoc._id }, { $set: { pushSentAt: new Date(), lastError: null } });
+              console.log(`[Worker] Push notification delivered for event ${eventId} to recipient ${recipientId}`);
+            }
+          }
+        } catch (workerPushErr) {
+          console.warn(`[Worker] Push delivery warning for ${eventId}:`, workerPushErr.message);
+        }
+      }
 
       // Reliably schedule travel reminders from the worker upon processing BOOKING_CONFIRMED
       if (name === NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED && relatedBookingId) {

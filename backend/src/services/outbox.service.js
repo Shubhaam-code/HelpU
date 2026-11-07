@@ -59,7 +59,9 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
     : {
         $or: [
           { status: 'pending' },
-          { status: 'processing', lockedAt: { $lt: leaseCutoff } }
+          { status: 'processing', lockedAt: { $lt: leaseCutoff } },
+          { status: 'processed', pushSentAt: null, retries: { $lt: 5 } },
+          { status: 'processed', pushSentAt: { $exists: false }, retries: { $lt: 5 } }
         ]
       };
 
@@ -78,7 +80,9 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
           _id: candidate._id,
           $or: [
             { status: 'pending' },
-            { status: 'processing', lockedAt: { $lt: leaseCutoff } }
+            { status: 'processing', lockedAt: { $lt: leaseCutoff } },
+            { status: 'processed', pushSentAt: null, retries: { $lt: 5 } },
+            { status: 'processed', pushSentAt: { $exists: false }, retries: { $lt: 5 } }
           ]
         };
 
@@ -164,16 +168,27 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
             pushPayloadData
           );
 
-          if (!pushResult.skipped) {
+          if (pushResult && pushResult.sent > 0) {
             // Atomically record push dispatch time to prevent duplicates on outbox retries
             await Outbox.updateOne(
               { _id: event._id },
-              { $set: { pushSentAt: new Date() } }
+              { $set: { pushSentAt: new Date(), lastError: null } }
+            );
+          } else if (pushResult && pushResult.failed > 0) {
+            const nextRetries = (event.retries || 0) + 1;
+            await Outbox.updateOne(
+              { _id: event._id },
+              { $set: { retries: nextRetries, lastError: `Push failed (${pushResult.failed} device(s) failed)` } }
             );
           }
         } catch (pushErr) {
           // FCM failure must never roll back committed transactions or break in-app notifications
           console.warn(`[Outbox] Non-fatal push delivery error for event ${event.eventId}:`, pushErr.message);
+          const nextRetries = (event.retries || 0) + 1;
+          await Outbox.updateOne(
+            { _id: event._id },
+            { $set: { retries: nextRetries, lastError: pushErr.message } }
+          );
         }
       } else {
         console.log(`[Outbox] Push notification already sent for event ${event.eventId}. Skipping duplicate push.`);
