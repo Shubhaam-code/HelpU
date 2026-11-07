@@ -25,5 +25,7 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+make_hero.ps1
+test_search_error.js
 
 
