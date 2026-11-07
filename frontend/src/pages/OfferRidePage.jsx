@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import {
   MapPin, Calendar, Clock, Users, ArrowUpDown,
-  Search, Check, Sparkles, Car as CarIcon,
+  Search, Check, Sparkles, ChevronDown,
   MoreHorizontal, ShieldCheck, ArrowRight, IndianRupee,
   CheckCircle2, X, FileText
 } from 'lucide-react';
@@ -66,6 +66,18 @@ function EecoCarIcon({ className = "w-8 sm:w-9 h-5 sm:h-6" }) {
   );
 }
 
+// Crisp Car Outline Icon matching the reference buttons and tabs
+function ButtonCarIcon({ className = "w-4 h-4 sm:w-5 sm:h-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+      <circle cx="7" cy="17" r="2" />
+      <path d="M9 17h6" />
+      <circle cx="17" cy="17" r="2" />
+    </svg>
+  );
+}
+
 const POPULAR_LOCATIONS = [
   'VIT, Bhopal',
   'Bhopal Railway Station',
@@ -77,6 +89,31 @@ const POPULAR_LOCATIONS = [
   'Sehore Bus Stand',
   'Ashta Toll Plaza',
 ];
+
+// Date and Time display formatters matching exact mobile UI
+function formatDateDisplay(dStr) {
+  if (!dStr) return 'Select Date';
+  const parts = dStr.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+  return dStr;
+}
+
+function formatTimeDisplay(tStr) {
+  if (!tStr) return 'Select Time';
+  const parts = tStr.split(':');
+  if (parts.length >= 2) {
+    let hh = parseInt(parts[0], 10);
+    const mm = parts[1].padStart(2, '0');
+    const ampm = hh >= 12 ? 'pm' : 'am';
+    hh = hh % 12;
+    if (hh === 0) hh = 12;
+    return `${hh}:${mm} ${ampm}`;
+  }
+  return tStr;
+}
 
 export default function OfferRidePage() {
   const navigate = useNavigate();
@@ -92,6 +129,7 @@ export default function OfferRidePage() {
     const isReq = location.pathname.includes('/request') || searchParams.get('mode') === 'request';
     setMode(isReq ? 'request' : 'offer');
   }, [location.pathname, searchParams]);
+
   const [fromLoc, setFromLoc] = useState('VIT, Bhopal');
   const [toLoc, setToLoc] = useState('Bhopal Railway Station');
   const [date, setDate] = useState(() => {
@@ -217,34 +255,35 @@ export default function OfferRidePage() {
       hideSidebarOnDesktop={true}
       customMobileHeader={<AppHeader title="Offer a Ride" backTo="/rides" />}
     >
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <div className="w-full max-w-xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-1.5 pb-20 sm:pt-4 sm:pb-12">
 
         {/* ========================================================================= */}
-        {/* SUB-HEADER TOOLBAR (Matching Match Page sub-bar)                          */}
+        {/* TOP SEGMENTED BAR: Tabs & Find Matches Button                             */}
         {/* ========================================================================= */}
-        <div className="flex items-center justify-between mb-4 sm:mb-5">
-
+        <div className="flex items-center justify-between gap-2 mb-3.5 sm:mb-5">
           {/* Mode Switcher Pill */}
-          <div className="inline-flex bg-white/90 p-1 rounded-full border border-[#F4E3D8]/90 shadow-xs backdrop-blur-sm">
+          <div className="inline-flex bg-white p-1 rounded-full border border-[#F4E3D8] shadow-2xs shrink-0">
             <button
               type="button"
               onClick={() => setMode('offer')}
-              className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${mode === 'offer'
-                  ? 'bg-[#FF572E] text-white shadow-sm'
-                  : 'text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2]'
-                }`}
+              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                mode === 'offer'
+                  ? 'bg-[#FF572E] text-white shadow-xs'
+                  : 'text-[#17233C] hover:text-[#FF572E]'
+              }`}
             >
-              <CarIcon className="w-3.5 h-3.5 stroke-[2.2]" />
+              <ButtonCarIcon className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>Offer a Ride</span>
             </button>
 
             <button
               type="button"
               onClick={() => setMode('request')}
-              className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${mode === 'request'
-                  ? 'bg-[#FF572E] text-white shadow-sm'
-                  : 'text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2]'
-                }`}
+              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                mode === 'request'
+                  ? 'bg-[#FF572E] text-white shadow-xs'
+                  : 'text-[#17233C] hover:text-[#FF572E]'
+              }`}
             >
               <Search className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>Find / Request</span>
@@ -255,7 +294,7 @@ export default function OfferRidePage() {
           <button
             type="button"
             onClick={() => navigate('/match')}
-            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-white rounded-2xl border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs sm:text-sm font-bold shadow-xs hover:bg-[#FFF7F2] transition-all cursor-pointer"
+            className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 bg-white rounded-full border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs font-bold shadow-2xs hover:bg-[#FFF7F2] transition-all cursor-pointer shrink-0"
           >
             <span>Find Matches</span>
             <ArrowRight className="w-3.5 h-3.5 text-[#FF572E]" />
@@ -264,145 +303,138 @@ export default function OfferRidePage() {
 
 
         {/* ========================================================================= */}
-        {/* MAIN PREMIUM WHITE CARD (Matching Match Page Hero card)                   */}
+        {/* RESPONSIVE LAYOUT CONTAINER (2 Columns on Desktop, Stacked on Mobile)      */}
         {/* ========================================================================= */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="bg-white rounded-[28px] border border-[#F4E3D8]/90 shadow-sm relative overflow-hidden p-5 sm:p-7 lg:p-8"
-        >
-          {/* Subtle warm decorative glow */}
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-[#FFF0E7]/50 via-[#FFF5EE]/30 to-transparent pointer-events-none rounded-r-[28px]" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-6 items-start">
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start lg:items-stretch relative z-10">
-
-            {/* ------------------------------------------------------------------- */}
-            {/* LEFT COLUMN: HEADING, VALUE PROPS & VERIFIED CAMPUS NETWORK         */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-6">
-
-              <div className="space-y-3.5">
-                {/* Small Badge */}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFEBE0] text-[#FF572E] font-bold text-xs">
-                  <Sparkles className="w-3.5 h-3.5 fill-[#FF572E]/10 text-[#FF572E]" />
-                  <span>{mode === 'offer' ? 'Offer a Ride' : 'Request a Ride'}</span>
+          {/* ----------------------------------------------------------------------- */}
+          {/* HERO CARD (Exact match to reference)                                    */}
+          {/* ----------------------------------------------------------------------- */}
+          <div className="lg:col-span-5 space-y-3.5">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs p-4 sm:p-5 relative overflow-hidden"
+            >
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                {/* Left text column */}
+                <div className="flex-1 min-w-0 pt-1">
+                  <h1 className="text-2xl sm:text-3xl font-black text-[#17233C] leading-tight tracking-tight">
+                    {mode === 'offer' ? (
+                      <>
+                        Share Your <span className="text-[#FF572E]">Ride</span>
+                      </>
+                    ) : (
+                      <>
+                        Find Your <span className="text-[#FF572E]">Ride</span>
+                      </>
+                    )}
+                  </h1>
+                  <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium leading-relaxed mt-2 max-w-[210px] sm:max-w-[280px]">
+                    {mode === 'offer'
+                      ? 'Share empty seats, split travel costs, and travel with verified students.'
+                      : 'Discover fellow students heading along your route and journey together safely.'}
+                  </p>
                 </div>
 
-                {/* Main Heading */}
-                <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-black text-[#17233C] leading-tight tracking-tight">
-                  {mode === 'offer' ? (
-                    <>
-                      Share Your <br />
-                      <span className="text-[#FF572E]">Ride</span>
-                    </>
-                  ) : (
-                    <>
-                      Find Your <br />
-                      <span className="text-[#FF572E]">Campus Ride</span>
-                    </>
-                  )}
-                </h1>
-
-                {/* Subtitle */}
-                <p className="text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-sm">
-                  {mode === 'offer'
-                    ? 'Share empty seats, split travel costs, and travel with verified students.'
-                    : 'Discover fellow students heading along your route and journey together safely.'}
-                </p>
-
-                {/* Feature Pills */}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
-                    <MapPin className="w-3 h-3 text-[#FF572E]" />
-                    Same Route
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFF6F0] border border-[#FDE3D3] text-[11px] font-bold text-[#17233C]">
-                    <IndianRupee className="w-3 h-3 text-[#FF572E]" />
-                    Split Fuel
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#F0FAF4] border border-[#C6EFD9] text-[11px] font-bold text-[#17233C]">
-                    <ShieldCheck className="w-3 h-3 text-[#16A34A]" />
-                    Verified Campus
-                  </span>
+                {/* Right illustration column - Large and prominent matching reference */}
+                <div className="shrink-0 w-[140px] sm:w-[175px] md:w-[195px] -mt-1 -mr-1 flex justify-end items-center">
+                  <img
+                    src="/car-hero.png"
+                    alt="Helpu campus ride illustration"
+                    className="w-full h-auto object-contain select-none pointer-events-none drop-shadow-xs"
+                    onError={(e) => {
+                      e.currentTarget.src = '/car.png';
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Student & Car Illustration (Properly positioned & balanced) */}
-              <div className="w-full flex justify-center items-center py-2 my-auto -translate-y-10">
-                <img
-                  src="/car.png"
-                  alt="Student campus ride illustration"
-                  className="w-full max-w-[360px] scale-110 sm:max-w-[420px] lg:max-w-[460px] h-auto max-h-[320px] sm:max-h-[360px] object-contain drop-shadow-sm select-none pointer-events-none hover:scale-105 transition-transform duration-300"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
+              {/* Feature Badges Row - Clean pills with NO divider line */}
+              <div className="flex flex-wrap items-center gap-2 pt-3 mt-1">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF8F3] border border-[#FEE6D8] text-xs font-bold text-[#17233C]">
+                  <MapPin className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <span>Same Route</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF8F3] border border-[#FEE6D8] text-xs font-bold text-[#17233C]">
+                  <IndianRupee className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <span>Split Fuel</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#EBF9F1] border border-[#C2EED7] text-xs font-bold text-[#17233C]">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
+                  <span>Verified Campus</span>
+                </span>
               </div>
+            </motion.div>
 
-              {/* Verified Campus Network Card aligned to bottom */}
-              <div className="bg-[#FFFBF8] rounded-2xl p-4 sm:p-4.5 border border-[#F4E3D8] flex items-center gap-3.5 shadow-2xs">
-                <div className="w-10 h-10 rounded-xl bg-[#EAF8F0] border border-[#C6EFD9] text-[#16A34A] flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="font-extrabold text-[#17233C] text-xs sm:text-sm block leading-snug">
-                    Verified Campus Network
-                  </span>
-                  <span className="text-[11px] sm:text-xs text-[#6E7587] font-medium block mt-0.5 leading-relaxed">
-                    Direct coordination with verified students once matched.
-                  </span>
-                </div>
+            {/* Desktop-only secondary trust badge */}
+            <div className="hidden lg:flex bg-white rounded-2xl p-4 border border-[#F4E3D8] items-center gap-3.5 shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-[#EAF8F0] border border-[#C6EFD9] text-[#16A34A] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
               </div>
-
+              <div className="min-w-0 flex-1">
+                <span className="font-extrabold text-[#17233C] text-sm block leading-snug">
+                  Verified Campus Network
+                </span>
+                <span className="text-xs text-[#6E7587] font-medium block mt-0.5 leading-relaxed">
+                  Direct coordination with verified students once matched.
+                </span>
+              </div>
             </div>
+          </div>
 
 
-            {/* ------------------------------------------------------------------- */}
-            {/* RIGHT COLUMN: TRAVEL DETAILS FORM                                   */}
-            {/* ------------------------------------------------------------------- */}
-            <div className="lg:col-span-7 bg-[#FFFBF8] rounded-[24px] p-4 sm:p-6 border border-[#F4E3D8] shadow-xs lg:mt-4">
-
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#F4E3D8]">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center">
-                    <MapPin className="w-4 h-4" />
+          {/* ----------------------------------------------------------------------- */}
+          {/* TRAVEL DETAILS FORM CARD (Exact reference match)                       */}
+          {/* ----------------------------------------------------------------------- */}
+          <div className="lg:col-span-7">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: 0.05 }}
+              className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs p-4 sm:p-5"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#F4E3D8]/70">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
+                    <MapPin className="w-4 h-4 stroke-[2.5]" />
                   </div>
                   <div>
-                    <h2 className="font-extrabold text-[#17233C] text-sm sm:text-base leading-tight">
+                    <h2 className="font-black text-[#17233C] text-sm sm:text-base leading-tight">
                       Your Travel Details
                     </h2>
-                    <p className="text-[11px] text-[#6E7587]">Enter route, schedule and vehicle preference</p>
+                    <p className="text-[11px] sm:text-xs text-[#6E7587] font-medium">
+                      Enter route, schedule and vehicle preference
+                    </p>
                   </div>
                 </div>
 
-                <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E]">
+                <span className="text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full bg-[#FFF6F0] border border-[#FF572E]/25 text-[#FF572E] shrink-0">
                   {mode === 'offer' ? 'Offering' : 'Requesting'}
                 </span>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-3">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
 
-                {/* Route Section: From & To */}
-                <div className="relative space-y-2">
+                {/* Route Section: From & To Box with Central Floating Swap */}
+                <div className="relative bg-white rounded-2xl border border-[#F4E3D8] overflow-hidden">
 
-                  {/* From Field */}
-                  <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-[#F4E3D8] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF572E]" />
+                  {/* Departure Location */}
+                  <div className="p-3 pr-11 border-b border-[#F4E3D8] focus-within:bg-[#FFFBF8] transition-colors">
+                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
                       <span>Departure Location</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                      <input
-                        type="text"
-                        list="from-locations"
-                        value={fromLoc}
-                        onChange={(e) => setFromLoc(e.target.value)}
-                        placeholder="e.g. VIT, Bhopal"
-                        className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      list="from-locations"
+                      value={fromLoc}
+                      onChange={(e) => setFromLoc(e.target.value)}
+                      placeholder="VIT, Bhopal"
+                      className="w-full bg-transparent text-xs sm:text-sm font-extrabold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none"
+                    />
                     <datalist id="from-locations">
                       {POPULAR_LOCATIONS.map((loc) => (
                         <option key={loc} value={loc} />
@@ -410,35 +442,30 @@ export default function OfferRidePage() {
                     </datalist>
                   </div>
 
-                  {/* Swap Button */}
-                  <div className="absolute right-3.5 top-[50%] -translate-y-1/2 z-10">
-                    <button
-                      type="button"
-                      onClick={handleSwapLocations}
-                      title="Swap Departure and Destination"
-                      className="w-7 h-7 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] hover:bg-[#FFF7F2] hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-xs cursor-pointer"
-                    >
-                      <ArrowUpDown className="w-3.5 h-3.5 text-[#FF572E]" />
-                    </button>
-                  </div>
+                  {/* Swap Button (Floating on the right edge over the divider) */}
+                  <button
+                    type="button"
+                    onClick={handleSwapLocations}
+                    title="Swap Departure and Destination"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] hover:bg-[#FFF7F2] active:scale-90 shadow-sm flex items-center justify-center cursor-pointer transition-all"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
+                  </button>
 
-                  {/* To Field */}
-                  <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-[#F4E3D8] focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#17233C]" />
+                  {/* Destination */}
+                  <div className="p-3 pr-11 focus-within:bg-[#FFFBF8] transition-colors">
+                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#17233C] shrink-0" />
                       <span>Destination</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-[#17233C] shrink-0" />
-                      <input
-                        type="text"
-                        list="to-locations"
-                        value={toLoc}
-                        onChange={(e) => setToLoc(e.target.value)}
-                        placeholder="e.g. Bhopal Railway Station"
-                        className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      list="to-locations"
+                      value={toLoc}
+                      onChange={(e) => setToLoc(e.target.value)}
+                      placeholder="Bhopal Railway Station"
+                      className="w-full bg-transparent text-xs sm:text-sm font-extrabold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none"
+                    />
                     <datalist id="to-locations">
                       {POPULAR_LOCATIONS.map((loc) => (
                         <option key={loc} value={loc} />
@@ -449,159 +476,171 @@ export default function OfferRidePage() {
                 </div>
 
 
-                {/* Date & Time Grid */}
-                <div className="grid grid-cols-2 gap-2.5">
+                {/* Schedule Row: Date & Time side by side with Chevrons */}
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
 
                   {/* Date */}
-                  <div className="bg-white rounded-xl p-2.5 border border-[#F4E3D8] focus-within:border-[#FF572E] transition-all">
-                    <label className="flex items-center gap-1 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-0.5">
-                      <Calendar className="w-3 h-3 text-[#FF572E]" />
+                  <div className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/40 focus-within:border-[#FF572E] transition-all cursor-pointer">
+                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-1">
+                      <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
                       <span>Date</span>
-                    </label>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs sm:text-sm text-[#17233C]">
+                        {formatDateDisplay(date)}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-[#17233C]/70 shrink-0" />
+                    </div>
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17233C] focus:outline-none cursor-pointer"
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                      aria-label="Travel Date"
                     />
                   </div>
 
                   {/* Time */}
-                  <div className="bg-white rounded-xl p-2.5 border border-[#F4E3D8] focus-within:border-[#FF572E] transition-all">
-                    <label className="flex items-center gap-1 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-0.5">
-                      <Clock className="w-3 h-3 text-[#FF572E]" />
+                  <div className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/40 focus-within:border-[#FF572E] transition-all cursor-pointer">
+                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-1">
+                      <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
                       <span>Time (Optional)</span>
-                    </label>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs sm:text-sm text-[#17233C]">
+                        {formatTimeDisplay(time)}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-[#17233C]/70 shrink-0" />
+                    </div>
                     <input
                       type="time"
                       value={time}
                       onChange={(e) => setTime(e.target.value)}
-                      className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#17233C] focus:outline-none cursor-pointer"
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                      aria-label="Departure Time"
                     />
                   </div>
 
                 </div>
 
 
-                {/* Preferred Car Selection */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                {/* Preferred Vehicle Selection */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <CarIcon className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span className="font-extrabold text-[#17233C] text-xs">Preferred Vehicle</span>
+                      <ButtonCarIcon className="w-3.5 h-3.5 text-[#FF572E]" />
+                      <span className="font-black text-xs sm:text-sm text-[#17233C]">Preferred Vehicle</span>
                     </div>
-                    <span className="text-[10px] text-[#6E7587]">Select model</span>
+                    <span className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium">Select model</span>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2">
-
+                  <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
                     {/* Omni */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Omni')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Omni'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
+                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
+                        preferredCar === 'Omni'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                        }`}
+                      }`}
                     >
                       {preferredCar === 'Omni' && (
-                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
+                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
                       <OmniCarIcon className="w-7 sm:w-8 h-4.5 sm:h-5 mb-0.5" />
-                      <span className="text-[11px] font-black text-[#17233C]">Omni</span>
+                      <span className="text-[11px] font-extrabold text-[#17233C]">Omni</span>
                     </button>
 
                     {/* Creta */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Creta')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Creta'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
+                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
+                        preferredCar === 'Creta'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                        }`}
+                      }`}
                     >
                       {preferredCar === 'Creta' && (
-                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
+                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
                       <CretaCarIcon className="w-7 sm:w-8 h-4.5 sm:h-5 mb-0.5" />
-                      <span className="text-[11px] font-black text-[#17233C]">Creta</span>
+                      <span className="text-[11px] font-extrabold text-[#17233C]">Creta</span>
                     </button>
 
                     {/* Eeco */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Eeco')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Eeco'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
+                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
+                        preferredCar === 'Eeco'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                        }`}
+                      }`}
                     >
                       {preferredCar === 'Eeco' && (
-                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
+                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
                       <EecoCarIcon className="w-7 sm:w-8 h-4.5 sm:h-5 mb-0.5" />
-                      <span className="text-[11px] font-black text-[#17233C]">Eeco</span>
+                      <span className="text-[11px] font-extrabold text-[#17233C]">Eeco</span>
                     </button>
 
                     {/* Other */}
                     <button
                       type="button"
                       onClick={() => setPreferredCar('Other')}
-                      className={`relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${preferredCar === 'Other'
-                          ? 'border-[#FF572E] bg-white ring-2 ring-[#FF572E]/15 shadow-2xs'
+                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
+                        preferredCar === 'Other'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                        }`}
+                      }`}
                     >
                       {preferredCar === 'Other' && (
-                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center">
+                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
                       <div className="w-7 sm:w-8 h-4.5 sm:h-5 flex items-center justify-center text-[#6E7587] mb-0.5">
                         <MoreHorizontal className="w-4 h-4" />
                       </div>
-                      <span className="text-[11px] font-black text-[#17233C]">Other</span>
+                      <span className="text-[11px] font-extrabold text-[#17233C]">Other</span>
                     </button>
-
                   </div>
                 </div>
 
 
-                {/* Co-travellers Counter & Fuel Split Price */}
-                <div className="flex items-center justify-between gap-3 bg-white rounded-xl p-2.5 sm:p-3 border border-[#F4E3D8]">
-
-                  {/* Travellers Info */}
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
-                      <Users className="w-3.5 h-3.5" />
+                {/* Max. Co-travellers & Fuel Split Price */}
+                <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4 stroke-[2.2]" />
                     </div>
                     <div>
-                      <h4 className="font-extrabold text-[#17233C] text-xs leading-none">
+                      <h4 className="font-black text-xs sm:text-sm text-[#17233C] leading-none">
                         {mode === 'offer' ? 'Max. Co-travellers' : 'Seats Needed'}
                       </h4>
-                      <p className="text-[10px] text-[#6E7587] mt-0.5">Available seats</p>
+                      <p className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium mt-0.5">Available seats</p>
                     </div>
                   </div>
 
-                  {/* Counter [- 1 +] & Price Input */}
-                  <div className="flex items-center gap-2.5">
-
+                  <div className="flex items-center gap-2">
                     {mode === 'offer' && (
-                      <div className="flex items-center gap-1 bg-[#FFFBF8] rounded-lg px-2 py-1 border border-[#F4E3D8]">
-                        <span className="font-bold text-[#FF572E] text-xs">₹</span>
+                      <div className="flex items-center gap-1 bg-[#FFFBF8] rounded-xl px-2.5 py-1.5 border border-[#F4E3D8]">
+                        <span className="font-black text-[#FF572E] text-xs sm:text-sm">₹</span>
                         <input
                           type="number"
                           value={pricePerSeat}
                           onChange={(e) => setPricePerSeat(e.target.value)}
                           placeholder="350"
                           title="Price per seat"
-                          className="w-12 text-xs font-black text-[#17233C] focus:outline-none bg-transparent"
+                          className="w-12 text-xs sm:text-sm font-black text-[#17233C] focus:outline-none bg-transparent"
                         />
                       </div>
                     )}
@@ -610,33 +649,33 @@ export default function OfferRidePage() {
                       <button
                         type="button"
                         onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
-                        className="w-6 h-6 rounded-lg bg-[#FFFBF8] border border-[#F4E3D8] text-[#17233C] hover:bg-[#FFEBE0] font-black text-xs flex items-center justify-center cursor-pointer"
+                        className="w-7 h-7 rounded-xl bg-white border border-[#F4E3D8] text-[#17233C] hover:bg-[#FFEBE0] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
                       >
                         −
                       </button>
-                      <span className="font-black text-[#17233C] text-xs min-w-[14px] text-center">
+                      <span className="font-black text-[#17233C] text-sm min-w-[16px] text-center">
                         {travellers}
                       </span>
                       <button
                         type="button"
                         onClick={() => setTravellers((prev) => Math.min(8, prev + 1))}
-                        className="w-6 h-6 rounded-lg bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-xs flex items-center justify-center cursor-pointer shadow-xs"
+                        className="w-7 h-7 rounded-xl bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform shadow-xs"
                       >
                         +
                       </button>
                     </div>
-
                   </div>
                 </div>
 
+
                 {/* Optional Message / Personal Notes Box */}
-                <div className="bg-[#FFFBF8] rounded-2xl p-3 sm:p-3.5 border border-[#F4E3D8] space-y-1.5 focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
+                <div className="bg-white rounded-2xl p-3 border border-[#F4E3D8] space-y-1.5 focus-within:border-[#FF572E] transition-all">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] sm:text-xs font-black text-[#17233C] flex items-center gap-1.5">
+                    <label className="text-xs font-black text-[#17233C] flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5 text-[#FF572E]" />
                       <span>{mode === 'offer' ? 'Ride Notes / Preferences' : 'Request Notes / Details'}</span>
                     </label>
-                    <span className="text-[10px] font-bold text-[#8C93A4] bg-white px-2 py-0.5 rounded-full border border-[#F4E3D8]">
+                    <span className="text-[10px] font-bold text-[#8C93A4] bg-[#FFFBF8] px-2 py-0.5 rounded-full border border-[#F4E3D8]">
                       Optional
                     </span>
                   </div>
@@ -659,22 +698,23 @@ export default function OfferRidePage() {
                   )}
                 </div>
 
+
                 {/* Error Banner */}
                 {error && (
-                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-xl text-center">
+                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl text-center">
                     {error}
                   </div>
                 )}
 
 
-                {/* Submit Action Button */}
+                {/* Primary CTA Submit Action Button */}
                 <div className="pt-1">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-xl sm:rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer disabled:opacity-60"
+                    className="w-full py-3.5 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-[#FF572E]/25 transition-all cursor-pointer disabled:opacity-60"
                   >
-                    <Search className="w-4 h-4 stroke-[2.5]" />
+                    <ButtonCarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     <span>
                       {loading
                         ? 'Processing...'
@@ -687,10 +727,10 @@ export default function OfferRidePage() {
 
               </form>
 
-            </div>
-
+            </motion.div>
           </div>
-        </motion.div>
+
+        </div>
 
       </div>
 
