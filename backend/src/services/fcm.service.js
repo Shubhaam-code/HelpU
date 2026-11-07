@@ -1,5 +1,6 @@
 import { getFirebaseMessaging, isFirebaseConfigured } from '../config/firebase.js';
 import DeviceToken from '../models/DeviceToken.js';
+import Student from '../models/Student.js';
 
 /**
  * Maximum batch size supported by Firebase Admin sendEachForMulticast
@@ -188,7 +189,8 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
           color: '#FF572E',
           defaultSound: true,
           defaultVibrateTimings: true,
-          clickAction: 'FCM_PLUGIN_ACTIVITY'
+          clickAction: 'FCM_PLUGIN_ACTIVITY',
+          tag: sanitizedData.eventId || sanitizedData.notificationId || undefined
         }
       },
       apns: {
@@ -280,9 +282,35 @@ export async function sendPushToUsers(userIds, notification = {}, data = {}, opt
   }
 
   try {
-    // Fetch all active device tokens for the target users
+    // 1. Expand search user IDs across all known canonical and Firebase aliases
+    const searchUserIds = new Set(validUserIds);
+    try {
+      const bareUids = validUserIds.map((id) => id.replace(/^firebase_/, ''));
+      const linkedStudents = await Student.find(
+        {
+          $or: [
+            { clerkId: { $in: validUserIds } },
+            { firebaseUid: { $in: validUserIds } },
+            { firebaseUid: { $in: bareUids } }
+          ]
+        },
+        { clerkId: 1, firebaseUid: 1 }
+      ).lean();
+
+      for (const s of linkedStudents) {
+        if (s.clerkId) searchUserIds.add(s.clerkId);
+        if (s.firebaseUid) {
+          searchUserIds.add(s.firebaseUid);
+          searchUserIds.add(`firebase_${s.firebaseUid}`);
+        }
+      }
+    } catch (aliasErr) {
+      console.warn('[HelpuFCM] Student alias expansion non-fatal warning:', aliasErr.message);
+    }
+
+    // 2. Fetch all active device tokens for the target users (supporting multiple devices)
     const deviceDocs = await DeviceToken.find(
-      { userId: { $in: validUserIds } },
+      { userId: { $in: Array.from(searchUserIds) } },
       { token: 1, userId: 1, platform: 1 }
     ).lean();
 

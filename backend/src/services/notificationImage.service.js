@@ -239,7 +239,7 @@ export async function resolveNotificationContentAndPayload({
     case NOTIFICATION_JOB_TYPES.BOOKING_REQUESTED: {
       title = 'New Booking Request';
       const timeStr = timeFormatted ? ` at ${timeFormatted}` : '';
-      message = `${passengerName} requested ${requestedSeats} seat(s) for your ride: ${source} → ${destination}${dateFormatted ? ' (' + dateFormatted + timeStr + ')' : ''}.`;
+      message = `${passengerName} wants to travel with you from ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''} (${requestedSeats} seat). Open Helpu to review the request.`;
       targetRoute = effectiveBookingId ? `/bookings/${effectiveBookingId}` : (effectiveTravelId ? `/rides/${effectiveTravelId}` : '/bookings/received');
       break;
     }
@@ -248,22 +248,27 @@ export async function resolveNotificationContentAndPayload({
     // CASE 2: New Match Found (Recipients: Both eligible users)
     // ------------------------------------------------------------------------
     case NOTIFICATION_JOB_TYPES.NEW_MATCH_FOUND: {
-      title = 'New Match Found!';
+      title = 'New Ride Match';
       const matchTypeDesc = (payload.type || travelDoc?.type) === 'offer' ? 'ride offer' : 'ride request';
       const timeStr = timeFormatted ? ` at ${timeFormatted}` : '';
-      message = `Matching ${matchTypeDesc} found: ${source} → ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''}. Tap to connect!`;
+      message = `A compatible ${matchTypeDesc} has been found for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''}. Open Helpu to view the match.`;
       targetRoute = effectiveTravelId ? `/rides/${effectiveTravelId}` : '/match';
       break;
     }
 
     // ------------------------------------------------------------------------
-    // CASE 3: Booking Confirmed (Recipient: Passenger)
+    // CASE 3: Booking Confirmed (Recipient: Passenger or Owner)
     // ------------------------------------------------------------------------
     case NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED:
     case NOTIFICATION_JOB_TYPES.BOOKING_ACCEPTED: {
-      title = 'Booking Confirmed!';
+      title = 'Booking Request Accepted';
       const timeStr = timeFormatted ? ` at ${timeFormatted}` : '';
-      message = `Your ride from ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''} is confirmed! (${requestedSeats} seat(s) reserved with ${ownerName}).`;
+      if (eventType === NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED) {
+        title = 'Booking Confirmed';
+        message = `Your ride booking from ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''} is confirmed (${requestedSeats} seat(s) reserved with ${ownerName}). Open Helpu to view the booking.`;
+      } else {
+        message = `Your booking request for ${source} to ${destination} has been accepted by ${ownerName}. Open Helpu to view the booking.`;
+      }
       targetRoute = effectiveBookingId ? `/bookings/${effectiveBookingId}` : (effectiveTravelId ? `/rides/${effectiveTravelId}` : '/bookings');
       break;
     }
@@ -273,14 +278,14 @@ export async function resolveNotificationContentAndPayload({
     // ------------------------------------------------------------------------
     case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_PASSENGER: {
       title = 'Booking Cancelled';
-      message = `${passengerName} cancelled their booking for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted : ''}.`;
+      message = `${passengerName} cancelled their booking for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted : ''}. Released seat is now available.`;
       targetRoute = effectiveBookingId ? `/bookings/${effectiveBookingId}` : (effectiveTravelId ? `/rides/${effectiveTravelId}` : '/bookings');
       break;
     }
 
     case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER: {
       title = 'Booking Cancelled';
-      message = `${ownerName} cancelled the booking for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted : ''}.`;
+      message = `${ownerName} cancelled the booking for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted : ''}. Open Helpu to find an alternative ride.`;
       targetRoute = effectiveBookingId ? `/bookings/${effectiveBookingId}` : '/bookings';
       break;
     }
@@ -290,7 +295,7 @@ export async function resolveNotificationContentAndPayload({
     // ------------------------------------------------------------------------
     case NOTIFICATION_JOB_TYPES.BOOKING_REJECTED: {
       title = 'Booking Request Declined';
-      message = `Your booking request for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted : ''} was declined by ${ownerName}.`;
+      message = `Your booking request for ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted : ''} was declined by ${ownerName}. Open Helpu to find other rides.`;
       targetRoute = effectiveBookingId ? `/bookings/${effectiveBookingId}` : '/bookings';
       break;
     }
@@ -300,7 +305,7 @@ export async function resolveNotificationContentAndPayload({
     // ------------------------------------------------------------------------
     case NOTIFICATION_JOB_TYPES.BOOKING_WITHDRAWN: {
       title = 'Booking Request Withdrawn';
-      message = `${passengerName} withdrew their request for ${requestedSeats} seat(s) on your ride: ${source} → ${destination}.`;
+      message = `${passengerName} withdrew their booking request for ${source} to ${destination}. Open Helpu to view your ride.`;
       targetRoute = effectiveTravelId ? `/rides/${effectiveTravelId}` : '/bookings/received';
       break;
     }
@@ -312,7 +317,7 @@ export async function resolveNotificationContentAndPayload({
       title = 'Ride Details Updated';
       const changeText = payload.changeSummary ? `: ${payload.changeSummary}` : '';
       const timeStr = timeFormatted ? ` (${timeFormatted})` : '';
-      message = `Your ride from ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''} was updated by ${ownerName}${changeText}.`;
+      message = `Your ride from ${source} to ${destination}${dateFormatted ? ' on ' + dateFormatted + timeStr : ''} was updated by ${ownerName}${changeText}. Open Helpu to check the updated details.`;
       targetRoute = effectiveTravelId ? `/rides/${effectiveTravelId}` : '/rides';
       break;
     }
@@ -339,8 +344,8 @@ export async function resolveNotificationContentAndPayload({
 
     // Reminders
     case NOTIFICATION_JOB_TYPES.TRAVEL_REMINDER_24H:
-      title = 'Upcoming Ride Reminder (24h)';
-      message = `Reminder: Your ride from ${source} to ${destination} departs tomorrow${timeFormatted ? ' at ' + timeFormatted : ''}.`;
+      title = 'Ride Reminder (24h)';
+      message = `Reminder: Your ride from ${source} to ${destination} departs tomorrow${timeFormatted ? ' at ' + timeFormatted : ''}. Open Helpu to view travel details.`;
       targetRoute = effectiveTravelId ? `/rides/${effectiveTravelId}` : '/rides';
       break;
 

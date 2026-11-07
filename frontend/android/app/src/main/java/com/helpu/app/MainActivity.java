@@ -100,8 +100,8 @@ public class MainActivity extends BridgeActivity {
                 notificationManager.deleteNotificationChannel("helpu_high_importance");
             } catch (Exception ignored) {}
 
-            CharSequence name = "HelpU Booking & Ride Alerts";
-            String description = "Instant heads-up popup alerts for booking requests, confirmations, and ride updates";
+            CharSequence name = "Helpu Booking & Ride Alerts";
+            String description = "Instant heads-up popup alerts for booking requests, confirmations, matches, and ride updates";
             int importance = NotificationManager.IMPORTANCE_HIGH;
 
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);

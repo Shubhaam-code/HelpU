@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { triggerInAppNotification } from '../components/ui/InAppNotificationBanner';
-import { registerFcmToken, unregisterFcmToken } from '../lib/api';
+import { registerFcmToken, unregisterFcmToken, markRead } from '../lib/api';
 
 /**
  * In-memory cache of the latest device FCM token
@@ -238,6 +238,25 @@ export async function initPushNotifications({
       console.log('[HelpuPush] Notification tapped by user:', action);
       const data = action.notification?.data || {};
       const notifType = (data.type || data.eventType || '').toUpperCase();
+      const notifId = data.notificationId || data.id || data._id;
+
+      // Mark tapped notification as Read on backend & trigger local cache update
+      if (notifId) {
+        try {
+          markRead(notifId)
+            .then(() => {
+              console.log(`[HelpuPush] Marked tapped notification ${notifId} as Read.`);
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('notifications-updated', { detail: { markedId: notifId } }));
+              }
+            })
+            .catch((readErr) => {
+              console.warn('[HelpuPush] Non-fatal error marking notification as read on tap:', readErr.message);
+            });
+        } catch (err) {
+          console.warn('[HelpuPush] Error dispatching markRead on notification tap:', err);
+        }
+      }
 
       let targetRoute = null;
       if (data.route) {
@@ -291,8 +310,8 @@ export async function initPushNotifications({
       try {
         await PushNotifications.createChannel({
           id: HELPU_NOTIFICATION_CHANNEL_ID,
-          name: 'HelpU Booking & Ride Alerts',
-          description: 'Instant popup alerts for booking requests, confirmations, and ride updates',
+          name: 'Helpu Booking & Ride Alerts',
+          description: 'Instant heads-up popup alerts for booking requests, confirmations, matches, and ride updates',
           importance: 5, // NotificationManager.IMPORTANCE_HIGH / MAX
           visibility: 1, // NotificationCompat.VISIBILITY_PUBLIC
           sound: 'default',

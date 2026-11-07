@@ -179,6 +179,78 @@ export default function NotificationsPage() {
       };
     }
 
+    if (t.includes('MATCH')) {
+      return {
+        icon: Sparkles,
+        iconBg: 'bg-[#FFF4ED]',
+        iconColor: 'text-[#FF572E]',
+        badgeBg: 'bg-[#FFF4ED]',
+        badgeColor: 'text-[#FF572E]',
+        badgeText: 'New Ride Match',
+        actionLabel: 'View Match',
+      };
+    }
+
+    if (t.includes('ACCEPTED')) {
+      return {
+        icon: CheckCircle2,
+        iconBg: 'bg-[#EDFAF3]',
+        iconColor: 'text-[#16A34A]',
+        badgeBg: 'bg-[#EDFAF3]',
+        badgeColor: 'text-[#16A34A]',
+        badgeText: 'Request Accepted',
+        actionLabel: 'View Booking',
+      };
+    }
+
+    if (t.includes('REJECTED')) {
+      return {
+        icon: XCircle,
+        iconBg: 'bg-[#FEF2F2]',
+        iconColor: 'text-[#DC2626]',
+        badgeBg: 'bg-[#FEF2F2]',
+        badgeColor: 'text-[#DC2626]',
+        badgeText: 'Request Declined',
+        actionLabel: 'Find Rides',
+      };
+    }
+
+    if (t.includes('WITHDRAWN')) {
+      return {
+        icon: AlertCircle,
+        iconBg: 'bg-[#F8FAFC]',
+        iconColor: 'text-[#64748B]',
+        badgeBg: 'bg-[#F1F5F9]',
+        badgeColor: 'text-[#64748B]',
+        badgeText: 'Request Withdrawn',
+        actionLabel: 'View Post',
+      };
+    }
+
+    if (t.includes('UPDATED')) {
+      return {
+        icon: Car,
+        iconBg: 'bg-[#FFF8E7]',
+        iconColor: 'text-[#D97706]',
+        badgeBg: 'bg-[#FFF8E7]',
+        badgeColor: 'text-[#D97706]',
+        badgeText: 'Ride Updated',
+        actionLabel: 'View Changes',
+      };
+    }
+
+    if (t.includes('EXPIRED')) {
+      return {
+        icon: Clock,
+        iconBg: 'bg-[#F8FAFC]',
+        iconColor: 'text-[#64748B]',
+        badgeBg: 'bg-[#F1F5F9]',
+        badgeColor: 'text-[#64748B]',
+        badgeText: 'Ride Expired',
+        actionLabel: 'View Post',
+      };
+    }
+
     // Default Fallback
     return {
       icon: Bell,
@@ -186,8 +258,8 @@ export default function NotificationsPage() {
       iconColor: 'text-[#FF572E]',
       badgeBg: 'bg-[#FFF4ED]',
       badgeColor: 'text-[#FF572E]',
-      badgeText: 'Campus Alert',
-      actionLabel: 'View Post',
+      badgeText: 'Helpu Alert',
+      actionLabel: 'View Notification',
     };
   };
 

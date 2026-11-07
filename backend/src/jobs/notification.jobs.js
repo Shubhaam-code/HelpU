@@ -48,39 +48,39 @@ export function formatNotificationContent(eventType, payload = {}) {
       const studentName = payload.passengerName || payload.studentName || 'A student';
       return {
         title: 'New Booking Request',
-        message: `${studentName} requested ${requestedSeats} seat(s) for your ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+        message: `${studentName} wants to travel with you from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Open Helpu to review the request.`
       };
     }
 
     case NOTIFICATION_JOB_TYPES.BOOKING_ACCEPTED:
       return {
         title: 'Booking Request Accepted',
-        message: `Your booking request for ${source} to ${destination} was accepted by the ride owner. Final confirmation pending.`
+        message: `Your booking request for ${source} to ${destination} has been accepted. Open Helpu to view the booking.`
       };
 
     case NOTIFICATION_JOB_TYPES.BOOKING_REJECTED:
       return {
         title: 'Booking Request Declined',
-        message: `Your booking request for ${source} to ${destination} was declined by the ride owner.`
+        message: `Your booking request for ${source} to ${destination} was declined. Open Helpu to find other rides.`
       };
 
     case NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED:
       return {
-        title: 'Booking Confirmed!',
-        message: `Your ride booking from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} is confirmed! (${requestedSeats} seat(s) reserved).`
+        title: 'Booking Confirmed',
+        message: `Your ride booking from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} is confirmed (${requestedSeats} seat(s) reserved). Open Helpu to view the ride.`
       };
 
     case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_PASSENGER:
       return {
         title: 'Booking Cancelled',
-        message: `A passenger has cancelled their booking for the ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+        message: `${payload.passengerName || 'A passenger'} cancelled their booking for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Released seat is now available.`
       };
 
     case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER: {
       const ownerName = payload.ownerName || 'The ride host';
       return {
         title: 'Booking Cancelled',
-        message: `${ownerName} cancelled the booking for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+        message: `${ownerName} cancelled the booking for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Open Helpu to find an alternative ride.`
       };
     }
 
@@ -88,7 +88,7 @@ export function formatNotificationContent(eventType, payload = {}) {
       const passengerName = payload.passengerName || 'The passenger';
       return {
         title: 'Booking Request Withdrawn',
-        message: `${passengerName} withdrew their request for ${requestedSeats} seat(s) on your ride from ${source} to ${destination}.`
+        message: `${passengerName} withdrew their booking request for ${source} to ${destination}. Open Helpu to view your ride.`
       };
     }
 
@@ -96,7 +96,7 @@ export function formatNotificationContent(eventType, payload = {}) {
       const changeText = payload.changeSummary ? `: ${payload.changeSummary}` : '';
       return {
         title: 'Ride Details Updated',
-        message: `Your ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was updated by the host${changeText}.`
+        message: `Your ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was updated by the host${changeText}. Open Helpu to check the updated details.`
       };
     }
 
@@ -117,29 +117,28 @@ export function formatNotificationContent(eventType, payload = {}) {
 
     case NOTIFICATION_JOB_TYPES.TRAVEL_REMINDER_24H:
       return {
-        title: 'Upcoming Ride Reminder (24h)',
-        message: `Reminder: Your ride from ${source} to ${destination} is scheduled to depart in 24 hours.`
+        title: 'Ride Reminder (24h)',
+        message: `Reminder: Your ride from ${source} to ${destination} departs tomorrow. Open Helpu to view travel details.`
       };
 
     case NOTIFICATION_JOB_TYPES.TRAVEL_REMINDER_1H:
       return {
         title: 'Ride Departing Soon (1h)',
-        message: `Reminder: Your ride from ${source} to ${destination} departs in 1 hour. Please be ready at your pickup point.`
+        message: `Reminder: Your ride from ${source} to ${destination} departs in 1 hour. Please head to your pickup point.`
       };
 
     case NOTIFICATION_JOB_TYPES.NEW_MATCH_FOUND: {
-      const matchTypeDesc = payload.type === 'offer' ? 'ride offer' : 'ride request';
       return {
-        title: 'New Ride Match Found! 🚗',
-        message: `A new matching ${matchTypeDesc} was posted for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+        title: 'New Ride Match',
+        message: `A compatible ride has been found for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Open Helpu to view the match.`
       };
     }
 
     case NOTIFICATION_JOB_TYPES.TEST_NOTIFICATION:
     default:
       return {
-        title: 'CampusPool Notification',
-        message: payload.message || 'You have a new update in CampusPool.'
+        title: 'Helpu Alert',
+        message: payload.message || 'You have a new update in Helpu.'
       };
   }
 }
