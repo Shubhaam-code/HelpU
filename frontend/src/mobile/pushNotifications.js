@@ -273,8 +273,8 @@ export async function initPushNotifications({
     let permStatus = await PushNotifications.checkPermissions();
     console.log('[HelpuPush] Initial notification permission status:', permStatus.receive);
 
-    if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
-      console.log('[HelpuPush] Prompting user for notification permission...');
+    if (permStatus.receive !== 'granted') {
+      console.log('[HelpuPush] Notification permission not yet granted (status: ' + permStatus.receive + '). Prompting user...');
       permStatus = await PushNotifications.requestPermissions();
       console.log('[HelpuPush] Post-prompt permission status:', permStatus.receive);
     }

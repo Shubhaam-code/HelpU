@@ -35,6 +35,18 @@ public class MainActivity extends BridgeActivity {
 
         configureSystemWindowBars();
         createNotificationChannel();
+        requestNotificationPermissionIfNeeded();
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                Log.i(TAG, "[HelpuPush] Requesting POST_NOTIFICATIONS permission from user...");
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            } else {
+                Log.i(TAG, "[HelpuPush] POST_NOTIFICATIONS permission already granted.");
+            }
+        }
     }
 
     /**

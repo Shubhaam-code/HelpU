@@ -181,8 +181,11 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
         notification: {
           channelId: HELPU_NOTIFICATION_CHANNEL_ID,
           priority: 'high',
+          icon: 'ic_stat_notification',
+          color: '#FF572E',
           defaultSound: true,
           defaultVibrateTimings: true,
+          clickAction: 'FCM_PLUGIN_ACTIVITY',
           ...(hasValidImage ? { imageUrl: imageUrl.trim() } : {})
         }
       },
