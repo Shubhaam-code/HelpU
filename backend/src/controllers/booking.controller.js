@@ -536,7 +536,9 @@ export async function respondToBookingRequest(req, res) {
             source: travel?.source || 'Source',
             destination: travel?.destination || 'Destination',
             travelDate: travel?.travelDate,
-            requestedSeats: booking.requestedSeats
+            departureTime: travel?.departureTime,
+            requestedSeats: booking.requestedSeats,
+            ownerName: travel?.authorName || 'Ride Host'
           }
         },
         session
@@ -901,7 +903,9 @@ export async function confirmBooking(req, res) {
         source: reservedTravel.source,
         destination: reservedTravel.destination,
         travelDate: reservedTravel.travelDate,
-        requestedSeats: booking.requestedSeats
+        departureTime: reservedTravel.departureTime,
+        requestedSeats: booking.requestedSeats,
+        ownerName: reservedTravel.authorName || 'Ride Host'
       };
 
       // Notify passenger
@@ -1067,7 +1071,7 @@ export async function cancelBooking(req, res) {
           {
             eventType: isOwner
               ? NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER
-              : NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_PASSENGER,
+              : NOTIFICATION_JOB_TYPES.BOOKING_WITHDRAWN,
             recipientId,
             relatedBookingId: booking._id,
             relatedTravelId: booking.travelId,
@@ -1075,6 +1079,9 @@ export async function cancelBooking(req, res) {
               source: travel?.source || 'Origin',
               destination: travel?.destination || 'Destination',
               travelDate: travel?.travelDate,
+              departureTime: travel?.departureTime,
+              passengerName: booking.passengerName || 'A Student',
+              requestedSeats: booking.requestedSeats || 1,
               cancelledBy: isOwner ? 'owner' : 'passenger'
             }
           },
@@ -1181,6 +1188,11 @@ export async function cancelBooking(req, res) {
             source: travel.source,
             destination: travel.destination,
             travelDate: travel.travelDate,
+            departureTime: travel.departureTime,
+            requestedSeats: booking.requestedSeats,
+            ownerName: travel.authorName || 'Ride Host',
+            passengerName: booking.passengerName || 'Passenger',
+            cancellerName: isOwner ? (travel.authorName || 'Host') : (booking.passengerName || 'Passenger'),
             cancelledBy: isOwner ? 'owner' : 'passenger'
           }
         },

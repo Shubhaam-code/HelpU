@@ -15,6 +15,49 @@ import {
   normalizeLocation 
 } from '../services/matching.service.js';
 
+/**
+ * Automatically marks active rides past expiresAt as expired and creates Outbox events
+ * notifying the post owners (Case 9: Ride Expired).
+ */
+export async function expireOverdueRidesAndNotify(filterUserId = null) {
+  const now = new Date();
+  const query = { status: 'active', expiresAt: { $lte: now } };
+  if (filterUserId) query.userId = filterUserId;
+
+  const overdue = await Travel.find(query);
+  if (!overdue || overdue.length === 0) return 0;
+
+  for (const t of overdue) {
+    t.status = 'expired';
+    await t.save();
+
+    try {
+      await createOutboxEvent({
+        eventType: NOTIFICATION_JOB_TYPES.RIDE_EXPIRED,
+        recipientId: t.userId,
+        relatedTravelId: t._id,
+        payload: {
+          source: t.source,
+          destination: t.destination,
+          travelDate: t.travelDate,
+          departureTime: t.departureTime
+        }
+      });
+    } catch (notifErr) {
+      console.warn(`[Expiry] Could not create outbox event for travel ${t._id}:`, notifErr.message);
+    }
+  }
+
+  if (overdue.length > 0) {
+    try {
+      triggerOutboxSweep();
+    } catch (sweepErr) {
+      console.warn('[Expiry] Outbox sweep warning:', sweepErr.message);
+    }
+  }
+  return overdue.length;
+}
+
 const router = express.Router();
 
 /**
@@ -123,6 +166,40 @@ router.post('/', requireAuth, async (req, res) => {
       expiresAt
     });
 
+    // Notify matching peers about this new ride in background (non-blocking)
+    setImmediate(async () => {
+      try {
+        const matches = await findMatchesForTravel(travel);
+        if (matches && matches.length > 0) {
+          const notifiedUserIds = new Set();
+          for (const match of matches) {
+            const peerId = match.userId;
+            if (peerId && peerId !== req.userId && !notifiedUserIds.has(peerId)) {
+              notifiedUserIds.add(peerId);
+              await createOutboxEvent({
+                eventType: NOTIFICATION_JOB_TYPES.NEW_MATCH_FOUND,
+                recipientId: peerId,
+                relatedTravelId: travel._id,
+                payload: {
+                  source: travel.source,
+                  destination: travel.destination,
+                  travelDate: travel.travelDate,
+                  type: travel.type,
+                  authorName: travel.authorName || 'Campus Student',
+                  carModel: travel.carModel
+                }
+              });
+            }
+          }
+          if (notifiedUserIds.size > 0) {
+            triggerOutboxSweep();
+          }
+        }
+      } catch (matchErr) {
+        console.warn('[Travel] Non-fatal match notification error:', matchErr.message);
+      }
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Travel post created successfully',
@@ -155,11 +232,8 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const now = new Date();
 
-    // Automatically transition user's active posts that passed expiresAt to 'expired'
-    await Travel.updateMany(
-      { userId: req.userId, status: 'active', expiresAt: { $lte: now } },
-      { $set: { status: 'expired' } }
-    );
+    // Automatically transition user's active posts that passed expiresAt to 'expired' and notify owner
+    await expireOverdueRidesAndNotify(req.userId);
 
     // 1. Check if authenticated user has created any active offer or request
     const myActiveTravels = await Travel.find({
@@ -614,7 +688,7 @@ export async function cancelTravelPost(travelId, userId) {
     // Create outbox notification for passenger
     try {
       await createOutboxEvent({
-        eventType: NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER,
+        eventType: NOTIFICATION_JOB_TYPES.RIDE_CANCELLED,
         recipientId: b.passengerId,
         relatedBookingId: b._id,
         relatedTravelId: travel._id,
@@ -622,7 +696,9 @@ export async function cancelTravelPost(travelId, userId) {
           source: travel.source,
           destination: travel.destination,
           travelDate: travel.travelDate,
-          requestedSeats: b.requestedSeats || 1
+          departureTime: travel.departureTime,
+          requestedSeats: b.requestedSeats || 1,
+          ownerName: travel.authorName || 'The ride host'
         }
       });
     } catch (notifErr) {
@@ -1004,6 +1080,44 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
 
     await travel.save();
+
+    // Notify affected passengers about the ride update
+    try {
+      const affectedBookings = await Booking.find({
+        travelId: travel._id,
+        status: { $in: ['confirmed', 'accepted', 'pending'] }
+      }).lean();
+
+      if (affectedBookings.length > 0) {
+        const changes = [];
+        if (departureTime !== undefined) changes.push('departure time');
+        if (pricePerSeat !== undefined) changes.push('price');
+        if (carModel !== undefined) changes.push('vehicle');
+        const changeSummary = changes.length > 0 ? changes.join(', ') : 'details';
+
+        for (const b of affectedBookings) {
+          if (b.passengerId && b.passengerId !== req.userId) {
+            await createOutboxEvent({
+              eventType: NOTIFICATION_JOB_TYPES.RIDE_UPDATED,
+              recipientId: b.passengerId,
+              relatedBookingId: b._id,
+              relatedTravelId: travel._id,
+              payload: {
+                source: travel.source,
+                destination: travel.destination,
+                travelDate: travel.travelDate,
+                departureTime: travel.departureTime,
+                ownerName: travel.authorName || 'The ride host',
+                changeSummary
+              }
+            });
+          }
+        }
+        triggerOutboxSweep();
+      }
+    } catch (notifErr) {
+      console.warn('[TravelUpdate] Non-fatal notification error:', notifErr.message);
+    }
 
     return res.status(200).json({
       success: true,
