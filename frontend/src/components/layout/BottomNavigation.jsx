@@ -21,8 +21,8 @@ export function BottomNavigation() {
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-100 z-40 safe-area-pb">
-      <div className="flex items-center justify-around px-2 py-2">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white border-t border-[#F4E3D8]/60 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-40 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1">
+      <div className="flex items-center justify-around px-2 py-0.5">
         {NAV_ITEMS.map((item) => {
           if (item.isCreate) {
             return (
@@ -30,9 +30,10 @@ export function BottomNavigation() {
                 key={item.path}
                 onClick={() => navigate('/create')}
                 whileTap={{ scale: 0.9 }}
-                className="w-14 h-14 -mt-5 bg-coral rounded-full flex items-center justify-center shadow-lg shadow-coral/40"
+                className="w-13 h-13 -mt-4 bg-coral rounded-full flex items-center justify-center shadow-lg shadow-coral/40 cursor-pointer"
+                aria-label="Create Ride Activity"
               >
-                <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
+                <Plus className="w-6.5 h-6.5 text-white" strokeWidth={2.5} />
               </motion.button>
             );
           }
@@ -45,13 +46,13 @@ export function BottomNavigation() {
               key={item.path}
               onClick={() => navigate(item.path)}
               whileTap={{ scale: 0.9 }}
-              className="flex flex-col items-center gap-0.5 flex-1 py-1 relative"
+              className="flex flex-col items-center gap-0.5 flex-1 py-1 relative cursor-pointer"
             >
               <Icon
-                className={`w-6 h-6 transition-colors ${active ? 'text-coral' : 'text-text-secondary'}`}
+                className={`w-5 h-5 sm:w-5.5 sm:h-5.5 transition-colors ${active ? 'text-coral' : 'text-[#8C93A4]'}`}
                 strokeWidth={active ? 2.5 : 2}
               />
-              <span className={`text-[10px] font-medium transition-colors ${active ? 'text-coral' : 'text-text-secondary'}`}>
+              <span className={`text-[10px] font-bold transition-colors ${active ? 'text-coral' : 'text-[#8C93A4]'}`}>
                 {item.label}
               </span>
               {active && (
