@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useUser, useAuth } from './FirebaseAuthContext';
 import { getProfile, saveProfile, setTokenGetter } from '../lib/api';
 
@@ -7,8 +7,37 @@ const AuthProfileContext = createContext(null);
 export function AuthProfileProvider({ children }) {
   const { getToken } = useAuth();
   const { isLoaded, isSignedIn, user } = useUser();
-  const [profile, setProfile] = useState(null);
+
+  const storageKey = useMemo(() => {
+    return user?.id ? `helpu_profile_${user.id}` : 'helpu_active_profile';
+  }, [user?.id]);
+
+  // Restore cached profile immediately to prevent flashing or unnecessary onboarding redirects
+  const [profile, setProfile] = useState(() => {
+    try {
+      const raw = localStorage.getItem('helpu_active_profile');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  // Sync profile from user-specific localStorage whenever user ID is established
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        const userSpecific = localStorage.getItem(`helpu_profile_${user.id}`);
+        if (userSpecific) {
+          const parsed = JSON.parse(userSpecific);
+          setProfile(parsed);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [user?.id]);
 
   // Always ensure token getter is registered with apiClient
   useEffect(() => {
@@ -25,60 +54,88 @@ export function AuthProfileProvider({ children }) {
 
     try {
       const res = await getProfile();
-      const p = res?.data?.data || null;
-      setProfile(p);
+      const p = res?.data?.data;
 
-      // Auto-sync basic auth image/name if missing
-      const currentImg = user.imageUrl || '';
-      const email = p?.email || user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '';
-      const name = p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Campus Student';
-      const phone = p?.phone || p?.whatsappNumber || user.primaryPhoneNumber?.phoneNumber || user.phoneNumbers?.[0]?.phoneNumber || '';
-
-      if ((!p || !p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email) {
-        const syncPayload = {
-          name,
-          email,
-          college: p?.college || 'VIT, Bhopal',
-          imageUrl: currentImg
-        };
-        // Never pass blank phone numbers during background image sync
-        if (phone) {
-          syncPayload.phone = phone;
-          syncPayload.whatsappNumber = phone;
+      if (p) {
+        setProfile(p);
+        try {
+          localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(p));
+          localStorage.setItem('helpu_active_profile', JSON.stringify(p));
+        } catch (e) {
+          // ignore
         }
-        saveProfile(syncPayload).then((savedRes) => {
-          if (savedRes?.data?.data) {
-            setProfile(savedRes.data.data);
-          }
-        }).catch((err) => console.warn('[ProfileProvider] Auto-sync image warning:', err?.message));
-      }
 
-      return p;
+        // Auto-sync basic auth image if missing from profile, without touching phone numbers
+        const currentImg = user.imageUrl || '';
+        const email = p.email || user.primaryEmailAddress?.emailAddress || '';
+        const name = p.name || user.fullName || 'Campus Student';
+
+        if ((!p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email && currentImg) {
+          saveProfile({
+            name,
+            email,
+            college: p.college || 'VIT, Bhopal',
+            imageUrl: currentImg
+          }).then((savedRes) => {
+            if (savedRes?.data?.data) {
+              setProfile(savedRes.data.data);
+              try {
+                localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(savedRes.data.data));
+              } catch (e) {}
+            }
+          }).catch((err) => console.warn('[ProfileProvider] Auto-sync image warning:', err?.message));
+        }
+
+        return p;
+      } else {
+        // Backend returned null data (user genuinely not created in DB yet)
+        setProfile((prev) => {
+          // If we had a locally cached profile with a verified WhatsApp number, preserve it
+          if (prev?.whatsappNumber || prev?.phone) {
+            return prev;
+          }
+          return null;
+        });
+        return null;
+      }
     } catch (err) {
-      console.warn('[ProfileProvider] Profile fetch warning:', err?.message);
-      return null;
+      console.warn('[ProfileProvider] Profile fetch warning (preserving cached profile):', err?.message);
+      // Keep existing cached profile so an existing user is NEVER falsely redirected to onboarding on network error
+      return profile;
     } finally {
       setIsProfileLoading(false);
     }
-  }, [isLoaded, isSignedIn, user]);
+  }, [isLoaded, isSignedIn, user, profile]);
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
       setProfile(null);
       setIsProfileLoading(false);
+      try {
+        localStorage.removeItem('helpu_active_profile');
+      } catch (e) {}
       return;
     }
     fetchProfile();
-  }, [isLoaded, isSignedIn, fetchProfile]);
+  }, [isLoaded, isSignedIn, user?.id]);
 
   const setWhatsAppNumber = useCallback((number) => {
-    setProfile((prev) => ({
-      ...(prev || {}),
-      whatsappNumber: number,
-      phone: prev?.phone || number
-    }));
-  }, []);
+    setProfile((prev) => {
+      const updated = {
+        ...(prev || {}),
+        whatsappNumber: number,
+        phone: prev?.phone || number
+      };
+      if (user?.id) {
+        try {
+          localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(updated));
+          localStorage.setItem('helpu_active_profile', JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+  }, [user?.id]);
 
   const value = {
     profile,

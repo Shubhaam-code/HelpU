@@ -10,8 +10,10 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { CancelBookingModal } from '../components/ui/CancelBookingModal';
 import { getBookingById, confirmBooking, cancelBooking, getWhatsAppDetails, respondBooking } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
+import { invalidateBookingQueries } from '../lib/queryClient';
 
 export default function BookingDetailsPage() {
   const { id } = useParams();
@@ -22,6 +24,8 @@ export default function BookingDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelModalError, setCancelModalError] = useState('');
   const [whatsAppLoading, setWhatsAppLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -69,21 +73,28 @@ export default function BookingDetailsPage() {
     }
   };
 
-  const handleCancel = async () => {
-    const isOwner = Boolean(user?.id && booking?.ownerId === user.id);
-    const actionLabel = isOwner ? 'decline/cancel this booking request' : 'cancel this booking';
-    if (!confirm(`Are you sure you want to ${actionLabel}?`)) return;
+  const handleCancel = () => {
+    setCancelModalError('');
+    setShowCancelModal(true);
+  };
 
+  const handleConfirmCancel = async () => {
     setCancelling(true);
+    setCancelModalError('');
     setErrorMsg('');
     setSuccessMsg('');
     try {
       await cancelBooking(id);
+      invalidateBookingQueries();
+      const isOwner = Boolean(user?.id && booking?.ownerId === user.id);
       setSuccessMsg(isOwner ? 'Booking request declined.' : 'Booking cancelled successfully.');
+      setShowCancelModal(false);
       loadBooking();
     } catch (err) {
       console.error('Error cancelling booking:', err);
-      setErrorMsg(err.response?.data?.message || err.message || 'Cancel failed.');
+      const msg = err.response?.data?.message || err.message || 'Failed to cancel booking. Please try again.';
+      setCancelModalError(msg);
+      setErrorMsg(msg);
     } finally {
       setCancelling(false);
     }
@@ -728,6 +739,15 @@ export default function BookingDetailsPage() {
         </div>
 
       </div>
+
+      {/* Premium Reusable Helpu Booking Cancellation Modal */}
+      <CancelBookingModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={handleConfirmCancel}
+        isCancelling={cancelling}
+        error={cancelModalError}
+      />
     </ResponsiveShell>
   );
 }

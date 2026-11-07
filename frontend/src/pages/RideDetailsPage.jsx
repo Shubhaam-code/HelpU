@@ -12,6 +12,8 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { CancelBookingModal } from '../components/ui/CancelBookingModal';
+import { invalidateBookingQueries } from '../lib/queryClient';
 import { 
   getTravelById, 
   getProfile, 
@@ -53,6 +55,9 @@ export default function RideDetailsPage() {
   const [submitError, setSubmitError] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelModalError, setCancelModalError] = useState('');
+  const [pendingCancelId, setPendingCancelId] = useState(null);
 
   // 1. Fetch live ride details, passenger profile, and bookings on mount
   const loadData = useCallback(async () => {
@@ -365,24 +370,35 @@ export default function RideDetailsPage() {
     }
   };
 
-  // 8. Cancel Booking
-  const handleCancelBooking = async (bookingId) => {
+  // 8. Cancel Booking via Helpu Modal
+  const handleCancelBooking = (bookingId) => {
     const targetBookingId = bookingId || myActiveBooking?._id;
     if (!targetBookingId || isCancelling) return;
+    setPendingCancelId(targetBookingId);
+    setCancelModalError('');
+    setShowCancelModal(true);
+  };
 
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+  const handleConfirmCancelModal = async () => {
+    if (!pendingCancelId || isCancelling) return;
 
     setIsCancelling(true);
+    setCancelModalError('');
     setSubmitError('');
     setSuccessNotice('');
 
     try {
-      await cancelBooking(targetBookingId);
+      await cancelBooking(pendingCancelId);
+      invalidateBookingQueries();
       setSuccessNotice('Booking cancelled successfully.');
+      setShowCancelModal(false);
+      setPendingCancelId(null);
       loadData();
     } catch (err) {
       console.error('Cancel booking error:', err);
-      setSubmitError(err.response?.data?.message || 'Failed to cancel booking.');
+      const msg = err.response?.data?.message || 'Failed to cancel booking. Please try again.';
+      setCancelModalError(msg);
+      setSubmitError(msg);
     } finally {
       setIsCancelling(false);
     }
@@ -1159,6 +1175,20 @@ export default function RideDetailsPage() {
         )}
 
       </div>
+
+      {/* Premium Reusable Helpu Booking Cancellation Modal */}
+      <CancelBookingModal
+        isOpen={showCancelModal}
+        onClose={() => {
+          if (!isCancelling) {
+            setShowCancelModal(false);
+            setPendingCancelId(null);
+          }
+        }}
+        onConfirm={handleConfirmCancelModal}
+        isCancelling={isCancelling}
+        error={cancelModalError}
+      />
     </ResponsiveShell>
   );
 }

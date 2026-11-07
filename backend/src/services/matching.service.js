@@ -273,7 +273,7 @@ export async function findMatchesForTravel(travelPost) {
       imageUrl: student?.imageUrl || post.authorImage || null,
       avatarId: student?.avatarId || 'm1',
       college: student?.college || 'VIT, Bhopal',
-      isVerified: student?.isVerified ?? true
+      isVerified: Boolean(student?.isVerified)
     };
     return {
       ...post,

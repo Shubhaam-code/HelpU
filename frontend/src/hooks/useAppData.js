@@ -47,19 +47,64 @@ export function useMyTravels() {
 }
 
 /**
- * Hook to get user matches with caching.
+ * Fetcher function for user matches ensuring consistent payload shape across Home and Match pages.
+ */
+async function fetchUserMatchesPayload() {
+  const res = await getUserMatches();
+  const mData = res.data || {};
+  const matches = Array.isArray(mData.data) ? mData.data : (Array.isArray(mData.matches) ? mData.matches : []);
+  return {
+    matches,
+    hasPostedTravel: Boolean(mData.hasPostedTravel ?? (matches.length > 0 || (Array.isArray(mData.myTravels) && mData.myTravels.length > 0))),
+    myTravels: Array.isArray(mData.myTravels) ? mData.myTravels : []
+  };
+}
+
+/**
+ * Hook to get user matches list with caching (used on Home and dashboard).
+ * Perfectly synchronized with useUserMatchesData via shared Query Key and select.
  */
 export function useUserMatches() {
   const { user } = useUser();
   return useQuery({
     queryKey: QUERY_KEYS.userMatches(user?.id),
-    queryFn: async () => {
-      const res = await getUserMatches();
-      const mData = res.data || {};
-      return Array.isArray(mData.data) ? mData.data : [];
+    queryFn: fetchUserMatchesPayload,
+    select: (data) => {
+      if (Array.isArray(data)) return data;
+      return Array.isArray(data?.matches) ? data.matches : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 30 * 1000
+    staleTime: 45 * 1000,
+    gcTime: 10 * 60 * 1000
+  });
+}
+
+/**
+ * Hook to get comprehensive user matches payload (matches, hasPostedTravel, myTravels) with caching.
+ * Perfectly synchronized with useUserMatches via shared Query Key.
+ */
+export function useUserMatchesData() {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.userMatches(user?.id),
+    queryFn: fetchUserMatchesPayload,
+    select: (data) => {
+      if (Array.isArray(data)) {
+        return {
+          matches: data,
+          hasPostedTravel: data.length > 0,
+          myTravels: []
+        };
+      }
+      return {
+        matches: Array.isArray(data?.matches) ? data.matches : [],
+        hasPostedTravel: Boolean(data?.hasPostedTravel ?? (Array.isArray(data?.matches) && data.matches.length > 0)),
+        myTravels: Array.isArray(data?.myTravels) ? data.myTravels : []
+      };
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 45 * 1000,
+    gcTime: 10 * 60 * 1000
   });
 }
 

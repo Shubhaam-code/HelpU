@@ -14,7 +14,10 @@ import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { DatePickerModal } from '../components/ui/DatePickerModal';
+import { TimePickerModal } from '../components/ui/TimePickerModal';
 import { getMyTravels, updateTravel, deleteTravel, cancelTravel } from '../lib/api';
+import { useMyTravels } from '../hooks/useAppData';
+import { invalidateRideQueries } from '../lib/queryClient';
 
 /**
  * Format minutes from midnight into 12-hour AM/PM format
@@ -66,10 +69,28 @@ export default function MyPostsPage() {
   const navigate = useNavigate();
   const { user } = useUser();
 
+  // TanStack Query cached travel posts (Instant navigation, 0ms return visits, zero full-page spinners)
+  const { 
+    data: cachedTravels = [], 
+    isLoading: travelsLoading, 
+    isFetching: isRefreshingTravels, 
+    error: queryError, 
+    refetch: refetchTravels 
+  } = useMyTravels();
+
   const [travels, setTravels] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'active' | 'expired' | 'completed' | 'cancelled' | 'offers' | 'requests'
+
+  // Keep local travels in sync with TanStack Query cached list
+  useEffect(() => {
+    if (cachedTravels) {
+      setTravels(cachedTravels);
+    }
+  }, [cachedTravels]);
+
+  // Loading skeleton only on initial visit when memory cache is empty
+  const loading = travelsLoading && travels.length === 0;
 
   // Post cancellation states
   const [postToCancel, setPostToCancel] = useState(null);
@@ -98,6 +119,7 @@ export default function MyPostsPage() {
       setTravels((prev) =>
         prev.map((t) => (t._id === postToCancel._id ? { ...t, status: 'cancelled' } : t))
       );
+      invalidateRideQueries();
       setFeedbackMsg({
         type: 'success',
         text: 'Ride cancelled successfully. All passenger bookings were cancelled and passengers notified.'
@@ -123,6 +145,7 @@ export default function MyPostsPage() {
       await deleteTravel(targetId);
       // Immediately remove from UI list
       setTravels((prev) => prev.filter((t) => t._id !== targetId));
+      invalidateRideQueries();
       setFeedbackMsg({
         type: 'success',
         text: 'Post deleted successfully!'
@@ -134,6 +157,7 @@ export default function MyPostsPage() {
       const is404 = err?.status === 404 || err?.response?.status === 404 || err?.message?.includes('404');
       if (is404) {
         setTravels((prev) => prev.filter((t) => t._id !== targetId));
+        invalidateRideQueries();
         setFeedbackMsg({
           type: 'success',
           text: 'Post removed from your list.'
@@ -153,6 +177,7 @@ export default function MyPostsPage() {
   // Post editing states
   const [postToEdit, setPostToEdit] = useState(null);
   const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const [showEditTimePicker, setShowEditTimePicker] = useState(false);
   const [editFormData, setEditFormData] = useState({
     source: '',
     destination: '',
@@ -228,6 +253,7 @@ export default function MyPostsPage() {
 
       // Immediately update the UI without requiring page refresh
       setTravels((prev) => prev.map((t) => (t._id === postToEdit._id ? { ...t, ...updated } : t)));
+      invalidateRideQueries();
 
       setFeedbackMsg({
         type: 'success',
@@ -242,21 +268,16 @@ export default function MyPostsPage() {
     }
   };
 
-  // Fetch logged-in user's own published travel posts
+  // Manual refresh handler delegating to TanStack Query
   const fetchPosts = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      const res = await getMyTravels();
-      const list = res?.data?.data || [];
-      setTravels(Array.isArray(list) ? list : []);
+      await refetchTravels();
     } catch (err) {
       console.error('Error fetching my travel posts:', err);
       setError(err?.response?.data?.message || err?.message || 'Unable to load your posts.');
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  }, [refetchTravels]);
 
   useEffect(() => {
     fetchPosts();
@@ -855,13 +876,13 @@ export default function MyPostsPage() {
                     <label className="block text-xs font-black text-[#17233C] mb-1">
                       Departure Time
                     </label>
-                    <input
-                      type="time"
-                      required
-                      value={editFormData.timeStr}
-                      onChange={(e) => setEditFormData({ ...editFormData, timeStr: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] text-xs font-bold text-[#17233C] focus:outline-none focus:border-[#FF572E]"
-                    />
+                    <div
+                      onClick={() => setShowEditTimePicker(true)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] text-xs font-bold text-[#17233C] flex items-center justify-between cursor-pointer hover:border-[#FF572E]"
+                    >
+                      <span>{editFormData.timeStr ? formatMinutesToTime(timeStringToMinutes(editFormData.timeStr)) : 'Select Time'}</span>
+                      <Clock className="w-4 h-4 text-[#FF572E]" />
+                    </div>
                   </div>
                 </div>
 
@@ -1118,6 +1139,18 @@ export default function MyPostsPage() {
           setShowEditDatePicker(false);
         }}
         title="Select New Travel Date"
+      />
+
+      {/* Modern Time Picker Modal for Ride Editing */}
+      <TimePickerModal
+        isOpen={showEditTimePicker}
+        onClose={() => setShowEditTimePicker(false)}
+        value={editFormData.timeStr}
+        onChange={(newTime) => {
+          setEditFormData({ ...editFormData, timeStr: newTime });
+          setShowEditTimePicker(false);
+        }}
+        title="Select New Departure Time"
       />
     </ResponsiveShell>
   );

@@ -86,7 +86,7 @@ class ErrorBoundary extends Component {
   }
 }
 
-// Token injector & Profile picture auto-synchronization + FCM Token sync
+// Token injector & FCM Token sync
 function TokenInjector() {
   const { getToken } = useAuth();
   const { user, isLoaded, isSignedIn } = useUser();
@@ -106,35 +106,6 @@ function TokenInjector() {
     } else if (!isSignedIn && previousUserIdRef.current) {
       previousUserIdRef.current = null;
       unregisterDeviceTokenFromBackend();
-    }
-  }, [isLoaded, isSignedIn, user]);
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn && user) {
-      getProfile()
-        .then((res) => {
-          const p = res.data?.data;
-          const currentImg = user.imageUrl || '';
-          const email = p?.email || user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '';
-          const name = p?.name || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Campus Student';
-          const canonicalNumber = p?.whatsappNumber || p?.phone || user.primaryPhoneNumber?.phoneNumber || user.phoneNumbers?.[0]?.phoneNumber || '';
-
-          if ((!p || !p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email) {
-            const syncPayload = {
-              name,
-              email,
-              college: p?.college || 'VIT, Bhopal',
-              imageUrl: currentImg
-            };
-            // Never pass blank phone numbers during background image sync
-            if (canonicalNumber) {
-              syncPayload.phone = canonicalNumber;
-              syncPayload.whatsappNumber = canonicalNumber;
-            }
-            saveProfile(syncPayload).catch((err) => console.warn('Failed to sync profile image:', err));
-          }
-        })
-        .catch(() => {});
     }
   }, [isLoaded, isSignedIn, user]);
 

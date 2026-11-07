@@ -12,8 +12,10 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { getProfile, saveProfile, getMyBookings, getMyTravels } from '../lib/api';
+import { saveProfile } from '../lib/api';
 import { useAuthProfile } from '../context/AuthProfileContext';
+import { useUserProfile, useMyTravels, useMyBookings } from '../hooks/useAppData';
+import { queryClient, QUERY_KEYS, invalidateProfileQueries } from '../lib/queryClient';
 
 const COUNTRIES = [
   { code: 'IN', name: 'India', dial: '+91', flag: '🇮🇳' },
@@ -31,11 +33,16 @@ export default function ProfilePage() {
   const { signOut } = useFirebaseAuth();
   const { setWhatsAppNumber: setContextWhatsAppNumber } = useAuthProfile();
 
-  // Data states
-  const [profile, setProfile] = useState(null);
-  const [ridesCount, setRidesCount] = useState(0);
-  const [bookingsCount, setBookingsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // TanStack Query cached data flow (Instant navigation, zero full-page spinners on return visits)
+  const { data: cachedProfile, isLoading: profileLoading } = useUserProfile();
+  const { data: myTravels = [], isLoading: travelsLoading } = useMyTravels();
+  const { data: myBookings = [], isLoading: bookingsLoading } = useMyBookings();
+
+  // Profile data & counts derived from cache
+  const profile = cachedProfile || null;
+  const ridesCount = Array.isArray(myTravels) ? myTravels.length : 0;
+  const bookingsCount = Array.isArray(myBookings) ? myBookings.length : 0;
+  const loading = profileLoading && !cachedProfile;
 
   // Edit profile modal state
   const [isEditing, setIsEditing] = useState(false);
@@ -50,69 +57,42 @@ export default function ProfilePage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  const fetchProfile = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [profRes, bookingsRes, travelsRes] = await Promise.allSettled([
-        getProfile(),
-        getMyBookings(),
-        getMyTravels(),
-      ]);
-
-      if (profRes.status === 'fulfilled') {
-        const p = profRes.value.data?.data;
-        setProfile(p);
-        setEditName(p?.name || user?.fullName || '');
-        
-        // Resolve canonical saved number from whatsappNumber or phone
-        const savedNumber = (p?.whatsappNumber || p?.phone || user?.primaryPhoneNumber?.phoneNumber || '').trim();
-        if (savedNumber) {
-          try {
-            const parsed = parsePhoneNumber(savedNumber);
-            if (parsed && parsed.nationalNumber) {
-              setEditWhatsAppNumber(parsed.nationalNumber);
-              setEditWhatsAppCountry(parsed.country || 'IN');
-            } else {
-              setEditWhatsAppNumber(savedNumber.replace(/[^\d]/g, ''));
-              setEditWhatsAppCountry('IN');
-            }
-          } catch {
-            try {
-              const parsedIN = parsePhoneNumber(savedNumber, 'IN');
-              setEditWhatsAppNumber(parsedIN?.nationalNumber || savedNumber.replace(/[^\d]/g, ''));
-              setEditWhatsAppCountry(parsedIN?.country || 'IN');
-            } catch {
-              setEditWhatsAppNumber(savedNumber.replace(/[^\d]/g, ''));
-              setEditWhatsAppCountry('IN');
-            }
-          }
-        } else {
-          setEditWhatsAppNumber('');
-          setEditWhatsAppCountry('IN');
-        }
-        
-        setEditCollege(p?.college || 'VIT, Bhopal');
-        setEditCourse(p?.course || 'B.Tech Computer Science');
-        setEditBio(p?.bio || '');
-      }
-      if (bookingsRes.status === 'fulfilled') {
-        const bList = bookingsRes.value.data?.data || bookingsRes.value.data?.bookings || [];
-        setBookingsCount(Array.isArray(bList) ? bList.length : 0);
-      }
-      if (travelsRes.status === 'fulfilled') {
-        const list = travelsRes.value.data?.data || travelsRes.value.data?.travels || [];
-        setRidesCount(Array.isArray(list) ? list.length : 0);
-      }
-    } catch (err) {
-      console.error('Error loading profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
+  // Sync edit form with cached profile data
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if (cachedProfile) {
+      setEditName(cachedProfile.name || user?.fullName || '');
+      
+      const savedNumber = (cachedProfile.whatsappNumber || cachedProfile.phone || user?.primaryPhoneNumber?.phoneNumber || '').trim();
+      if (savedNumber) {
+        try {
+          const parsed = parsePhoneNumber(savedNumber);
+          if (parsed && parsed.nationalNumber) {
+            setEditWhatsAppNumber(parsed.nationalNumber);
+            setEditWhatsAppCountry(parsed.country || 'IN');
+          } else {
+            setEditWhatsAppNumber(savedNumber.replace(/[^\d]/g, ''));
+            setEditWhatsAppCountry('IN');
+          }
+        } catch {
+          try {
+            const parsedIN = parsePhoneNumber(savedNumber, 'IN');
+            setEditWhatsAppNumber(parsedIN?.nationalNumber || savedNumber.replace(/[^\d]/g, ''));
+            setEditWhatsAppCountry(parsedIN?.country || 'IN');
+          } catch {
+            setEditWhatsAppNumber(savedNumber.replace(/[^\d]/g, ''));
+            setEditWhatsAppCountry('IN');
+          }
+        }
+      } else {
+        setEditWhatsAppNumber('');
+        setEditWhatsAppCountry('IN');
+      }
+
+      setEditCollege(cachedProfile.college || 'VIT, Bhopal');
+      setEditCourse(cachedProfile.course || 'B.Tech Computer Science');
+      setEditBio(cachedProfile.bio || '');
+    }
+  }, [cachedProfile, user]);
 
   // Handle Edit Profile Save
   const handleSaveProfile = async (e) => {
@@ -153,7 +133,10 @@ export default function ProfilePage() {
 
       const res = await saveProfile(payload);
       const updated = res.data?.data || payload;
-      setProfile(updated);
+      
+      // Update TanStack Query cache immediately
+      queryClient.setQueryData(QUERY_KEYS.profile(user?.id), updated);
+      invalidateProfileQueries();
       
       if (setContextWhatsAppNumber) {
         setContextWhatsAppNumber(payload.whatsappNumber || '');
@@ -225,18 +208,16 @@ export default function ProfilePage() {
               <div className="flex items-center sm:items-end gap-3 sm:gap-4 min-w-0">
                 {/* Avatar with Orange Ring & Verified Checkmark Badge */}
                 <div className="relative shrink-0">
-                  <div className="w-18 h-18 sm:w-22 sm:h-22 lg:w-24 lg:h-24 rounded-full border-[3px] border-[#FF572E] bg-white p-[2px] shadow-md flex items-center justify-center">
-                    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[#FFF5ED]">
-                      <Avatar 
-                        src={user?.imageUrl || profile?.imageUrl}
-                        name={profile?.name || user?.fullName}
-                        email={profile?.email || user?.primaryEmailAddress?.emailAddress}
-                        size="full"
-                        className="w-full h-full"
-                      />
-                    </div>
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-[3px] border-[#FF572E] bg-white p-0.5 shadow-md flex items-center justify-center overflow-hidden">
+                    <Avatar 
+                      src={user?.imageUrl || profile?.imageUrl}
+                      name={profile?.name || user?.fullName}
+                      email={profile?.email || user?.primaryEmailAddress?.emailAddress}
+                      size="full"
+                      className="w-full h-full aspect-square"
+                    />
                   </div>
-                  <div className="absolute bottom-0 right-0 w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-md z-10">
+                  <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-md z-10 pointer-events-none">
                     <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white stroke-[2.8]" />
                   </div>
                 </div>

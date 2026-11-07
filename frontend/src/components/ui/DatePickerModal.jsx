@@ -143,15 +143,15 @@ export function DatePickerModal({
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+        className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center px-3.5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+1.25rem))] pt-4 sm:p-4"
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
         <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.98 }}
+          initial={{ opacity: 0, y: 30, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 30, scale: 0.98 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          className="bg-white rounded-t-[28px] sm:rounded-[28px] w-full max-w-sm sm:max-w-md border border-[#F4E3D8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          exit={{ opacity: 0, y: 25, scale: 0.98 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 360 }}
+          className="bg-white rounded-[26px] sm:rounded-[28px] w-full max-w-sm sm:max-w-md border border-[#F4E3D8] shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[85vh]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#F4E3D8]/70">
@@ -172,7 +172,7 @@ export function DatePickerModal({
             </button>
           </div>
 
-          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+          <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto max-h-[55vh] sm:max-h-[60vh]">
             {/* Quick Action Chips: Today, Tomorrow, Day After */}
             <div className="grid grid-cols-3 gap-2">
               {quickOptions.map((opt) => {
@@ -283,8 +283,8 @@ export function DatePickerModal({
             </div>
           </div>
 
-          {/* Bottom Bar: Selected Preview & Done Button */}
-          <div className="px-5 py-3.5 bg-[#FFFBF8] border-t border-[#F4E3D8] flex items-center justify-between gap-3">
+          {/* Bottom Bar: Selected Preview & Action Buttons with safe-area spacing */}
+          <div className="px-5 pt-3.5 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#FFFBF8] border-t border-[#F4E3D8] flex items-center justify-between gap-3">
             <div className="min-w-0">
               <span className="block text-[10px] font-bold text-[#6E7587] uppercase tracking-wider">
                 Selected Date
@@ -294,14 +294,23 @@ export function DatePickerModal({
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="py-2.5 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-95 text-white text-xs sm:text-sm font-black rounded-full shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <Check className="w-4 h-4 stroke-[2.5]" />
-              <span>Confirm</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="py-2 px-3.5 bg-white border border-[#F4E3D8] hover:bg-[#FFF7F2] text-[#6E7587] hover:text-[#17233C] text-xs font-bold rounded-full transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="py-2 px-5 bg-[#FF572E] hover:bg-[#E64A22] active:scale-95 text-white text-xs sm:text-sm font-black rounded-full shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4 stroke-[2.5]" />
+                <span>Confirm</span>
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

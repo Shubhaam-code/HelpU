@@ -95,7 +95,8 @@ export default function HomePage() {
   // Cached global data queries (instant navigation without full-page reloads)
   const { data: profile } = useUserProfile();
   const { data: myTravels = [], isLoading: travelsLoading } = useMyTravels();
-  const { data: userMatches = [], isLoading: matchesLoading } = useUserMatches();
+  const { data: rawMatches, isLoading: matchesLoading } = useUserMatches();
+  const userMatches = Array.isArray(rawMatches) ? rawMatches : (Array.isArray(rawMatches?.matches) ? rawMatches.matches : []);
   const { data: unreadCount = 0 } = useUnreadNotificationsCount();
 
   const handleSearchSubmit = (e) => {

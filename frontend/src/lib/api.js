@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { auth } from './firebase';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { Capacitor } from '@capacitor/core';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -22,7 +24,7 @@ apiClient.interceptors.request.use(async (config) => {
   try {
     let token = null;
     if (_getToken) {
-      token = await _getToken();
+      token = await _getToken(false);
     }
     // Direct fallback: obtain fresh token from Firebase Auth currentUser
     if (!token && auth?.currentUser) {
@@ -37,10 +39,77 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor: normalize errors
+// Automatic 401 token refresh queue to seamlessly restore session after token expiration
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+// Response interceptor: automatically refresh expired token & retry failed requests
 apiClient.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
+    const originalRequest = err.config;
+    const status = err.response?.status;
+    const isTokenExpired = 
+      status === 401 && 
+      originalRequest && 
+      !originalRequest._retry;
+
+    if (isTokenExpired) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((e) => Promise.reject(e));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        let freshToken = null;
+        if (auth?.currentUser) {
+          try {
+            freshToken = await auth.currentUser.getIdToken(true);
+          } catch (e) {
+            console.warn('[API] auth.currentUser.getIdToken(true) failed:', e?.message);
+          }
+        }
+        if (!freshToken && Capacitor.isNativePlatform()) {
+          try {
+            const res = await FirebaseAuthentication.getIdToken({ forceRefresh: true });
+            freshToken = res?.token;
+          } catch (e) {
+            console.warn('[API] FirebaseAuthentication.getIdToken({ forceRefresh: true }) failed:', e?.message);
+          }
+        }
+
+        if (freshToken) {
+          originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+          processQueue(null, freshToken);
+          return apiClient(originalRequest);
+        }
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     const message =
       err.response?.data?.message ||
       err.response?.data?.error ||

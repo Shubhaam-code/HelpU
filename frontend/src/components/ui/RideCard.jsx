@@ -1,145 +1,223 @@
 import { motion } from 'framer-motion';
-import { Star, Heart, ArrowRight, Calendar, Users, ShieldCheck, Car, Clock, MapPin } from 'lucide-react';
+import { 
+  ShieldCheck, MapPin, Calendar, Clock, 
+  ArrowRight 
+} from 'lucide-react';
 import { Avatar } from './Avatar';
-import { StatusBadge } from './StatusBadge';
-import { formatDate, formatCurrency } from '../../lib/utils';
 
-export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
-  const isOffer = travel?.type === 'offer';
-  const availableSeats = typeof travel?.seats === 'number' 
+/**
+ * Format minutes from midnight (0..1439) into 12-hour AM/PM format (e.g. 08:00 AM)
+ */
+function formatMinutesToTime(minutes) {
+  if (typeof minutes !== 'number' || isNaN(minutes)) return '08:00 AM';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+/**
+ * Format travel date into bold friendly format (e.g. Sat, 14 Nov)
+ */
+function formatTravelDate(dateStr) {
+  if (!dateStr) return 'Upcoming Date';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'Upcoming Date';
+  return d.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  });
+}
+
+/**
+ * Normal Travel Post Card Component
+ * Strictly follows the Reference Card Design for Normal Travel Posts:
+ * - Displays ONLY actual post type: "OFFER" or "REQUEST" (Never "Matching Offer/Request")
+ * - Verified badge when student is verified
+ * - Peach-colored price box (₹350 per seat)
+ * - Green hollow circle -> vertical dashed line -> Orange map pin
+ * - Bold location names
+ * - Bold date and departure time with orange icons
+ * - Green pill for available seats
+ * - Student profile picture and bold name
+ * - Peach-colored View Details button
+ * - NO vehicle names (Creta, Omni, etc.) displayed
+ */
+export function RideCard({ travel, onPress }) {
+  if (!travel) return null;
+
+  const isOffer = travel.type === 'offer';
+  const student = travel.student || travel.creator || {};
+  const studentName = travel.studentName || student.name || travel.authorName || 'Campus Student';
+  const isVerified = Boolean(student.isVerified || travel.isVerified);
+
+  const availableSeats = typeof travel.seats === 'number' 
     ? Math.max(0, travel.seats - (travel.bookedSeats || 0)) 
-    : (travel?.availableSeats || 1);
+    : (travel.availableSeats || 1);
 
-  const fromCity = travel?.source || travel?.from || 'Campus Gate';
-  const toCity = travel?.destination || travel?.to || 'City Center';
+  const fromCity = travel.source || travel.from || 'Campus Gate';
+  const toCity = travel.destination || travel.to || 'City Destination';
+  const pricePerSeat = travel.pricePerSeat ?? 350;
 
-  const timeDisplay = travel?.travelDate 
-    ? new Date(travel.travelDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) + (typeof travel.departureTime === 'number' ? ` • ${String(Math.floor(travel.departureTime / 60)).padStart(2, '0')}:${String(travel.departureTime % 60).padStart(2, '0')}` : '')
-    : formatDate(travel?.departureTime);
+  const dateFormatted = formatTravelDate(travel.travelDate);
+  const timeFormatted = formatMinutesToTime(travel.departureTime);
 
   return (
     <motion.div
       onClick={onPress}
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      className="bg-white rounded-[22px] p-4 sm:p-5 border border-[#F4E3D8]/90 shadow-xs hover:border-[#FF572E]/40 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.99 }}
+      className="bg-white rounded-[26px] sm:rounded-[28px] p-5 sm:p-6 border border-[#F4E3D8] hover:border-[#FF572E]/40 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between gap-4"
     >
-      <div>
-        {/* Creator Info & Tags Header */}
-        <div className="flex items-start justify-between mb-3.5 gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Avatar 
-              avatarId={travel?.studentAvatarId || travel?.student?.avatarId || 'm1'} 
-              src={travel?.student?.imageUrl || travel?.authorImage}
-              size="md" 
-              ring
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-extrabold text-[#17233C] text-sm truncate">
-                  {travel?.studentName || travel?.student?.name || 'Campus Student'}
-                </span>
-                {Boolean(travel?.student?.isVerified) && (
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" title="Verified Student" />
-                )}
-                {(travel?.gender || travel?.student?.gender) && 
-                  (travel.gender || travel.student?.gender) !== 'Prefer not to say' && (
-                  <span className="px-1.5 py-0.2 rounded-md text-[9px] font-bold bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]">
-                    {travel.gender || travel.student?.gender}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-[#6E7587] mt-0.5">
-                <span>{travel?.student?.college || 'VIT, Bhopal'}</span>
-                <span>•</span>
-                <span className="flex items-center gap-0.5 text-amber-500 font-bold">
-                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  {travel?.rating || '4.9'}
-                </span>
-              </div>
-            </div>
+      {/* 1. TOP HEADER: OFFER / REQUEST Badge | Verified & Peach Price Box */}
+      <div className="flex items-start justify-between gap-3">
+        {/* Left: OFFER or REQUEST pill + Optional Verified Status */}
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider shrink-0 ${
+            isOffer
+              ? 'bg-[#FFF0E6] text-[#FF572E] border border-[#FFD9C7]'
+              : 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]'
+          }`}>
+            <span>{isOffer ? 'OFFER' : 'REQUEST'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {travel?.isMine && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EAF8F0] text-[#16A34A] border border-[#BCECD4]">
-                Your Ride
-              </span>
-            )}
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-              isOffer 
-                ? 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]' 
-                : 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]'
-            }`}>
-              {isOffer ? '🚗 Offer' : '🙋 Request'}
+          {travel.isMine && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EAF8F0] text-[#16A34A] border border-[#BCECD4] shrink-0">
+              Your Ride
             </span>
-          </div>
+          )}
+
+          {isVerified && (
+            <>
+              <span className="text-gray-300 font-light select-none">|</span>
+              <div className="inline-flex items-center gap-1 text-xs font-bold text-[#16A34A] shrink-0">
+                <ShieldCheck className="w-4 h-4 text-[#16A34A] fill-[#EDFAF3]" />
+                <span>Verified</span>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Matching Reason Tag */}
-        {travel?.matchingReason && (
-          <div className="mb-2.5 px-2.5 py-1 rounded-lg bg-[#EDFAF3] border border-[#BCECD4] text-[10px] font-black text-[#16A34A] flex items-center gap-1">
-            <span>🎯</span>
-            <span className="truncate">{travel.matchingReason}</span>
-          </div>
-        )}
+        {/* Right: Peach Price Box */}
+        <div className="shrink-0">
+          {isOffer ? (
+            pricePerSeat > 0 ? (
+              <div className="bg-[#FFF4ED] rounded-2xl px-4 py-2 text-center border border-[#FDE0D0]">
+                <div className="text-xl sm:text-2xl font-black text-[#FF572E] leading-none">
+                  ₹{pricePerSeat}
+                </div>
+                <div className="text-[10.5px] font-bold text-[#8C93A4] mt-1">
+                  per seat
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#EDFAF3] rounded-2xl px-3.5 py-2 text-center border border-[#BCECD4]">
+                <div className="text-base font-black text-[#16A34A] leading-none">Free</div>
+                <div className="text-[10px] font-bold text-[#16A34A]/80 mt-1">Ride Share</div>
+              </div>
+            )
+          ) : (
+            <div className="bg-[#EFF6FF] rounded-2xl px-3.5 py-2 text-center border border-[#DBEAFE]">
+              <div className="text-sm font-black text-[#2563EB] leading-none">Seeking</div>
+              <div className="text-[10px] font-bold text-[#6E7587] mt-1">Ride Request</div>
+            </div>
+          )}
+        </div>
+      </div>
 
-        {/* Route Details */}
-        <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8] mb-3 space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0 ring-2 ring-[#DCFCE7]" />
-            <span className="font-bold text-[#17233C] truncate">{fromCity}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0 ring-2 ring-[#FFEBE0]" />
-            <span className="font-bold text-[#17233C] truncate">{toCity}</span>
-          </div>
+      {/* 2. ROUTE SECTION: Green Circle -> Dashed Line -> Orange Pin */}
+      <div className="flex items-start gap-3 my-1">
+        {/* Route dots & dashed line */}
+        <div className="flex flex-col items-center pt-1 shrink-0">
+          <div className="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#16A34A] bg-white ring-2 ring-[#DCFCE7]" />
+          <div className="w-0.5 h-7 border-l-2 border-dashed border-[#CBD5E1] my-1" />
+          <MapPin className="w-4 h-4 text-[#FF572E] fill-[#FF572E]" />
         </div>
 
-        {/* Meta badges: Time & Vehicle */}
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#6E7587] mb-3">
-          <div className="flex items-center gap-1 bg-[#F9FAFB] px-2 py-1 rounded-lg border border-gray-100 font-medium">
-            <Calendar className="w-3 h-3 text-[#FF572E]" />
-            <span>{timeDisplay}</span>
+        {/* Route text with bold location names */}
+        <div className="flex flex-col justify-between gap-3 min-w-0 flex-1">
+          <div className="font-black text-[#17233C] text-base sm:text-lg truncate leading-tight capitalize">
+            {fromCity}
           </div>
-          <div className="flex items-center gap-1 bg-[#F9FAFB] px-2 py-1 rounded-lg border border-gray-100 font-medium">
-            <Car className="w-3 h-3 text-[#FF572E]" />
-            <span>{travel?.carModel || (isOffer ? 'Shared Car' : 'Co-traveler')}</span>
+          <div className="font-black text-[#17233C] text-base sm:text-lg truncate leading-tight capitalize">
+            {toCity}
           </div>
         </div>
       </div>
 
-      {/* Footer: Price, Seats & Action Button */}
-      <div className="flex items-center justify-between pt-3 border-t border-[#F4E3D8]/70">
-        <div>
-          <span className="text-[10px] uppercase font-bold text-[#6E7587] block">
-            {isOffer ? 'Seat Split' : 'Seats'}
+      {/* 3. SUBTLE HORIZONTAL DIVIDER */}
+      <div className="border-t border-[#F4E3D8]/80 my-0.5" />
+
+      {/* 4. METADATA ROW: Date (bold) | Time (bold) | Available Seats (green pill) */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs">
+        {/* Date */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Calendar className="w-4 h-4 text-[#FF572E]" />
+          <span className="font-black text-[#17233C] text-xs sm:text-sm">
+            {dateFormatted}
           </span>
-          <div className="flex items-baseline gap-1">
-            <span className="font-black text-sm sm:text-base text-[#17233C]">
-              {formatCurrency(travel?.pricePerSeat || 350)}
-            </span>
-            <span className="text-[10px] text-[#6E7587]">/ seat</span>
-          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-            availableSeats > 0 ? 'bg-[#EAF8F0] text-[#16A34A]' : 'bg-gray-100 text-gray-500'
-          }`}>
-            {availableSeats} seat{availableSeats !== 1 ? 's' : ''} left
+        <span className="text-gray-300 font-light select-none">|</span>
+
+        {/* Time */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Clock className="w-4 h-4 text-[#FF572E]" />
+          <span className="font-black text-[#17233C] text-xs sm:text-sm">
+            {timeFormatted}
           </span>
-          <button
-            onClick={onPress}
-            className="w-8 h-8 rounded-full bg-[#FF572E] text-white flex items-center justify-center hover:bg-[#E64A22] transition-colors shadow-xs"
-          >
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
+
+        <span className="text-gray-300 font-light select-none">|</span>
+
+        {/* Seat count in green pill */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] shrink-0">
+          <svg className="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3" />
+            <path d="M3 11v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0z" />
+            <path d="M5 18v2" />
+            <path d="M19 18v2" />
+          </svg>
+          <span>
+            {availableSeats} {isOffer ? (availableSeats === 1 ? 'seat left' : 'seats left') : (availableSeats === 1 ? 'seat needed' : 'seats needed')}
+          </span>
+        </div>
+      </div>
+
+      {/* 5. FOOTER: Student Profile & Peach View Details Button */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        {/* Student Avatar + Full Name */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Avatar
+            avatarId={travel.studentAvatarId || student.avatarId || 'm1'}
+            src={student.imageUrl || travel.authorImage}
+            name={studentName}
+            email={student.email}
+            size="sm"
+            className="w-9 h-9 aspect-square rounded-full border border-[#F4E3D8] shrink-0"
+          />
+          <span className="font-black text-sm sm:text-base text-[#17233C] truncate">
+            {studentName}
+          </span>
+        </div>
+
+        {/* Peach-colored View Details Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onPress) onPress();
+          }}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full font-black text-xs sm:text-sm bg-[#FFF0E6] hover:bg-[#FFE0D0] text-[#FF572E] border border-[#FFD9C7] transition-all cursor-pointer active:scale-95 shadow-2xs shrink-0"
+        >
+          <span>View Details</span>
+          <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+        </button>
       </div>
     </motion.div>
   );
 }
 
 export default RideCard;
-

@@ -12,6 +12,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { DatePickerModal } from '../components/ui/DatePickerModal';
+import { TimePickerModal } from '../components/ui/TimePickerModal';
 import { createTravel } from '../lib/api';
 import { invalidateRideQueries } from '../lib/queryClient';
 
@@ -140,6 +141,7 @@ export default function OfferRidePage() {
     return tomorrow.toISOString().split('T')[0];
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [time, setTime] = useState('08:00');
   const [gender, setGender] = useState(''); // 'Male' | 'Female' | 'Prefer not to say' | ''
   const [travellers, setTravellers] = useState(1);
@@ -505,8 +507,11 @@ export default function OfferRidePage() {
                     </div>
                   </div>
 
-                  {/* Time */}
-                  <div className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/40 focus-within:border-[#FF572E] transition-all cursor-pointer">
+                  {/* Time (Custom Helpu Time Picker - No Oversized Native Dialog) */}
+                  <div 
+                    onClick={() => setShowTimePicker(true)}
+                    className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/60 focus-within:border-[#FF572E] active:scale-[0.98] transition-all cursor-pointer"
+                  >
                     <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-1">
                       <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
                       <span>Time (Optional)</span>
@@ -517,13 +522,6 @@ export default function OfferRidePage() {
                       </span>
                       <ChevronDown className="w-4 h-4 text-[#17233C]/70 shrink-0" />
                     </div>
-                    <input
-                      type="time"
-                      value={time}
-                      onChange={(e) => setTime(e.target.value)}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                      aria-label="Departure Time"
-                    />
                   </div>
 
                 </div>
@@ -864,6 +862,18 @@ export default function OfferRidePage() {
           setShowDatePicker(false);
         }}
         title={mode === 'offer' ? 'Select Ride Date' : 'Select Travel Date'}
+      />
+
+      {/* Modern Custom Time Picker Modal */}
+      <TimePickerModal
+        isOpen={showTimePicker}
+        onClose={() => setShowTimePicker(false)}
+        value={time}
+        onChange={(newTime) => {
+          setTime(newTime);
+          setShowTimePicker(false);
+        }}
+        title="Select Departure Time"
       />
     </ResponsiveShell>
   );

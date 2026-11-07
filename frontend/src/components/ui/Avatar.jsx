@@ -40,7 +40,7 @@ export function Avatar({
           src={src} 
           alt={name || 'User Profile'} 
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover rounded-full" 
+          className="w-full h-full object-cover rounded-full aspect-square block" 
           onError={() => setImgError(true)}
         />
       ) : (

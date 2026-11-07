@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 import { useUser } from '../context/FirebaseAuthContext';
 import { 
   Users, MapPin, Clock, Calendar, ShieldCheck, Car, MessageSquare, 
@@ -11,8 +12,10 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { CompactMatchCard } from '../components/ui/CompactMatchCard';
 import { openWhatsAppChat } from '../lib/whatsapp';
-import { getUserMatches, getMyTravels, getMyBookings } from '../lib/api';
+import { useUserMatchesData, useMyTravels, useMyBookings } from '../hooks/useAppData';
+import { invalidateRideQueries } from '../lib/queryClient';
 
 /**
  * Format minutes from midnight (0..1439) into 12-hour AM/PM format
@@ -69,15 +72,40 @@ function formatRouteDisplay(source, destination) {
 export default function MyMatchesPage() {
   const navigate = useNavigate();
   const { user } = useUser();
+  const isAndroid = Capacitor.getPlatform() === 'android';
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [toastMsg, setToastMsg] = useState(null); // { type: 'error' | 'success', text: string }
-  const [userMatches, setUserMatches] = useState([]);
-  const [myTravels, setMyTravels] = useState([]);
-  const [myBookings, setMyBookings] = useState([]);
-  const [hasPostedTravel, setHasPostedTravel] = useState(false);
   const [selectedRouteFilter, setSelectedRouteFilter] = useState('all');
+
+  // TanStack Query cached data flow (Instant navigation, zero full-page spinners on return visits)
+  const { 
+    data: matchesPayload, 
+    isLoading: matchesLoading, 
+    isFetching: isFetchingMatches,
+    error: matchesError,
+    refetch: refetchMatches 
+  } = useUserMatchesData();
+
+  const { 
+    data: userTravels = [], 
+    isLoading: travelsLoading, 
+    refetch: refetchTravels 
+  } = useMyTravels();
+
+  const { 
+    data: myBookings = [] 
+  } = useMyBookings();
+
+  const userMatches = Array.isArray(matchesPayload)
+    ? matchesPayload
+    : (Array.isArray(matchesPayload?.matches) ? matchesPayload.matches : []);
+  const hasPostedTravel = Boolean(matchesPayload?.hasPostedTravel || userTravels.length > 0 || userMatches.length > 0);
+  const myTravels = userTravels.length > 0 ? userTravels : (Array.isArray(matchesPayload?.myTravels) ? matchesPayload.myTravels : []);
+
+  // Show loading skeleton ONLY on initial mount when NO cached data is in memory yet
+  const loading = (matchesLoading || travelsLoading) && userMatches.length === 0 && userTravels.length === 0;
+  const error = matchesError ? (matchesError.response?.data?.message || matchesError.message || 'Unable to retrieve matches.') : null;
+  const isRefreshing = isFetchingMatches;
 
   // Auto-dismiss toast message
   useEffect(() => {
@@ -85,6 +113,16 @@ export default function MyMatchesPage() {
     const t = setTimeout(() => setToastMsg(null), 4000);
     return () => clearTimeout(t);
   }, [toastMsg]);
+
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    try {
+      await Promise.all([refetchMatches(), refetchTravels()]);
+      setToastMsg({ type: 'success', text: 'Matches updated from campus network.' });
+    } catch {
+      setToastMsg({ type: 'error', text: 'Failed to refresh matches. Please try again.' });
+    }
+  };
 
   // Handle direct WhatsApp coordination
   const handleContactWhatsApp = (match) => {
@@ -122,56 +160,6 @@ export default function MyMatchesPage() {
       });
     }
   };
-
-  // Fetch actual matches and current user's bookings from backend
-  const fetchMatches = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [matchesRes, travelsRes, bookingsRes] = await Promise.allSettled([
-        getUserMatches(),
-        getMyTravels(),
-        getMyBookings()
-      ]);
-
-      if (matchesRes.status === 'fulfilled') {
-        const data = matchesRes.value.data || {};
-        const matchesList = Array.isArray(data.data) ? data.data : [];
-        setUserMatches(matchesList);
-        setHasPostedTravel(Boolean(data.hasPostedTravel));
-        if (Array.isArray(data.myTravels) && data.myTravels.length > 0) {
-          setMyTravels(data.myTravels);
-        }
-      } else {
-        throw new Error(matchesRes.reason?.response?.data?.message || matchesRes.reason?.message || 'Failed to load matches');
-      }
-
-      if (travelsRes.status === 'fulfilled') {
-        const travelsList = travelsRes.value.data?.data || travelsRes.value.data || [];
-        if (Array.isArray(travelsList)) {
-          setMyTravels(travelsList);
-          if (travelsList.length > 0) {
-            setHasPostedTravel(true);
-          }
-        }
-      }
-
-      if (bookingsRes.status === 'fulfilled') {
-        const bList = bookingsRes.value?.data?.data || bookingsRes.value?.data?.bookings || bookingsRes.value?.data || [];
-        setMyBookings(Array.isArray(bList) ? bList : []);
-      }
-    } catch (err) {
-      console.error('Error fetching matches:', err);
-      setError(err.message || 'Unable to retrieve matches from the campus network.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMatches();
-  }, [fetchMatches]);
 
   // Lookup map for active booking status per travel post
   const activeBookingStatusByTravelId = useMemo(() => {
@@ -296,13 +284,13 @@ export default function MyMatchesPage() {
             {/* Quick Actions */}
             <div className="flex flex-wrap items-center gap-2.5 pt-3.5 sm:pt-4">
               <button
-                onClick={fetchMatches}
-                disabled={loading}
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] text-[#17233C] text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-50"
                 title="Refresh matches"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#FF572E]' : ''}`} />
-                <span>Refresh</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#FF572E]' : ''}`} />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
 
               <button
@@ -541,167 +529,17 @@ export default function MyMatchesPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {/* Unified Compact Vertical List for Both Android and Website */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredMatches.map((match) => {
-                const student = match.student || {};
-                const fromCity = match.source || match.from || 'Campus';
-                const toCity = match.destination || match.to || 'City';
-                const seats = match.availableSeats ?? match.seats ?? 1;
-                const phone = student.phone || match.phone || '';
-                const dateFormatted = formatTravelDate(match.travelDate);
-                const timeFormatted = formatMinutesToTime(match.departureTime);
-                const isOffer = match.type === 'offer';
                 const travelId = match._id?.toString() || match.id?.toString();
-
                 return (
-                  <motion.div
+                  <CompactMatchCard
                     key={travelId}
-                    whileHover={{ y: -3 }}
-                    className="bg-white rounded-[26px] p-5 sm:p-6 border border-[#F4E3D8] hover:border-[#FF572E]/40 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between gap-4.5 group"
-                  >
-                    <div className="space-y-4">
-                      
-                      {/* Top Header: Student Profile, Type Badge & Price (Matches Post Card UI) */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Avatar
-                            avatarId={student.avatarId || 'm1'}
-                            src={student.imageUrl}
-                            name={student.name || match.authorName}
-                            size="md"
-                            ring
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <h4 className="font-black text-sm sm:text-base text-[#17233C] truncate">
-                                {student.name || match.authorName || 'Campus Student'}
-                              </h4>
-                              <ShieldCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-[11px] text-[#6E7587] font-semibold truncate">
-                                {student.college || 'VIT, Bhopal'}
-                              </span>
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                isOffer
-                                  ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
-                                  : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
-                              }`}>
-                                {isOffer ? 'Ride Offer' : 'Request'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Price per seat if offer (Identical to Post card) */}
-                        {isOffer && (
-                          <div className="text-right shrink-0">
-                            <span className="text-[#FF572E] font-black text-base sm:text-lg font-mono leading-none block">
-                              ₹{match.pricePerSeat || 350}
-                            </span>
-                            <span className="text-[10px] font-bold text-[#8C93A4] block mt-0.5">
-                              per seat
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Matching Reason Pill if present */}
-                      {match.matchingReason && (
-                        <div className="px-3.5 py-1.5 bg-[#FFF4ED] rounded-xl text-[11px] font-bold text-[#FF572E] border border-[#FDE0D0] flex items-center gap-2">
-                          <span>🎯</span>
-                          <span className="truncate">{match.matchingReason}</span>
-                        </div>
-                      )}
-
-                      {/* Route Box with Departure, Destination, Route Arrow & Schedule Details */}
-                      <div className="bg-[#FFFBF8] rounded-2xl p-3.5 sm:p-4 border border-[#F4E3D8]/80 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          {/* Pickup */}
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block mb-1">
-                              Pickup
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
-                              <span className="font-extrabold text-[#17233C] text-sm sm:text-base truncate capitalize" title={fromCity}>
-                                {fromCity}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Route Arrow */}
-                          <div className="flex flex-col items-center justify-center shrink-0 px-2">
-                            <div className="w-8 h-8 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] flex items-center justify-center shadow-2xs group-hover:scale-105 group-hover:border-[#FF572E]/40 transition-all">
-                              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                            </div>
-                          </div>
-
-                          {/* Drop */}
-                          <div className="min-w-0 flex-1 text-right">
-                            <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block mb-1">
-                              Drop
-                            </span>
-                            <div className="flex items-center justify-end gap-1.5">
-                              <span className="font-extrabold text-[#17233C] text-sm sm:text-base truncate capitalize" title={toCity}>
-                                {toCity}
-                              </span>
-                              <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Divider & Schedule / Seats Row */}
-                        <div className="border-t border-[#F4E3D8]/60 pt-2.5 flex items-center justify-between gap-2 text-xs">
-                          <div className="flex items-center gap-1.5 font-bold text-[#6E7587] min-w-0">
-                            <Calendar className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                            <span className="truncate">
-                              {dateFormatted} • {timeFormatted || '08:00 AM'}
-                            </span>
-                          </div>
-
-                          <div className={`font-bold shrink-0 text-xs ${isOffer ? 'text-[#16A34A]' : 'text-[#FF572E]'}`}>
-                            {isOffer ? `${seats} seat(s) left` : `${match.seats || 1} seat(s) needed`}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Vehicle Model indicator & Price Row */}
-                      <div className="flex items-center justify-between text-xs px-1 font-semibold text-[#6E7587]">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <Car className="w-4 h-4 text-[#8C93A4] shrink-0" />
-                          <span className="truncate">{match.carModel || (isOffer ? 'Campus Carpool' : 'Peer Request')}</span>
-                        </div>
-
-                        {isOffer && (
-                          <div className="text-right shrink-0">
-                            <span className="text-[#FF572E] font-black text-base sm:text-lg font-mono">
-                              ₹{match.pricePerSeat || 350}
-                            </span>
-                            <span className="text-xs text-[#8C93A4] font-medium font-sans">/seat</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions Row: View Details Button (Same for Offer and Request) */}
-                    <div className="pt-3 border-t border-[#F4E3D8]/70">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
-                            navigate(`/rides/${travelId}`);
-                          } else {
-                            navigate('/rides/offer');
-                          }
-                        }}
-                        className="w-full py-2.5 px-4 bg-[#FFF4ED] hover:bg-[#FF572E] text-[#FF572E] hover:text-white border border-[#FDE0D0] hover:border-[#FF572E] font-black text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <span>View Details</span>
-                        <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                      </button>
-                    </div>
-                  </motion.div>
+                    match={match}
+                    onContactWhatsApp={handleContactWhatsApp}
+                    activeBookingStatusByTravelId={activeBookingStatusByTravelId}
+                  />
                 );
               })}
             </div>

@@ -12,7 +12,9 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { CancelBookingModal } from '../components/ui/CancelBookingModal';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { invalidateBookingQueries } from '../lib/queryClient';
 import { 
   getMyBookings, 
   getReceivedBookings, 
@@ -49,6 +51,9 @@ export default function BookingsListPage() {
 
   // Modal for Viewing Details & Status Timeline
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [bookingToCancel, setBookingToCancel] = useState(null);
+  const [cancelModalError, setCancelModalError] = useState('');
+  const [isModalCancelling, setIsModalCancelling] = useState(false);
 
   // Sync tab with URL
   const handleTabChange = (tabId) => {
@@ -135,28 +140,31 @@ export default function BookingsListPage() {
     return receivedBookings;
   }, [receivedBookings, receivedFilter]);
 
-  // Handle Cancellation / Withdrawal
-  const handleCancelBooking = async (bookingId, isPending = false) => {
-    const confirmMsg = isPending
-      ? 'Are you sure you want to withdraw this ride request?'
-      : 'Are you sure you want to cancel this confirmed booking? This will release reserved seats.';
+  // Handle Cancellation / Withdrawal via Helpu Modal
+  const handleCancelBooking = (bookingId) => {
+    setBookingToCancel(bookingId);
+    setCancelModalError('');
+  };
 
-    if (!window.confirm(confirmMsg)) return;
-
-    setActionLoadingId(bookingId);
+  const handleConfirmCancelModal = async () => {
+    if (!bookingToCancel) return;
+    setIsModalCancelling(true);
+    setCancelModalError('');
     try {
-      await cancelBooking(bookingId);
-      const updater = (list) => list.map(b => b._id === bookingId ? { ...b, status: 'cancelled', cancelledAt: new Date().toISOString() } : b);
+      await cancelBooking(bookingToCancel);
+      invalidateBookingQueries();
+      const updater = (list) => list.map(b => b._id === bookingToCancel ? { ...b, status: 'cancelled', cancelledAt: new Date().toISOString() } : b);
       setMyBookings(updater);
       setReceivedBookings(updater);
-      if (selectedBooking && selectedBooking._id === bookingId) {
+      if (selectedBooking && selectedBooking._id === bookingToCancel) {
         setSelectedBooking(prev => ({ ...prev, status: 'cancelled', cancelledAt: new Date().toISOString() }));
       }
+      setBookingToCancel(null);
     } catch (err) {
       console.error('Cancel booking error:', err);
-      alert(err?.response?.data?.message || err.message || 'Failed to cancel booking.');
+      setCancelModalError(err?.response?.data?.message || err.message || 'Failed to cancel booking. Please try again.');
     } finally {
-      setActionLoadingId(null);
+      setIsModalCancelling(false);
     }
   };
 
@@ -1091,6 +1099,15 @@ export default function BookingsListPage() {
         </AnimatePresence>
 
       </div>
+
+      {/* Premium Reusable Helpu Booking Cancellation Modal */}
+      <CancelBookingModal
+        isOpen={Boolean(bookingToCancel)}
+        onClose={() => setBookingToCancel(null)}
+        onConfirm={handleConfirmCancelModal}
+        isCancelling={isModalCancelling}
+        error={cancelModalError}
+      />
     </ResponsiveShell>
   );
 }
