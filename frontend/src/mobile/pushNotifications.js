@@ -34,11 +34,11 @@ export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_high_importance';
  * @returns {Promise<{ synced: boolean, reason?: string, error?: string }>}
  */
 export async function syncDeviceTokenWithBackend(user = currentAuthUser) {
-  if (user && user.id) {
+  if (user && (user.id || user.uid)) {
     currentAuthUser = user;
   }
 
-  const userId = currentAuthUser?.id;
+  const userId = currentAuthUser?.id || currentAuthUser?.uid;
   const token = cachedFcmToken;
 
   if (!userId) {
@@ -71,6 +71,20 @@ export async function syncDeviceTokenWithBackend(user = currentAuthUser) {
     return { synced: true };
   } catch (err) {
     console.warn(`[HelpuPush] Non-fatal error registering device token prefix ${tokenPrefix}:`, err.message);
+    // Retry once after 2.5s in case token or auth session was initializing
+    setTimeout(async () => {
+      try {
+        if (currentAuthUser && cachedFcmToken && lastSyncedKey !== syncKey) {
+          console.log(`[HelpuPush] Retrying device token registration for user ${userId}...`);
+          const retryPlatform = Capacitor.getPlatform() || 'android';
+          await registerFcmToken(cachedFcmToken, retryPlatform);
+          lastSyncedKey = syncKey;
+          console.log(`[HelpuPush] Retry registration successful for user ${userId}`);
+        }
+      } catch (retryErr) {
+        console.warn(`[HelpuPush] Retry registration failed:`, retryErr.message);
+      }
+    }, 2500);
     return { synced: false, error: err.message };
   } finally {
     isSyncInProgress = false;
@@ -114,7 +128,7 @@ export async function unregisterDeviceTokenFromBackend() {
  * @param {Object|null} user - User object or null on logout
  */
 export function setActiveAuthUser(user) {
-  if (user && user.id) {
+  if (user && (user.id || user.uid)) {
     currentAuthUser = user;
     if (cachedFcmToken) {
       syncDeviceTokenWithBackend(user);
@@ -192,15 +206,22 @@ export async function initPushNotifications({
       // Trigger beautiful floating in-app popup banner (WhatsApp style)
       try {
         const data = notification.data || {};
+        const notificationType = data.type || data.eventType || 'BOOKING_REQUESTED';
+        const imageUri = data.imageUrl || notification.imageUrl || data.senderAvatar || data.passengerImage || data.ownerImage || '';
+        const displayName = data.passengerName || data.ownerName || data.senderName || '';
+        const fallbackRoute = data.bookingId
+          ? `/bookings/${data.bookingId}`
+          : (data.travelId || data.postId ? `/rides/${data.travelId || data.postId}` : '/notifications');
+
         triggerInAppNotification({
           id: notification.id || data.eventId || data.id,
           title: notification.title,
           body: notification.body,
           data,
-          type: data.type || 'BOOKING_REQUESTED',
-          senderName: data.senderName || data.passengerName || data.ownerName || '',
-          senderAvatar: data.senderAvatar || data.passengerImage || data.ownerImage || '',
-          targetRoute: data.route || (data.bookingId ? `/bookings/${data.bookingId}` : (data.travelId ? `/rides/${data.travelId}` : '/notifications'))
+          type: notificationType,
+          senderName: displayName,
+          senderAvatar: imageUri,
+          targetRoute: data.route || fallbackRoute
         });
       } catch (err) {
         console.warn('[HelpuPush] Error displaying foreground in-app banner:', err);
@@ -216,17 +237,20 @@ export async function initPushNotifications({
     const actHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
       console.log('[HelpuPush] Notification tapped by user:', action);
       const data = action.notification?.data || {};
+      const notifType = (data.type || data.eventType || '').toUpperCase();
 
       let targetRoute = null;
       if (data.route) {
         targetRoute = data.route;
       } else if (data.url) {
         targetRoute = data.url;
+      } else if (notifType.includes('MATCH')) {
+        targetRoute = data.travelId || data.postId ? `/rides/${data.travelId || data.postId}` : '/match';
       } else if (data.bookingId) {
         targetRoute = `/bookings/${data.bookingId}`;
-      } else if (data.travelId) {
-        targetRoute = `/rides/${data.travelId}`;
-      } else if (data.type === 'notification') {
+      } else if (data.travelId || data.postId) {
+        targetRoute = `/rides/${data.travelId || data.postId}`;
+      } else {
         targetRoute = '/notifications';
       }
 

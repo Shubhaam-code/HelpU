@@ -13,6 +13,7 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider } from '../lib/firebase';
 import { setTokenGetter } from '../lib/api';
+import { setActiveAuthUser } from '../mobile/pushNotifications';
 
 const FirebaseAuthContext = createContext(null);
 
@@ -75,6 +76,11 @@ export function FirebaseAuthProvider({ children }) {
   useEffect(() => {
     setTokenGetter(getToken);
   }, [getToken]);
+
+  // Synchronize authenticated user state with Native Push Notifications (FCM)
+  useEffect(() => {
+    setActiveAuthUser(user);
+  }, [user]);
 
   // Listen to Firebase JS auth state changes
   useEffect(() => {

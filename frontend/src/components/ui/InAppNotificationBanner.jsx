@@ -129,6 +129,42 @@ function getBannerVisuals(type = '') {
     };
   }
 
+  if (t.includes('WITHDRAW')) {
+    return {
+      icon: XCircle,
+      badgeText: 'Request Withdrawn',
+      badgeBg: 'bg-[#FFF4ED]',
+      badgeColor: 'text-[#FF572E]',
+      actionLabel: 'View Ride',
+      borderColor: 'border-[#FF572E]/30',
+      accentColor: '#FF572E'
+    };
+  }
+
+  if (t.includes('UPDATE')) {
+    return {
+      icon: Clock,
+      badgeText: 'Ride Updated',
+      badgeBg: 'bg-[#FFF8E7]',
+      badgeColor: 'text-[#D97706]',
+      actionLabel: 'View Changes',
+      borderColor: 'border-[#D97706]/30',
+      accentColor: '#D97706'
+    };
+  }
+
+  if (t.includes('EXPIRE')) {
+    return {
+      icon: Clock,
+      badgeText: 'Ride Expired',
+      badgeBg: 'bg-[#F3F4F6]',
+      badgeColor: 'text-[#6B7280]',
+      actionLabel: 'View Post',
+      borderColor: 'border-[#9CA3AF]/30',
+      accentColor: '#6B7280'
+    };
+  }
+
   if (t.includes('REJECTED')) {
     return {
       icon: XCircle,
