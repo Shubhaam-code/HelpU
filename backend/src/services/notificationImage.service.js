@@ -180,12 +180,13 @@ export async function resolveNotificationImage({
     }
   }
 
-  // (f) Default Helpu-branded fallback image
+  // (f) When no post/student image is available, return null so a clean text-only notification is delivered
+  // This guarantees Android never fails or suppresses notifications due to image download errors.
   return {
-    imageUrl: HELPU_DEFAULT_NOTIFICATION_IMAGE,
+    imageUrl: null,
     travelDoc,
     bookingDoc,
-    sourceField: 'fallback'
+    sourceField: 'none'
   };
 }
 
@@ -370,7 +371,7 @@ export async function resolveNotificationContentAndPayload({
     travelId: effectiveTravelId,
     bookingId: effectiveBookingId,
     route: targetRoute,
-    imageUrl: String(imageUrl),
+    imageUrl: imageUrl ? String(imageUrl) : '',
     imageSource: sourceField,
     source: String(source),
     destination: String(destination),

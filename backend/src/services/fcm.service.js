@@ -9,7 +9,7 @@ export const FCM_MULTICAST_MAX_BATCH_SIZE = 500;
 /**
  * High-importance Android notification channel matching frontend Capacitor setup
  */
-export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_high_importance';
+export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_alerts_v2';
 
 /**
  * Permanent error codes from Firebase Admin SDK that warrant token deletion
@@ -167,26 +167,23 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
 
   // 4. Dispatch batches
   for (const batch of tokenBatches) {
+    const hasValidImage = typeof imageUrl === 'string' && imageUrl.trim().startsWith('http');
+
     const multicastMessage = {
       tokens: batch,
       notification: {
         title,
         body,
-        ...(imageUrl ? { imageUrl } : {})
+        ...(hasValidImage ? { imageUrl: imageUrl.trim() } : {})
       },
       android: {
         priority: 'high',
         notification: {
           channelId: HELPU_NOTIFICATION_CHANNEL_ID,
           priority: 'high',
-          notificationPriority: 'PRIORITY_HIGH',
           defaultSound: true,
           defaultVibrateTimings: true,
-          icon: 'ic_stat_notification',
-          color: '#FF572E',
-          visibility: 'public',
-          clickAction: 'FCM_PLUGIN_ACTIVITY',
-          ...(imageUrl ? { imageUrl } : {})
+          ...(hasValidImage ? { imageUrl: imageUrl.trim() } : {})
         }
       },
       apns: {

@@ -278,9 +278,9 @@ async function runTests() {
   passedCount++;
 
   // -------------------------------------------------------------------------
-  // Test 11: Missing-image fallback handling
+  // Test 11: Missing-image safe text-only fallback handling
   // -------------------------------------------------------------------------
-  console.log('\n>>> TEST 11: Missing-image Fallback Handling <<<');
+  console.log('\n>>> TEST 11: Missing-image Safe Text-Only Delivery <<<');
   const fallbackResult = await resolveNotificationContentAndPayload({
     eventType: NOTIFICATION_JOB_TYPES.BOOKING_CONFIRMED,
     recipientId: 'user_fallback_test',
@@ -292,9 +292,9 @@ async function runTests() {
       imageUrl: null // No image provided
     }
   });
-  assert.equal(fallbackResult.imageUrl, HELPU_DEFAULT_NOTIFICATION_IMAGE);
-  assert.equal(fallbackResult.imageSource, 'fallback');
-  console.log(`✓ Post with no image successfully resolves to fallback: ${fallbackResult.imageUrl}`);
+  assert.equal(fallbackResult.imageUrl, null);
+  assert.equal(fallbackResult.imageSource, 'none');
+  console.log('✓ Post with no image safely defaults to null imageUrl to deliver clean text-only notification.');
   passedCount++;
 
   // -------------------------------------------------------------------------
@@ -304,27 +304,22 @@ async function runTests() {
   const testData = sanitizeCustomData(case1Result.customData);
   assert.equal(typeof testData.postId, 'string');
   assert.equal(typeof testData.route, 'string');
-  assert.equal(typeof testData.imageUrl, 'string');
 
   const fcmMessage = {
     tokens: ['mock_token_123'],
     notification: {
       title: case1Result.title,
       body: case1Result.message,
-      imageUrl: case1Result.imageUrl
+      ...(case1Result.imageUrl ? { imageUrl: case1Result.imageUrl } : {})
     },
     android: {
       priority: 'high',
       notification: {
         channelId: HELPU_NOTIFICATION_CHANNEL_ID,
         priority: 'high',
-        notificationPriority: 'PRIORITY_HIGH',
         defaultSound: true,
         defaultVibrateTimings: true,
-        icon: 'ic_stat_notification',
-        color: '#FF572E',
-        visibility: 'public',
-        imageUrl: case1Result.imageUrl
+        ...(case1Result.imageUrl ? { imageUrl: case1Result.imageUrl } : {})
       }
     },
     data: testData
@@ -332,8 +327,8 @@ async function runTests() {
 
   assert.equal(fcmMessage.notification.imageUrl, case1Result.imageUrl);
   assert.equal(fcmMessage.android.notification.imageUrl, case1Result.imageUrl);
-  assert.equal(fcmMessage.android.notification.channelId, 'helpu_high_importance');
-  console.log('✓ Verified BigPictureStyle payload in FCM notification and android.notification.');
+  assert.equal(fcmMessage.android.notification.channelId, 'helpu_alerts_v2');
+  console.log('✓ Verified BigPictureStyle payload in FCM notification and android.notification on helpu_alerts_v2.');
   passedCount++;
 
   // -------------------------------------------------------------------------

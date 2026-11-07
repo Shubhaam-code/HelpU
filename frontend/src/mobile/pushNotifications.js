@@ -22,9 +22,9 @@ let isSyncInProgress = false;
 export const getCachedFcmToken = () => cachedFcmToken;
 
 /**
- * High-importance notification channel ID for heads-up notifications
+ * High-importance Android notification channel ID for heads-up notifications (v2 fresh channel)
  */
-export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_high_importance';
+export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_alerts_v2';
 
 /**
  * Synchronize the current device FCM token with the backend for the authenticated user.
