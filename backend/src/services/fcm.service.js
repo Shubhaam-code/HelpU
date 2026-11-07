@@ -155,8 +155,14 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
   // 3. Prepare payload and sanitized data
   const title = notification.title || 'HelpU Notification';
   const body = notification.body || notification.message || '';
-  const imageUrl = notification.imageUrl || null;
-  const sanitizedData = sanitizeCustomData(data);
+  // Clean custom data to remove any image fields from push notification display
+  const cleanData = { ...data };
+  delete cleanData.imageUrl;
+  delete cleanData.image;
+  delete cleanData.picture;
+  delete cleanData.largeIcon;
+  delete cleanData.bigPicture;
+  const sanitizedData = sanitizeCustomData(cleanData);
 
   // Split into batches of at most 500 tokens
   const tokenBatches = batchTokens(uniqueTokens, FCM_MULTICAST_MAX_BATCH_SIZE);
@@ -165,16 +171,13 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
   let totalFailed = 0;
   const invalidTokensToPrune = [];
 
-  // 4. Dispatch batches
+  // 4. Dispatch batches (Standard Clean Android Notification Layout - No BigPictureStyle)
   for (const batch of tokenBatches) {
-    const hasValidImage = typeof imageUrl === 'string' && imageUrl.trim().startsWith('http');
-
     const multicastMessage = {
       tokens: batch,
       notification: {
         title,
-        body,
-        ...(hasValidImage ? { imageUrl: imageUrl.trim() } : {})
+        body
       },
       android: {
         priority: 'high',
@@ -185,8 +188,7 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
           color: '#FF572E',
           defaultSound: true,
           defaultVibrateTimings: true,
-          clickAction: 'FCM_PLUGIN_ACTIVITY',
-          ...(hasValidImage ? { imageUrl: imageUrl.trim() } : {})
+          clickAction: 'FCM_PLUGIN_ACTIVITY'
         }
       },
       apns: {

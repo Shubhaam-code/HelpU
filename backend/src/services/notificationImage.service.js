@@ -8,9 +8,7 @@ import { formatNotificationContent, NOTIFICATION_JOB_TYPES } from '../jobs/notif
  * Standard Helpu branded fallback image when a post has no user image attached.
  * Hosted on production backend & accessible publicly over HTTPS.
  */
-export const HELPU_DEFAULT_NOTIFICATION_IMAGE =
-  process.env.NOTIFICATION_FALLBACK_IMAGE_URL ||
-  'https://helpu.onrender.com/images/helpu-fallback-ride.png';
+export const HELPU_DEFAULT_NOTIFICATION_IMAGE = null;
 
 /**
  * Format minutes from midnight (0..1439) into 12-hour AM/PM string

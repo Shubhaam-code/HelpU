@@ -143,7 +143,7 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
         createdAt: notificationDoc?.createdAt || new Date()
       });
 
-      // 4. Native Mobile FCM Push Notification with BigPictureStyle Rich Image (idempotent, isolated, non-blocking)
+      // 4. Native Mobile FCM Push Notification (Standard Clean Layout - No Large Picture)
       if (!event.pushSentAt) {
         try {
           const pushPayloadData = {
@@ -151,13 +151,15 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
             notificationId: notificationDoc?._id ? String(notificationDoc._id) : '',
             eventId: event.eventId
           };
+          delete pushPayloadData.imageUrl;
+          delete pushPayloadData.image;
+          delete pushPayloadData.picture;
 
           const pushResult = await sendPushToUser(
             event.recipientId,
             {
               title,
-              body: message,
-              imageUrl
+              body: message
             },
             pushPayloadData
           );
