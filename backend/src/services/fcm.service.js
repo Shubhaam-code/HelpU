@@ -108,8 +108,8 @@ export async function removeInvalidTokens(tokens) {
  */
 export async function sendPushToTokens(rawTokens, notification = {}, data = {}, options = {}) {
   // 1. Check Firebase Admin availability
-  const messaging = options.messaging || getFirebaseMessaging();
-  const configured = options.messaging ? true : isFirebaseConfigured();
+  const messaging = options.messaging !== undefined ? options.messaging : getFirebaseMessaging();
+  const configured = options.messaging !== undefined ? Boolean(options.messaging) : isFirebaseConfigured();
 
   if (!configured || !messaging) {
     return {
@@ -179,17 +179,25 @@ export async function sendPushToTokens(rawTokens, notification = {}, data = {}, 
         notification: {
           channelId: HELPU_NOTIFICATION_CHANNEL_ID,
           priority: 'high',
+          notificationPriority: 'PRIORITY_HIGH',
           defaultSound: true,
           defaultVibrateTimings: true,
+          icon: 'ic_stat_notification',
+          color: '#FF572E',
+          visibility: 'public',
           clickAction: 'FCM_PLUGIN_ACTIVITY',
           ...(imageUrl ? { imageUrl } : {})
         }
       },
       apns: {
+        headers: {
+          'apns-priority': '10'
+        },
         payload: {
           aps: {
             sound: 'default',
-            contentAvailable: true
+            contentAvailable: true,
+            badge: 1
           }
         }
       },

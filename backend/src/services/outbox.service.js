@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import Outbox from '../models/Outbox.js';
 import Notification from '../models/Notification.js';
 import { formatNotificationContent } from '../jobs/notification.jobs.js';
+import { resolveNotificationContentAndPayload } from './notificationImage.service.js';
 import { emitRealtimeNotification } from './socket.service.js';
 import { sendPushToUser } from './fcm.service.js';
 import { addNotificationJob } from '../queues/notification.queue.js';
@@ -96,8 +97,20 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
     if (!event) continue;
 
     try {
-      // 1. Idempotently persist in-app notification in MongoDB using eventId
-      const { title, message } = formatNotificationContent(event.eventType, event.payload || {});
+      // 1. Resolve dynamic ride image and rich notification content from MongoDB
+      const richContent = await resolveNotificationContentAndPayload({
+        eventType: event.eventType,
+        recipientId: event.recipientId,
+        relatedBookingId: event.relatedBookingId,
+        relatedTravelId: event.relatedTravelId,
+        payload: event.payload || {}
+      });
+
+      const title = richContent.title;
+      const message = richContent.message;
+      const imageUrl = richContent.imageUrl;
+
+      // 2. Idempotently persist in-app notification in MongoDB using eventId
       const notificationDoc = await Notification.findOneAndUpdate(
         { eventId: event.eventId },
         {
@@ -107,6 +120,7 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
             type: event.eventType,
             title,
             message,
+            imageUrl,
             relatedBookingId: event.relatedBookingId || null,
             relatedTravelId: event.relatedTravelId || null,
             isRead: false
@@ -115,38 +129,35 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
         { upsert: true, returnDocument: 'after' }
       );
 
-      // 2. Real-time Socket.IO emission if available
+      // 3. Real-time Socket.IO emission if available
       emitRealtimeNotification(event.recipientId, {
         _id: notificationDoc?._id,
         eventId: event.eventId,
         type: event.eventType,
         title,
         message,
+        imageUrl,
         relatedBookingId: event.relatedBookingId,
         relatedTravelId: event.relatedTravelId,
         isRead: false,
         createdAt: notificationDoc?.createdAt || new Date()
       });
 
-      // 3. Native Mobile FCM Push Notification (idempotent, isolated, non-blocking)
+      // 4. Native Mobile FCM Push Notification with BigPictureStyle Rich Image (idempotent, isolated, non-blocking)
       if (!event.pushSentAt) {
         try {
           const pushPayloadData = {
+            ...richContent.customData,
             notificationId: notificationDoc?._id ? String(notificationDoc._id) : '',
-            eventId: event.eventId,
-            type: event.eventType,
-            bookingId: event.relatedBookingId ? String(event.relatedBookingId) : '',
-            travelId: event.relatedTravelId ? String(event.relatedTravelId) : '',
-            route: event.relatedBookingId
-              ? `/bookings/${event.relatedBookingId}`
-              : (event.relatedTravelId ? `/rides/${event.relatedTravelId}` : '/notifications')
+            eventId: event.eventId
           };
 
           const pushResult = await sendPushToUser(
             event.recipientId,
             {
               title,
-              body: message
+              body: message,
+              imageUrl
             },
             pushPayloadData
           );
