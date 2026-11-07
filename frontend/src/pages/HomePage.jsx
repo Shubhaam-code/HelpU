@@ -160,9 +160,6 @@ export default function HomePage() {
                 going{' '}
                 <span className="text-[#FF572E] relative inline-inline">
                   today?
-                  <span className="inline-block text-[#FF572E] text-sm sm:text-base font-black ml-0.5 select-none">
-                    ∿
-                  </span>
                 </span>
               </h1>
 

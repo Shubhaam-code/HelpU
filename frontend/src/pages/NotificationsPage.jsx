@@ -1,75 +1,55 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Bell, CheckCheck, Clock, CheckCircle2, XCircle, Car, AlertCircle, 
-  ArrowRight, ShieldCheck, RefreshCw, Sparkles, Filter, Calendar, MessageSquare, ChevronRight, Check, Users
+  ArrowRight, ShieldCheck, RefreshCw, Sparkles, Filter, Calendar, MessageSquare, ChevronRight, Users
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
-import { getNotifications, getUnreadCount, markRead, markAllRead } from '../lib/api';
+import { markRead, markAllRead } from '../lib/api';
 import { timeAgo } from '../lib/utils';
+import { useNotificationsList, useUnreadNotificationsCount } from '../hooks/useAppData';
+import { QUERY_KEYS, invalidateNotificationQueries } from '../lib/queryClient';
+import { useUser } from '../context/FirebaseAuthContext';
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useUser();
 
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'read'
   const [markingAll, setMarkingAll] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Fetch notifications and unread count
-  const fetchNotificationsData = useCallback(async (pageNum = 1, append = false) => {
-    if (pageNum === 1) setLoading(true);
-    else setLoadingMore(true);
-    setError(null);
+  // Cached notifications list and unread count via TanStack Query (no repeated full-page loading)
+  const { 
+    data: notifications = [], 
+    isLoading, 
+    isFetching, 
+    error: fetchError,
+    refetch 
+  } = useNotificationsList({ limit: 50 });
 
-    try {
-      const [notifsRes, countRes] = await Promise.allSettled([
-        getNotifications({ page: pageNum, limit: 20 }),
-        getUnreadCount()
-      ]);
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
 
-      if (notifsRes.status === 'fulfilled') {
-        const data = notifsRes.value?.data || {};
-        const items = data.data || [];
-        setNotifications((prev) => (append ? [...prev, ...items] : items));
-        setHasMore(data.page < data.totalPages);
-        setPage(data.page || pageNum);
-      } else {
-        throw new Error(notifsRes.reason?.response?.data?.message || 'Failed to load notifications');
-      }
+  // Show skeleton loading ONLY on first visit when no cached data exists yet
+  const loading = isLoading && notifications.length === 0;
+  const isRefreshing = isFetching && !isLoading;
 
-      if (countRes.status === 'fulfilled') {
-        setUnreadCount(countRes.value?.data?.unreadCount || 0);
-      }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-      setError(err?.response?.data?.message || err?.message || 'Unable to load notifications.');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchNotificationsData(1, false);
-  }, [fetchNotificationsData]);
-
-  // Mark all notifications as read
+  // Mark all notifications as read (only when explicitly requested by user)
   const handleMarkAllRead = async () => {
     if (unreadCount === 0 || markingAll) return;
     setMarkingAll(true);
     try {
       await markAllRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
+      // Optimistically update query cache
+      queryClient.setQueriesData({ queryKey: ['notifications', 'list'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((n) => ({ ...n, isRead: true }));
+      });
+      queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id), 0);
       window.dispatchEvent(new CustomEvent('notifications-updated'));
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
@@ -78,26 +58,24 @@ export default function NotificationsPage() {
     }
   };
 
-  // Mark single notification as read
-  const handleMarkOneRead = async (id, e) => {
-    e?.stopPropagation();
-    try {
-      await markRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-      window.dispatchEvent(new CustomEvent('notifications-updated'));
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-    }
-  };
-
-  // Handle clicking on a notification item: navigate to the appropriate target
-  const handleNotificationClick = (notification) => {
-    // If not read yet, mark it as read
+  // Handle clicking on a notification item: marks only THIS notification as read and navigates
+  const handleNotificationClick = async (notification) => {
+    // If not read yet, mark ONLY this notification as read in cache and backend
     if (!notification.isRead) {
-      handleMarkOneRead(notification._id);
+      // 1. Optimistic cache update for notifications list
+      queryClient.setQueriesData({ queryKey: ['notifications', 'list'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n));
+      });
+
+      // 2. Optimistic decrement of unread count
+      queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id), (old) => Math.max(0, (old || 1) - 1));
+      window.dispatchEvent(new CustomEvent('notifications-updated'));
+
+      // 3. Persist read status in MongoDB backend
+      markRead(notification._id).catch((err) => {
+        console.error('Failed to persist read status on backend:', err);
+      });
     }
 
     const bookingId = notification.relatedBookingId;
@@ -128,7 +106,7 @@ export default function NotificationsPage() {
     };
   }, [notifications]);
 
-  // Filtered notifications
+  // Filtered notifications based on active filter tab
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
       if (activeFilter === 'unread') return !n.isRead;
@@ -201,38 +179,15 @@ export default function NotificationsPage() {
       };
     }
 
-    if (t.includes('ACCEPTED')) {
-      return {
-        icon: CheckCircle2,
-        iconBg: 'bg-[#EDFAF3]',
-        iconColor: 'text-[#16A34A]',
-        badgeBg: 'bg-[#EDFAF3]',
-        badgeColor: 'text-[#16A34A]',
-        badgeText: 'Request Accepted',
-        actionLabel: 'Review Booking',
-      };
-    }
-
-    if (t.includes('REJECTED')) {
-      return {
-        icon: XCircle,
-        iconBg: 'bg-[#F8FAFC]',
-        iconColor: 'text-[#64748B]',
-        badgeBg: 'bg-[#F8FAFC]',
-        badgeColor: 'text-[#64748B]',
-        badgeText: 'Request Declined',
-        actionLabel: 'Find Other Rides',
-      };
-    }
-
+    // Default Fallback
     return {
       icon: Bell,
       iconBg: 'bg-[#FFF4ED]',
       iconColor: 'text-[#FF572E]',
       badgeBg: 'bg-[#FFF4ED]',
       badgeColor: 'text-[#FF572E]',
-      badgeText: 'CampusPool Update',
-      actionLabel: 'View Details',
+      badgeText: 'Campus Alert',
+      actionLabel: 'View Post',
     };
   };
 
@@ -245,12 +200,19 @@ export default function NotificationsPage() {
   return (
     <ResponsiveShell
       hideSidebarOnDesktop={true}
-      customMobileHeader={<AppHeader title="Notifications" backTo="/home" />}
+      unreadCount={unreadCount}
+      customMobileHeader={
+        <AppHeader
+          title="Notifications"
+          backTo="/home"
+          unreadCount={unreadCount}
+        />
+      }
     >
-      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
+      <div className="w-full max-w-xl lg:max-w-4xl mx-auto px-4 sm:px-6 pt-3 pb-16 sm:pt-6 space-y-4">
         
         {/* ========================================================================= */}
-        {/* HEADER: TITLE, UNREAD BADGE & MARK ALL AS READ ACTION                     */}
+        {/* HEADER: TITLE, UNREAD BADGE & ACTIONS                                     */}
         {/* ========================================================================= */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -266,7 +228,7 @@ export default function NotificationsPage() {
               </h1>
               {unreadCount > 0 && (
                 <span className="px-2.5 py-0.5 rounded-full bg-[#FF572E] text-white text-xs font-black shadow-2xs">
-                  {unreadCount} new
+                  {unreadCount} unread
                 </span>
               )}
             </div>
@@ -290,12 +252,12 @@ export default function NotificationsPage() {
 
             <button
               type="button"
-              onClick={() => fetchNotificationsData(1, false)}
-              disabled={loading}
+              onClick={() => refetch()}
+              disabled={isRefreshing}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] text-[#17233C] text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
               title="Refresh notifications"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#FF572E]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#FF572E]' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
@@ -352,17 +314,17 @@ export default function NotificationsPage() {
               </div>
             ))}
           </div>
-        ) : error ? (
+        ) : fetchError && notifications.length === 0 ? (
           <div className="bg-white rounded-[24px] p-8 text-center border border-red-200 max-w-md mx-auto space-y-4 shadow-sm">
             <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
               <h3 className="font-black text-base text-[#17233C]">Unable to Load Notifications</h3>
-              <p className="text-xs text-red-600 mt-1">{error}</p>
+              <p className="text-xs text-red-600 mt-1">{fetchError?.message || 'Failed to retrieve notifications.'}</p>
             </div>
             <button
-              onClick={() => fetchNotificationsData(1, false)}
+              onClick={() => refetch()}
               className="px-5 py-2 bg-[#FF572E] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -370,13 +332,12 @@ export default function NotificationsPage() {
             </button>
           </div>
         ) : filteredNotifications.length === 0 ? (
-          /* Premium Compact Friendly Empty State (no oversized blank box) */
-          <div className="bg-white rounded-[24px] p-8 sm:p-10 text-center border border-[#F4E3D8] max-w-md mx-auto space-y-3.5 shadow-2xs">
-            <div className="w-14 h-14 rounded-2xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center mx-auto text-2xl shadow-inner">
-              🎉
+          <div className="bg-white rounded-[24px] p-8 sm:p-12 text-center border border-[#F4E3D8] shadow-xs space-y-3">
+            <div className="w-14 h-14 rounded-full bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center mx-auto text-2xl shadow-2xs">
+              <Bell className="w-7 h-7 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-black text-lg sm:text-xl text-[#17233C]">
+              <h3 className="font-black text-base sm:text-lg text-[#17233C]">
                 {activeFilter === 'all'
                   ? "You're all caught up! 🎉"
                   : activeFilter === 'unread'
@@ -401,7 +362,7 @@ export default function NotificationsPage() {
             )}
           </div>
         ) : (
-          /* Compact Notification Cards */
+          /* Clean Notification Cards (No tick/checkmark icon anywhere) */
           <div className="space-y-2.5">
             {filteredNotifications.map((n) => {
               const visuals = getNotificationVisuals(n.type);
@@ -417,7 +378,7 @@ export default function NotificationsPage() {
                   className={`bg-white rounded-2xl p-4 sm:p-4.5 border transition-all cursor-pointer relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-sm hover:border-[#FF572E]/40 ${
                     n.isRead
                       ? 'border-[#F4E3D8]/80 text-[#6E7587]'
-                      : 'border-[#FF572E]/30 bg-gradient-to-r from-white via-white to-[#FFFBF8] shadow-2xs ring-1 ring-[#FF572E]/10'
+                      : 'border-[#FF572E]/35 bg-gradient-to-r from-white via-white to-[#FFFBF8] shadow-2xs ring-1 ring-[#FF572E]/10'
                   }`}
                 >
                   {/* Left: Icon & Notification Content */}
@@ -443,9 +404,18 @@ export default function NotificationsPage() {
                           {timeAgo(n.createdAt)}
                         </span>
 
-                        {/* Unread dot */}
-                        {!n.isRead && (
-                          <span className="w-2 h-2 rounded-full bg-[#FF572E] ring-2 ring-white shrink-0" />
+                        {/* Proper Read / Unread Status Indicator (No tick icon) */}
+                        {!n.isRead ? (
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-[#FF572E] ring-2 ring-white shrink-0 animate-pulse" />
+                            <span className="px-2 py-0.2 rounded-full text-[9.5px] font-black bg-[#FFF0E6] text-[#FF572E] border border-[#FFD9C7] shrink-0">
+                              Unread
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="px-2 py-0.2 rounded-full text-[9.5px] font-bold bg-[#F1F5F9] text-[#64748B] shrink-0">
+                            Read
+                          </span>
                         )}
                       </div>
 
@@ -465,7 +435,7 @@ export default function NotificationsPage() {
                     </div>
                   </div>
 
-                  {/* Right: Action button & mark read trigger */}
+                  {/* Right: Clean Action button without any checkmark or tick */}
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pl-13 sm:pl-0">
                     <button
                       type="button"
@@ -473,47 +443,15 @@ export default function NotificationsPage() {
                         e.stopPropagation();
                         handleNotificationClick(n);
                       }}
-                      className="px-3.5 py-1.5 bg-[#FFF4ED] hover:bg-[#FFE8DC] text-[#FF572E] text-xs font-bold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1"
+                      className="px-3.5 py-1.5 bg-[#FFF4ED] hover:bg-[#FFE8DC] text-[#FF572E] text-xs font-bold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 active:scale-95 shadow-2xs"
                     >
                       <span>{visuals.actionLabel}</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
-
-                    {!n.isRead && (
-                      <button
-                        type="button"
-                        onClick={(e) => handleMarkOneRead(n._id, e)}
-                        className="p-1.5 text-[#A0A6B5] hover:text-[#17233C] rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                        title="Mark as read"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    )}
                   </div>
                 </motion.div>
               );
             })}
-
-            {/* Load More Pagination */}
-            {hasMore && (
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  disabled={loadingMore}
-                  onClick={() => fetchNotificationsData(page + 1, true)}
-                  className="px-5 py-2 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] text-[#17233C] text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
-                >
-                  {loadingMore ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#FF572E]" />
-                      <span>Loading...</span>
-                    </>
-                  ) : (
-                    <span>Load More Notifications</span>
-                  )}
-                </button>
-              </div>
-            )}
           </div>
         )}
 

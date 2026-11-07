@@ -140,10 +140,6 @@ export default function CreatePage() {
                 Create Campus <br />
                 <span className="text-[#FF572E] relative inline-inline">
                   Activity
-                  {/* Radiating orange spark rays matching reference */}
-                  <span className="inline-block text-[#FF572E] text-base font-black ml-1 select-none">
-                    ∿
-                  </span>
                 </span>
               </h1>
 

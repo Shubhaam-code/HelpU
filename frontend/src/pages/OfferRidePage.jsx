@@ -269,57 +269,12 @@ export default function OfferRidePage() {
       <div className="w-full max-w-xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-1.5 pb-20 sm:pt-4 sm:pb-12">
 
         {/* ========================================================================= */}
-        {/* TOP SEGMENTED BAR: Tabs & Find Matches Button                             */}
-        {/* ========================================================================= */}
-        <div className="flex items-center justify-between gap-2 mb-3.5 sm:mb-5">
-          {/* Mode Switcher Pill */}
-          <div className="inline-flex bg-white p-1 rounded-full border border-[#F4E3D8] shadow-2xs shrink-0">
-            <button
-              type="button"
-              onClick={() => setMode('offer')}
-              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                mode === 'offer'
-                  ? 'bg-[#FF572E] text-white shadow-xs'
-                  : 'text-[#17233C] hover:text-[#FF572E]'
-              }`}
-            >
-              <ButtonCarIcon className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span>Offer a Ride</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMode('request')}
-              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                mode === 'request'
-                  ? 'bg-[#FF572E] text-white shadow-xs'
-                  : 'text-[#17233C] hover:text-[#FF572E]'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span>Find / Request</span>
-            </button>
-          </div>
-
-          {/* Quick link button to Match Page */}
-          <button
-            type="button"
-            onClick={() => navigate('/match')}
-            className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 bg-white rounded-full border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs font-bold shadow-2xs hover:bg-[#FFF7F2] transition-all cursor-pointer shrink-0"
-          >
-            <span>Find Matches</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[#FF572E]" />
-          </button>
-        </div>
-
-
-        {/* ========================================================================= */}
         {/* RESPONSIVE LAYOUT CONTAINER (2 Columns on Desktop, Stacked on Mobile)      */}
         {/* ========================================================================= */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-6 items-start">
 
           {/* ----------------------------------------------------------------------- */}
-          {/* HERO CARD (Exact match to reference)                                    */}
+          {/* HERO CARD (Share Your Ride introductory card)                           */}
           {/* ----------------------------------------------------------------------- */}
           <div className="lg:col-span-5 space-y-3.5">
             <motion.div
@@ -397,9 +352,52 @@ export default function OfferRidePage() {
 
 
           {/* ----------------------------------------------------------------------- */}
-          {/* TRAVEL DETAILS FORM CARD (Exact reference match)                       */}
+          {/* TRAVEL DETAILS FORM CARD & SELECTOR                                     */}
           {/* ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 space-y-3 sm:space-y-3.5">
+
+            {/* Offer a Ride | Find / Request Selector (Positioned immediately above Travel Details) */}
+            <div className="flex items-center justify-between gap-2">
+              {/* Mode Switcher Pill */}
+              <div className="inline-flex bg-white p-1 rounded-full border border-[#F4E3D8] shadow-2xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setMode('offer')}
+                  className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    mode === 'offer'
+                      ? 'bg-[#FF572E] text-white shadow-xs'
+                      : 'text-[#17233C] hover:text-[#FF572E]'
+                  }`}
+                >
+                  <ButtonCarIcon className="w-3.5 h-3.5 stroke-[2.2]" />
+                  <span>Offer a Ride</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMode('request')}
+                  className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    mode === 'request'
+                      ? 'bg-[#FF572E] text-white shadow-xs'
+                      : 'text-[#17233C] hover:text-[#FF572E]'
+                  }`}
+                >
+                  <Search className="w-3.5 h-3.5 stroke-[2.2]" />
+                  <span>Find / Request</span>
+                </button>
+              </div>
+
+              {/* Quick link button to Match Page */}
+              <button
+                type="button"
+                onClick={() => navigate('/match')}
+                className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 bg-white rounded-full border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs font-bold shadow-2xs hover:bg-[#FFF7F2] transition-all cursor-pointer shrink-0"
+              >
+                <span>Find Matches</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#FF572E]" />
+              </button>
+            </div>
+
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

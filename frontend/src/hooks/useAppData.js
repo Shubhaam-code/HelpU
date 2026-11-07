@@ -4,6 +4,7 @@ import {
   getMyTravels, 
   getUserMatches, 
   getUnreadCount,
+  getNotifications,
   getTravels,
   getTravelById,
   getMyBookings,
@@ -106,6 +107,23 @@ export function useUserMatchesData() {
     enabled: Boolean(user?.id),
     staleTime: 45 * 1000,
     gcTime: 10 * 60 * 1000
+  });
+}
+
+/**
+ * Hook to get notifications list with TanStack Query caching.
+ */
+export function useNotificationsList(params = {}) {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.notifications(params, user?.id),
+    queryFn: async () => {
+      const res = await getNotifications(params);
+      const items = res.data?.data || [];
+      return Array.isArray(items) ? items : [];
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 30 * 1000
   });
 }
 
