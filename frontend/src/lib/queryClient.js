@@ -28,6 +28,7 @@ export const QUERY_KEYS = {
   travelDetail: (id) => ['travels', 'detail', id],
   myBookings: (userId) => ['bookings', 'my', userId || 'current'],
   receivedBookings: (userId) => ['bookings', 'received', userId || 'current'],
+  confirmedBookings: (userId) => ['bookings', 'confirmed', userId || 'current'],
   bookingDetail: (id) => ['bookings', 'detail', id],
   unreadCount: (userId) => ['notifications', 'unread-count', userId || 'current'],
   notifications: (params, userId) => ['notifications', 'list', params || {}, userId || 'current'],

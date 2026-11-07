@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import { 
   Search, Users, ArrowRight, Calendar, Clock, 
-  Sparkles, ChevronRight, Zap, SlidersHorizontal
+  Sparkles, ChevronRight, Zap, SlidersHorizontal,
+  CheckCircle2, MapPin
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -14,7 +15,9 @@ import {
   useUserProfile, 
   useMyTravels, 
   useUserMatches, 
-  useUnreadNotificationsCount 
+  useUnreadNotificationsCount,
+  useConfirmedBookings,
+  categorizeConfirmedRides
 } from '../hooks/useAppData';
 
 // Crisp Car Outline Icon matching reference buttons
@@ -98,6 +101,12 @@ export default function HomePage() {
   const { data: rawMatches, isLoading: matchesLoading } = useUserMatches();
   const userMatches = Array.isArray(rawMatches) ? rawMatches : (Array.isArray(rawMatches?.matches) ? rawMatches.matches : []);
   const { data: unreadCount = 0 } = useUnreadNotificationsCount();
+  const { data: confirmedBookings = [] } = useConfirmedBookings();
+
+  // Automatic date-based categorization: upcoming confirmed rides whose travel date has not passed
+  const { upcoming: upcomingConfirmedRides } = useMemo(() => {
+    return categorizeConfirmedRides(confirmedBookings);
+  }, [confirmedBookings]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -310,7 +319,124 @@ export default function HomePage() {
 
 
         {/* ========================================================================= */}
-        {/* 4. RECENT MATCHES SECTION                                                 */}
+        {/* 4. CONFIRMED RIDES SECTION                                                */}
+        {/* ========================================================================= */}
+        <div className="bg-white rounded-[20px] p-3 sm:p-4 border border-[#F4E3D8] shadow-xs relative overflow-hidden">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#F4E3D8]/60">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-md bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+              </div>
+              <h3 className="font-black text-xs sm:text-sm text-[#17233C]">
+                Confirmed Rides {upcomingConfirmedRides.length > 0 && `(${upcomingConfirmedRides.length})`}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/confirmed-rides')}
+              className="text-xs font-black text-[#FF572E] hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>See All</span>
+              <ArrowRight className="w-3 h-3 stroke-[2.5]" />
+            </button>
+          </div>
+
+          {upcomingConfirmedRides.length > 0 ? (
+            /* Active Confirmed Rides List (ordered nearest first) */
+            <div className="space-y-2">
+              {upcomingConfirmedRides.slice(0, 3).map((booking) => {
+                const travel = typeof booking.travelId === 'object' ? booking.travelId : {};
+                const peer = booking.peer || {};
+                const peerName = peer.name || 'Campus Peer';
+                const dateDisplay = formatTravelDate(travel?.travelDate || booking.travelDate);
+                const timeDisplay = formatMinutesToTime(travel?.departureTime);
+                const isHost = booking.userRole === 'host';
+
+                return (
+                  <div
+                    key={booking._id}
+                    onClick={() => navigate(`/bookings/${booking._id}`)}
+                    className="p-2.5 sm:p-3 rounded-2xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 flex flex-col gap-2 cursor-pointer active:scale-[0.99] transition-all"
+                  >
+                    {/* Top Row: Route & Confirmed Pill */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-2 h-2 rounded-full bg-[#16A34A] shrink-0" />
+                        <span className="font-extrabold text-xs sm:text-sm text-[#17233C] truncate">
+                          {travel?.source || 'Origin'}
+                        </span>
+                        <span className="text-[#8C93A4] text-xs font-bold shrink-0">→</span>
+                        <span className="font-extrabold text-xs sm:text-sm text-[#17233C] truncate">
+                          {travel?.destination || 'Destination'}
+                        </span>
+                      </div>
+
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] shrink-0">
+                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                        <span>Confirmed</span>
+                      </span>
+                    </div>
+
+                    {/* Bottom Row: Date & Time + Role & Peer Avatar */}
+                    <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-[#F4E3D8]/40">
+                      <div className="flex items-center gap-2 text-[#6E7587] font-bold text-[11px]">
+                        <span className="flex items-center gap-1 text-[#17233C]">
+                          <Calendar className="w-3 h-3 text-[#FF572E]" />
+                          <span>{dateDisplay}</span>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-[#FF572E]" />
+                          <span>{timeDisplay}</span>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Avatar
+                          src={peer.imageUrl}
+                          name={peerName}
+                          avatarId={peer.avatarId || 'm1'}
+                          size="xs"
+                          className="w-5 h-5 rounded-full"
+                        />
+                        <span className="text-[10px] font-bold text-[#6E7587] truncate max-w-[100px] sm:max-w-none">
+                          {isHost ? `Passenger: ${peerName}` : `Host: ${peerName}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Clean Empty State */
+            <div className="py-3 px-2 text-center flex flex-col items-center justify-center">
+              <div className="w-9 h-9 rounded-full bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center mb-1.5">
+                <CheckCircle2 className="w-4.5 h-4.5 stroke-[2.2]" />
+              </div>
+              <h4 className="font-extrabold text-xs text-[#17233C]">
+                No confirmed rides yet
+              </h4>
+              <p className="text-[11px] text-[#8C93A4] max-w-xs mt-0.5 leading-snug">
+                When you and your co-travelers confirm a ride booking, it will appear here.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/confirmed-rides')}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#FF572E] hover:underline cursor-pointer"
+              >
+                <span>View Ride History →</span>
+              </button>
+            </div>
+          )}
+
+        </div>
+
+
+        {/* ========================================================================= */}
+        {/* 5. RECENT MATCHES SECTION                                                 */}
         {/* ========================================================================= */}
         <div className="bg-white rounded-[20px] p-3 sm:p-4 border border-[#F4E3D8] shadow-xs relative overflow-hidden">
           

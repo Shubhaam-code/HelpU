@@ -378,6 +378,81 @@ export async function getMyBookings(req, res) {
 }
 
 /**
+ * @route   GET /api/bookings/confirmed
+ * @desc    Get all confirmed or completed bookings for the logged-in user (as passenger or host)
+ * @access  Protected
+ */
+export async function getConfirmedBookings(req, res) {
+  try {
+    const userId = req.userId;
+
+    const bookings = await Booking.find({
+      $or: [{ passengerId: userId }, { ownerId: userId }],
+      status: { $in: ['confirmed', 'completed'] }
+    })
+      .populate({
+        path: 'travelId',
+        select: 'source destination travelDate departureTime timeFlexibility seats bookedSeats status type pricePerSeat vehicle'
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Fetch related student profiles for both owners and passengers
+    const relatedUserIds = [
+      ...new Set(
+        bookings.map((b) => (b.passengerId === userId ? b.ownerId : b.passengerId)).filter(Boolean)
+      )
+    ];
+
+    const peers = await Student.find(
+      { clerkId: { $in: relatedUserIds } },
+      { name: 1, email: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, phone: 1, whatsappNumber: 1, clerkId: 1, _id: 0 }
+    ).lean();
+
+    const peerMap = new Map();
+    peers.forEach((p) => peerMap.set(p.clerkId, p));
+
+    const confirmedRides = bookings.map((b) => {
+      const isPassenger = b.passengerId === userId;
+      const peerId = isPassenger ? b.ownerId : b.passengerId;
+      const peer = peerMap.get(peerId);
+
+      const resolvedPeer = {
+        clerkId: peerId,
+        name: peer?.name || (isPassenger ? 'Ride Host' : b.passengerName || 'Campus Student'),
+        email: peer?.email || (isPassenger ? '' : b.passengerEmail || ''),
+        college: peer?.college || 'VIT, Bhopal',
+        isVerified: peer?.isVerified ?? true,
+        imageUrl: peer?.imageUrl || (!isPassenger ? b.passengerImage : null),
+        avatarId: peer?.avatarId || 'm1',
+        phone: peer?.whatsappNumber || peer?.phone || (!isPassenger ? b.passengerPhone : '')
+      };
+
+      return {
+        ...b,
+        userRole: isPassenger ? 'passenger' : 'host',
+        peer: resolvedPeer,
+        owner: isPassenger ? resolvedPeer : undefined,
+        passenger: !isPassenger ? resolvedPeer : undefined
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: confirmedRides.length,
+      data: confirmedRides
+    });
+  } catch (error) {
+    console.error('Error in getConfirmedBookings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching confirmed bookings',
+      error: error.message
+    });
+  }
+}
+
+/**
  * @route   PATCH /api/bookings/:id/respond
  * @desc    Owner accept or reject a pending booking request with atomic seat decrement
  * @access  Protected (Post Owner only)

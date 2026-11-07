@@ -8,6 +8,7 @@ import {
   getTravelById,
   getMyBookings,
   getReceivedBookings,
+  getConfirmedBookings,
   getCommunityPosts
 } from '../lib/api';
 import { QUERY_KEYS } from '../lib/queryClient';
@@ -181,6 +182,99 @@ export function useReceivedBookings() {
     queryKey: QUERY_KEYS.receivedBookings(user?.id),
     queryFn: async () => {
       const res = await getReceivedBookings();
+      const list = res.data?.data || res.data?.bookings || res.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 30 * 1000
+  });
+}
+
+/**
+ * Converts any Date, ISO string, or YYYY-MM-DD string to canonical 'YYYY-MM-DD'
+ * in local timezone.
+ */
+export function toCanonicalDateString(d) {
+  if (!d) return '';
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    return d;
+  }
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Gets today's date in local 'YYYY-MM-DD' format
+ */
+export function getTodayDateString() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Categorizes confirmed rides into Upcoming and Completed history based on travel date.
+ */
+export function categorizeConfirmedRides(rides = []) {
+  const todayStr = getTodayDateString();
+
+  const upcoming = [];
+  const completed = [];
+
+  for (const r of rides) {
+    if (!['confirmed', 'completed'].includes(r.status)) continue;
+
+    const travel = typeof r.travelId === 'object' ? r.travelId : null;
+    const travelDateRaw = travel?.travelDate || r.travelDate;
+    const travelDateStr = toCanonicalDateString(travelDateRaw);
+
+    if (!travelDateStr) continue;
+
+    if (travelDateStr >= todayStr && r.status !== 'completed') {
+      upcoming.push({ ...r, travelDateStr });
+    } else {
+      completed.push({ ...r, travelDateStr });
+    }
+  }
+
+  // Nearest travel date first (ascending), secondary departureTime ascending
+  upcoming.sort((a, b) => {
+    if (a.travelDateStr !== b.travelDateStr) {
+      return a.travelDateStr.localeCompare(b.travelDateStr);
+    }
+    const tA = (typeof a.travelId === 'object' ? a.travelId?.departureTime : null) ?? 0;
+    const tB = (typeof b.travelId === 'object' ? b.travelId?.departureTime : null) ?? 0;
+    return tA - tB;
+  });
+
+  // Newest completed first (descending travel date), secondary departureTime descending
+  completed.sort((a, b) => {
+    if (a.travelDateStr !== b.travelDateStr) {
+      return b.travelDateStr.localeCompare(a.travelDateStr);
+    }
+    const tA = (typeof a.travelId === 'object' ? a.travelId?.departureTime : null) ?? 0;
+    const tB = (typeof b.travelId === 'object' ? b.travelId?.departureTime : null) ?? 0;
+    return tB - tA;
+  });
+
+  return { upcoming, completed };
+}
+
+/**
+ * Hook to get confirmed bookings for the logged-in user with TanStack Query caching.
+ */
+export function useConfirmedBookings() {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.confirmedBookings(user?.id),
+    queryFn: async () => {
+      const res = await getConfirmedBookings();
       const list = res.data?.data || res.data?.bookings || res.data || [];
       return Array.isArray(list) ? list : [];
     },

@@ -199,6 +199,7 @@ export const deleteTravel = async (id) => {
 export const createBooking = (data) => apiClient.post('/api/bookings', data);
 export const getMyBookings = () => apiClient.get('/api/bookings/my');
 export const getReceivedBookings = () => apiClient.get('/api/bookings/received');
+export const getConfirmedBookings = () => apiClient.get('/api/bookings/confirmed');
 export const getBookingById = (id) => apiClient.get(`/api/bookings/${id}`);
 export const getWhatsAppDetails = (id) => apiClient.get(`/api/bookings/${id}/whatsapp-details`);
 export const respondBooking = (id, data) => apiClient.patch(`/api/bookings/${id}/respond`, data);

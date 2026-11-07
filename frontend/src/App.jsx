@@ -15,6 +15,7 @@ import OfferRidePage from './pages/OfferRidePage';
 import RideDetailsPage from './pages/RideDetailsPage';
 import BookSeatPage from './pages/BookSeatPage';
 import BookingDetailsPage from './pages/BookingDetailsPage';
+import ConfirmedRidesPage from './pages/ConfirmedRidesPage';
 import MatchPage from './pages/MatchPage';
 import MyMatchesPage from './pages/MyMatchesPage';
 import MatchPreferencesPage from './pages/MatchPreferencesPage';
@@ -206,6 +207,8 @@ export default function App() {
           <Route path="/book/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
           <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
+          <Route path="/confirmed-rides" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
+          <Route path="/rides/confirmed" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
           <Route path="/match" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
           <Route path="/matches" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
           <Route path="/match/my" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
