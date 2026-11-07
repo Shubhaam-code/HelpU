@@ -10,8 +10,13 @@ export const NOTIFICATION_JOB_TYPES = {
   BOOKING_CONFIRMED: 'BOOKING_CONFIRMED',
   BOOKING_CANCELLED_BY_PASSENGER: 'BOOKING_CANCELLED_BY_PASSENGER',
   BOOKING_CANCELLED_BY_OWNER: 'BOOKING_CANCELLED_BY_OWNER',
+  BOOKING_WITHDRAWN: 'BOOKING_WITHDRAWN',
+  RIDE_UPDATED: 'RIDE_UPDATED',
+  RIDE_CANCELLED: 'RIDE_CANCELLED',
+  RIDE_EXPIRED: 'RIDE_EXPIRED',
   TRAVEL_REMINDER_24H: 'TRAVEL_REMINDER_24H',
-  TRAVEL_REMINDER_1H: 'TRAVEL_REMINDER_1H'
+  TRAVEL_REMINDER_1H: 'TRAVEL_REMINDER_1H',
+  NEW_MATCH_FOUND: 'NEW_MATCH_FOUND'
 };
 
 /**
@@ -71,11 +76,44 @@ export function formatNotificationContent(eventType, payload = {}) {
         message: `A passenger has cancelled their booking for the ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
       };
 
-    case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER:
+    case NOTIFICATION_JOB_TYPES.BOOKING_CANCELLED_BY_OWNER: {
+      const ownerName = payload.ownerName || 'The ride host';
       return {
         title: 'Booking Cancelled',
-        message: `The ride booking from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} has been cancelled.`
+        message: `${ownerName} cancelled the booking for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
       };
+    }
+
+    case NOTIFICATION_JOB_TYPES.BOOKING_WITHDRAWN: {
+      const passengerName = payload.passengerName || 'The passenger';
+      return {
+        title: 'Booking Request Withdrawn',
+        message: `${passengerName} withdrew their request for ${requestedSeats} seat(s) on your ride from ${source} to ${destination}.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.RIDE_UPDATED: {
+      const changeText = payload.changeSummary ? `: ${payload.changeSummary}` : '';
+      return {
+        title: 'Ride Details Updated',
+        message: `Your ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was updated by the host${changeText}.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.RIDE_CANCELLED: {
+      const hostName = payload.ownerName || payload.hostName || 'The ride host';
+      return {
+        title: 'Ride Cancelled',
+        message: `The ride from ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was cancelled by ${hostName}. All reserved seats have been released.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.RIDE_EXPIRED: {
+      return {
+        title: 'Your Ride Has Expired',
+        message: `Your ride post from ${source} to ${destination}${dateStr ? ' for ' + dateStr : ''} has reached its departure date and is no longer active.`
+      };
+    }
 
     case NOTIFICATION_JOB_TYPES.TRAVEL_REMINDER_24H:
       return {
@@ -88,6 +126,14 @@ export function formatNotificationContent(eventType, payload = {}) {
         title: 'Ride Departing Soon (1h)',
         message: `Reminder: Your ride from ${source} to ${destination} departs in 1 hour. Please be ready at your pickup point.`
       };
+
+    case NOTIFICATION_JOB_TYPES.NEW_MATCH_FOUND: {
+      const matchTypeDesc = payload.type === 'offer' ? 'ride offer' : 'ride request';
+      return {
+        title: 'New Ride Match Found! 🚗',
+        message: `A new matching ${matchTypeDesc} was posted for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+      };
+    }
 
     case NOTIFICATION_JOB_TYPES.TEST_NOTIFICATION:
     default:

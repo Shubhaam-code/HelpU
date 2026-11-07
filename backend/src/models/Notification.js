@@ -31,6 +31,10 @@ const notificationSchema = new mongoose.Schema(
       required: [true, 'Notification message is required'],
       trim: true
     },
+    imageUrl: {
+      type: String,
+      trim: true
+    },
     relatedBookingId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Booking',
