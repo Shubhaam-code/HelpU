@@ -33,7 +33,7 @@ export function Avatar({
       className={`relative inline-flex items-center justify-center shrink-0 rounded-full overflow-hidden select-none transition-all ${
         ring ? 'ring-2 ring-coral/80 ring-offset-1 ring-offset-white' : ''
       } ${className}`}
-      style={isFull ? {} : { width: px, height: px }}
+      style={isFull ? { width: '100%', height: '100%' } : { width: px, height: px }}
     >
       {hasValidImage ? (
         <img 

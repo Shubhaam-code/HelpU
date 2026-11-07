@@ -14,7 +14,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { CompactMatchCard } from '../components/ui/CompactMatchCard';
 import { openWhatsAppChat } from '../lib/whatsapp';
-import { useUserMatchesData, useMyTravels, useMyBookings } from '../hooks/useAppData';
+import { useUserMatchesData, useMyTravels, useMyBookings, useReceivedBookings } from '../hooks/useAppData';
 import { invalidateRideQueries } from '../lib/queryClient';
 
 /**
@@ -96,6 +96,11 @@ export default function MyMatchesPage() {
     data: myBookings = [] 
   } = useMyBookings();
 
+  const { 
+    data: receivedBookings = [],
+    refetch: refetchReceived 
+  } = useReceivedBookings();
+
   const userMatches = Array.isArray(matchesPayload)
     ? matchesPayload
     : (Array.isArray(matchesPayload?.matches) ? matchesPayload.matches : []);
@@ -117,7 +122,7 @@ export default function MyMatchesPage() {
   // Manual refresh handler
   const handleManualRefresh = async () => {
     try {
-      await Promise.all([refetchMatches(), refetchTravels()]);
+      await Promise.all([refetchMatches(), refetchTravels(), refetchReceived()]);
       setToastMsg({ type: 'success', text: 'Matches updated from campus network.' });
     } catch {
       setToastMsg({ type: 'error', text: 'Failed to refresh matches. Please try again.' });
@@ -161,19 +166,31 @@ export default function MyMatchesPage() {
     }
   };
 
-  // Lookup map for active booking status per travel post
+  // Lookup map for active booking status per travel post (both incoming requests and outgoing bookings)
   const activeBookingStatusByTravelId = useMemo(() => {
     const map = {};
     if (Array.isArray(myBookings)) {
       for (const b of myBookings) {
         const tId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
         if (tId && ['pending', 'accepted', 'confirmed'].includes(b.status)) {
-          map[String(tId)] = b.status;
+          map[String(tId)] = { status: b.status, direction: 'outgoing', bookingId: b._id };
+        }
+      }
+    }
+    if (Array.isArray(receivedBookings)) {
+      for (const b of receivedBookings) {
+        if (!['pending', 'accepted', 'confirmed'].includes(b.status)) continue;
+        const pId = b.passengerId;
+        if (pId) {
+          map[`sender_${pId}`] = { status: b.status, direction: 'incoming', bookingId: b._id };
+        }
+        if (b.matchedTravelId) {
+          map[String(b.matchedTravelId)] = { status: b.status, direction: 'incoming', bookingId: b._id };
         }
       }
     }
     return map;
-  }, [myBookings]);
+  }, [myBookings, receivedBookings]);
 
   // Group user's active travel posts by normalized route direction
   // ("patna -> gaya" and "Patna -> Gaya" are unified into a single route filter)

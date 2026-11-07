@@ -179,6 +179,28 @@ export default function RideDetailsPage() {
     }) || null;
   }, [myBookings, id]);
 
+  // Check if target host has already sent an active booking request to current user for this match
+  const reverseActiveBooking = useMemo(() => {
+    if (isOwnRide || !receivedBookings.length || !travel) return null;
+    const hostUserId = travel.userId;
+    return receivedBookings.find((b) => {
+      if (b.passengerId !== hostUserId) return false;
+      if (!['pending', 'accepted', 'confirmed'].includes(b.status)) return false;
+
+      const bTravel = typeof b.travelId === 'object' ? b.travelId : null;
+      if (bTravel) {
+        const sameDate = bTravel.travelDate === travel.travelDate;
+        const norm = (s) => (s || '').toLowerCase().trim();
+        const sameRoute = (
+          (norm(bTravel.source) === norm(travel.source) && norm(bTravel.destination) === norm(travel.destination)) ||
+          (norm(bTravel.source) === norm(travel.destination) && norm(bTravel.destination) === norm(travel.source))
+        );
+        return sameDate && sameRoute;
+      }
+      return true;
+    }) || null;
+  }, [isOwnRide, receivedBookings, travel]);
+
   const isPending = useMemo(() => {
     return myActiveBooking?.status === 'pending';
   }, [myActiveBooking]);
@@ -265,6 +287,11 @@ export default function RideDetailsPage() {
       return;
     }
 
+    if (reverseActiveBooking) {
+      setSubmitError('A booking request between these matching posts already exists. The student has already sent you a request.');
+      return;
+    }
+
     if (isConfirmed) {
       setSubmitError('You already have a confirmed booking for this ride.');
       return;
@@ -314,7 +341,7 @@ export default function RideDetailsPage() {
 
   // 6. Connect via WhatsApp using secure backend coordination URL
   const handleOpenWhatsApp = async (bookingId) => {
-    const targetBookingId = bookingId || myActiveBooking?._id;
+    const targetBookingId = bookingId || myActiveBooking?._id || reverseActiveBooking?._id;
     if (!targetBookingId) return;
 
     setIsWhatsAppLoading(true);
@@ -1026,7 +1053,44 @@ export default function RideDetailsPage() {
               <div className="space-y-3">
                 {!isOwnRide ? (
                   <>
-                    {!myActiveBooking ? (
+                    {reverseActiveBooking ? (
+                      <div className="space-y-3 bg-[#FFF7F2] border border-[#FFD9C7] rounded-2xl p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-[#FF572E]/10 text-[#FF572E] shrink-0 mt-0.5">
+                            <Clock className="w-5 h-5 stroke-[2.5]" />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-[#17233C] text-sm">
+                              Request Already Received
+                            </h4>
+                            <p className="text-xs text-[#6E7587] mt-0.5">
+                              {travel?.student?.name || travel?.authorName || 'This student'} has already sent you a booking request for this matching ride.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/bookings/${reverseActiveBooking._id}`)}
+                            className="w-full py-3 px-4 rounded-full font-black text-xs sm:text-sm bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white shadow-md shadow-[#FF572E]/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span>View Incoming Request</span>
+                            <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenWhatsApp(reverseActiveBooking._id)}
+                            disabled={isWhatsAppLoading}
+                            className="w-full py-3 px-4 rounded-full font-black text-xs sm:text-sm bg-[#25D366] hover:bg-[#20BD5A] active:scale-[0.99] text-white shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <img src="/whatsapp.png" alt="WhatsApp" className="w-4 h-4 object-contain shrink-0" onError={(e) => { e.currentTarget.src = '/whatsapp.svg'; }} />
+                            <span>Coordinate on WhatsApp</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : !myActiveBooking ? (
                       <div className="space-y-2.5">
                         {isFull ? (
                           <button

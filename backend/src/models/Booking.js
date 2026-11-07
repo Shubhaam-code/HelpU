@@ -8,6 +8,11 @@ const bookingSchema = new mongoose.Schema(
       required: [true, 'travelId is required'],
       index: true
     },
+    matchedTravelId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Travel',
+      index: true
+    },
     ownerId: {
       type: String,
       required: [true, 'ownerId is required'],

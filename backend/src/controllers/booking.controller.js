@@ -14,7 +14,7 @@ import { cancelBookingReminders } from '../services/reminder.service.js';
 export async function createBookingRequest(req, res) {
   try {
     const rawSeats = req.body.requestedSeats ?? req.body.seatsBooked ?? req.body.seats;
-    const { travelId } = req.body;
+    const { travelId, matchedTravelId } = req.body;
     const requestedSeats = rawSeats;
     const passengerId = req.userId;
 
@@ -121,11 +121,59 @@ export async function createBookingRequest(req, res) {
       });
     }
 
+    // 8. Prevent reverse booking requests for the same matching pair
+    // If the host (travel.userId) has already created an active booking request on one of this requester's
+    // travels for the matching route and date, reject this request.
+    const reverseQuery = {
+      ownerId: passengerId,
+      passengerId: travel.userId,
+      status: { $in: ['pending', 'accepted', 'confirmed'] }
+    };
+
+    if (matchedTravelId && mongoose.Types.ObjectId.isValid(matchedTravelId)) {
+      reverseQuery.travelId = matchedTravelId;
+    }
+
+    const reverseBookings = await Booking.find(reverseQuery).populate({
+      path: 'travelId',
+      select: 'source destination travelDate departureTime status type'
+    });
+
+    const activeReverseMatch = reverseBookings.find((rb) => {
+      if (!rb.travelId) return false;
+      if (rb.matchedTravelId && String(rb.matchedTravelId) === String(travel._id)) {
+        return true;
+      }
+      if (matchedTravelId && String(rb.travelId._id) === String(matchedTravelId)) {
+        return true;
+      }
+      const rbDate = rb.travelId.travelDate;
+      if (rbDate !== travel.travelDate) return false;
+
+      const norm = (s) => (s || '').toLowerCase().trim();
+      const sameEndpoints = (
+        (norm(rb.travelId.source) === norm(travel.source) && norm(rb.travelId.destination) === norm(travel.destination)) ||
+        (norm(rb.travelId.source) === norm(travel.destination) && norm(rb.travelId.destination) === norm(travel.source))
+      );
+      return sameEndpoints;
+    });
+
+    if (activeReverseMatch) {
+      return res.status(409).json({
+        success: false,
+        code: 'REVERSE_BOOKING_EXISTS',
+        status: activeReverseMatch.status,
+        bookingId: activeReverseMatch._id,
+        direction: 'incoming',
+        message: 'A booking request between these matching posts already exists'
+      });
+    }
+
     const { passengerName, passengerEmail, passengerPhone, passengerImage, notes, passengerNotes } = req.body;
     const pricePerSeat = travel.pricePerSeat || 350;
     const totalPrice = numSeats * pricePerSeat;
 
-    // 8. Create booking document with status: 'pending' inside transaction with Outbox event
+    // 9. Create booking document with status: 'pending' inside transaction with Outbox event
     // Do NOT reserve or subtract seats at this stage (seats are deducted only upon final owner confirmation)
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -135,6 +183,7 @@ export async function createBookingRequest(req, res) {
         [
           {
             travelId: travel._id,
+            matchedTravelId: (matchedTravelId && mongoose.Types.ObjectId.isValid(matchedTravelId)) ? matchedTravelId : undefined,
             ownerId: travel.userId,
             passengerId,
             requestedSeats: numSeats,

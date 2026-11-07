@@ -43,7 +43,7 @@ function formatTravelDate(dateStr) {
  * - Footer: Student avatar + name and "View Details →" button
  * - NO vehicle model/car name (Creta/Omni) displayed as strictly required
  */
-export function MatchCard({ match, onPress }) {
+export function MatchCard({ match, onPress, bookingStatus }) {
   const navigate = useNavigate();
   if (!match) return null;
 
@@ -52,6 +52,11 @@ export function MatchCard({ match, onPress }) {
   const student = match.student || match.creator || {};
   const studentName = student.name || match.authorName || 'Campus Student';
   const isVerified = Boolean(student.isVerified);
+
+  const bDirection = typeof bookingStatus === 'object' ? bookingStatus?.direction : null;
+  const bStatus = typeof bookingStatus === 'object' ? bookingStatus?.status : bookingStatus;
+  const isIncoming = bDirection === 'incoming';
+  const isOutgoing = bDirection === 'outgoing' || (bStatus && !bDirection);
   
   const fromCity = match.source || match.from || 'Campus Gate';
   const toCity = match.destination || match.to || 'City Destination';
@@ -93,6 +98,22 @@ export function MatchCard({ match, onPress }) {
                 <span>Verified</span>
               </div>
             </>
+          )}
+
+          {isIncoming && (
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] shrink-0 shadow-2xs">
+              Request Received
+            </div>
+          )}
+          {!isIncoming && isOutgoing && bStatus === 'pending' && (
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] shrink-0 shadow-2xs">
+              Request Sent
+            </div>
+          )}
+          {!isIncoming && isOutgoing && (bStatus === 'confirmed' || bStatus === 'accepted') && (
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] shrink-0 shadow-2xs">
+              Booked
+            </div>
           )}
         </div>
 
@@ -198,16 +219,20 @@ export function MatchCard({ match, onPress }) {
           </span>
         </div>
 
-        {/* View Details Button */}
+        {/* View Details / View Request Button */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             handleCardClick();
           }}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full font-black text-xs sm:text-sm bg-[#FFF0E6] hover:bg-[#FFE0D0] text-[#FF572E] border border-[#FFD9C7] transition-all cursor-pointer active:scale-95 shadow-2xs shrink-0"
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full font-black text-xs sm:text-sm border transition-all cursor-pointer active:scale-95 shadow-2xs shrink-0 ${
+            isIncoming 
+              ? 'bg-[#2563EB] text-white border-[#2563EB] hover:bg-[#1D4ED8]' 
+              : 'bg-[#FFF0E6] hover:bg-[#FFE0D0] text-[#FF572E] border-[#FFD9C7]'
+          }`}
         >
-          <span>View Details</span>
+          <span>{isIncoming ? 'View Request' : 'View Details'}</span>
           <ArrowRight className="w-4 h-4 stroke-[2.5]" />
         </button>
       </div>

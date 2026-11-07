@@ -208,13 +208,13 @@ export default function ProfilePage() {
               <div className="flex items-center sm:items-end gap-3 sm:gap-4 min-w-0">
                 {/* Avatar with Orange Ring & Verified Checkmark Badge */}
                 <div className="relative shrink-0">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-[3px] border-[#FF572E] bg-white p-0.5 shadow-md flex items-center justify-center overflow-hidden">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-[3px] border-[#FF572E] bg-[#FF572E]/10 p-0 shadow-md flex items-center justify-center overflow-hidden">
                     <Avatar 
                       src={user?.imageUrl || profile?.imageUrl}
                       name={profile?.name || user?.fullName}
                       email={profile?.email || user?.primaryEmailAddress?.emailAddress}
                       size="full"
-                      className="w-full h-full aspect-square"
+                      className="w-full h-full aspect-square object-cover"
                     />
                   </div>
                   <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-md z-10 pointer-events-none">

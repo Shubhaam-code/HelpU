@@ -12,7 +12,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { getTravelById, getProfile, createBooking, getMyBookings } from '../lib/api';
+import { getTravelById, getProfile, createBooking, getMyBookings, getReceivedBookings } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
 import { invalidateBookingQueries } from '../lib/queryClient';
 
@@ -26,6 +26,7 @@ export default function BookSeatPage() {
   const [travel, setTravel] = useState(state?.travel || null);
   const [profile, setProfile] = useState(null);
   const [existingBooking, setExistingBooking] = useState(null);
+  const [reverseBooking, setReverseBooking] = useState(null);
   const [loading, setLoading] = useState(!state?.travel);
   const [fetchError, setFetchError] = useState('');
 
@@ -49,14 +50,16 @@ export default function BookSeatPage() {
     setFetchError('');
 
     try {
-      const [travelRes, profileRes, bookingsRes] = await Promise.allSettled([
+      const [travelRes, profileRes, bookingsRes, receivedRes] = await Promise.allSettled([
         id ? getTravelById(id) : Promise.reject(new Error('No ride ID provided')),
         getProfile(),
-        getMyBookings()
+        getMyBookings(),
+        getReceivedBookings()
       ]);
 
+      let tData = travel;
       if (travelRes.status === 'fulfilled') {
-        const tData = travelRes.value.data?.data || travelRes.value.data?.travel || travelRes.value.data;
+        tData = travelRes.value.data?.data || travelRes.value.data?.travel || travelRes.value.data;
         setTravel(tData);
       } else if (!state?.travel) {
         setFetchError(travelRes.reason?.response?.data?.message || travelRes.reason?.message || 'Could not load ride details.');
@@ -77,6 +80,28 @@ export default function BookSeatPage() {
           return matches && isActive;
         });
         setExistingBooking(activeBooking || null);
+      }
+
+      if (receivedRes.status === 'fulfilled' && tData) {
+        const rawRec = receivedRes.value.data?.data || receivedRes.value.data?.bookings || receivedRes.value.data || [];
+        const recList = Array.isArray(rawRec) ? rawRec : [];
+        const hostUserId = tData.userId;
+        const rev = recList.find((b) => {
+          if (b.passengerId !== hostUserId) return false;
+          if (!['pending', 'accepted', 'confirmed'].includes(b.status)) return false;
+          const bTravel = typeof b.travelId === 'object' ? b.travelId : null;
+          if (bTravel) {
+            const sameDate = bTravel.travelDate === tData.travelDate;
+            const norm = (s) => (s || '').toLowerCase().trim();
+            const sameRoute = (
+              (norm(bTravel.source) === norm(tData.source) && norm(bTravel.destination) === norm(tData.destination)) ||
+              (norm(bTravel.source) === norm(tData.destination) && norm(bTravel.destination) === norm(tData.source))
+            );
+            return sameDate && sameRoute;
+          }
+          return true;
+        });
+        setReverseBooking(rev || null);
       }
     } catch (err) {
       if (!state?.travel) {
@@ -220,6 +245,11 @@ export default function BookSeatPage() {
 
     if (isPending) {
       setSubmitError('You already have a pending booking request for this ride post. Please wait for the host to respond.');
+      return;
+    }
+
+    if (reverseBooking) {
+      setSubmitError('A booking request between these matching posts already exists. The student has already sent you a request.');
       return;
     }
 
@@ -369,6 +399,27 @@ export default function BookSeatPage() {
                   Review your campus route details, verify passenger info, and reserve seats.
                 </p>
               </div>
+
+              {/* REVERSE BOOKING NOTICE */}
+              {reverseBooking && (
+                <div className="bg-[#FFF7F2] border border-[#FFD9C7] rounded-2xl p-4 flex items-start gap-3 shadow-xs">
+                  <Clock className="w-5 h-5 text-[#FF572E] shrink-0 mt-0.5 stroke-[2.5]" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-extrabold text-[#17233C] text-sm">Request Already Received</h3>
+                    <p className="text-xs text-[#6E7587] mt-0.5">
+                      {travel?.student?.name || travel?.authorName || 'This student'} has already sent you a booking request for this matching ride.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/bookings/${reverseBooking._id}`)}
+                      className="mt-2.5 inline-flex items-center gap-1.5 px-4 py-2 bg-[#FF572E] text-white text-xs font-bold rounded-full shadow-xs hover:bg-[#E64A22] transition-all cursor-pointer"
+                    >
+                      <span>View Incoming Request</span>
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* CARD 1: JOURNEY & ROUTE DETAILS */}
               <motion.div

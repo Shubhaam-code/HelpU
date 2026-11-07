@@ -13,10 +13,16 @@ export function CompactMatchCard({
   if (!match) return null;
 
   const travelId = match._id?.toString() || match.id?.toString();
+  const student = match.student || match.creator || {};
+  const studentId = student.clerkId || student.id || match.userId;
+  
+  const bookingInfo = activeBookingStatusByTravelId[travelId] || 
+                      (studentId ? activeBookingStatusByTravelId[`sender_${studentId}`] : null);
 
   return (
     <MatchCard
       match={match}
+      bookingStatus={bookingInfo}
       onPress={() => navigate(`/rides/${travelId}`)}
     />
   );
