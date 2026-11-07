@@ -268,66 +268,61 @@ export default function MyMatchesPage() {
         {/* ========================================================================= */}
         {/* HEADER TOOLBAR & HERO BANNER WITH RESPONSIVE HELPU ILLUSTRATION           */}
         {/* ========================================================================= */}
-        <div className="bg-gradient-to-r from-[#FFF0E6] via-[#FFF6EE] to-[#FFFBF8] rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 border border-[#F4E3D8] shadow-xs relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
-          <div className="max-w-xl z-10 w-full">
-            
-            {/* Top row with Badge & Mobile-visible Illustration */}
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 border border-[#F4E3D8] text-[10px] sm:text-[11px] font-black text-[#FF572E] uppercase tracking-wider mb-2 shadow-2xs">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Helpu Smart Matching</span>
-                </div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#17233C] tracking-tight leading-tight">
-                  My Travel <span className="text-[#FF572E]">Matches</span>
-                </h1>
-              </div>
+        <div className="relative bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-5">
+          {/* Subtle warm cream background glow at top */}
+          <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/70 to-transparent pointer-events-none" />
 
-              {/* Mobile-only Cute Illustration (Top Right Corner) */}
-              <div className="flex sm:hidden shrink-0 -mt-1 -mr-1">
-                <img
-                  src="/match.png"
-                  alt="Helpu Smart Travel Match"
-                  className="w-20 h-20 object-contain drop-shadow-sm select-none pointer-events-none"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-              </div>
-            </div>
-
-            <p className="text-xs sm:text-sm text-[#6E7587] font-medium mt-1.5 leading-relaxed">
-              Verified campus peers matched with your active ride offers and travel requests.
-            </p>
-
-            {/* Quick Actions */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-3.5 sm:pt-4">
-              <button
-                onClick={handleManualRefresh}
-                disabled={isRefreshing}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-[#FFF7F2] border border-[#F4E3D8] text-[#17233C] text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-                title="Refresh matches"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#FF572E]' : ''}`} />
-                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-              </button>
-
-              <button
-                onClick={() => navigate('/rides/offer')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black rounded-xl shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
-              >
-                <Car className="w-3.5 h-3.5" />
-                <span>+ Offer Ride</span>
-              </button>
-            </div>
+          {/* Top Badge */}
+          <div className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[10px] sm:text-[11px] font-black text-[#FF572E] uppercase tracking-wider mb-2 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
+            <span>Helpu Smart Matching</span>
           </div>
 
-          {/* Desktop-only Match Illustration (Shifted left) */}
-          <div className="hidden sm:flex items-center justify-center shrink-0 relative z-10 md:-translate-x-8 lg:-translate-x-14">
-            <img
-              src="/match.png"
-              alt="Helpu Smart Travel Match"
-              className="w-auto max-w-[140px] sm:max-w-[170px] lg:max-w-[200px] max-h-[110px] sm:max-h-[130px] lg:max-h-[145px] object-contain drop-shadow-sm select-none pointer-events-none hover:scale-105 transition-transform duration-300"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
+          {/* Content Row: Heading, Subtitle & Actions on Left, Prominent Illustration on Right */}
+          <div className="relative z-10 flex items-center justify-between gap-2.5 sm:gap-5">
+            
+            {/* Left Column */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-[21px] min-[390px]:text-[23px] sm:text-3xl font-black text-[#17233C] tracking-tight leading-[1.18]">
+                My Travel <span className="text-[#FF572E]">Matches</span>
+              </h1>
+
+              <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium mt-1.5 leading-relaxed max-w-[195px] min-[390px]:max-w-[230px] sm:max-w-md">
+                Verified campus peers matched with your active ride offers and travel requests.
+              </p>
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap items-center gap-2 pt-3">
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-[#FFF7F2] active:scale-[0.98] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] text-xs font-bold rounded-full shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                  title="Refresh matches"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#FF572E]' : ''}`} />
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                <button
+                  onClick={() => navigate('/rides/offer')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white text-xs font-black rounded-full shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+                >
+                  <Car className="w-3.5 h-3.5" />
+                  <span>+ Offer Ride</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Prominent Unified Illustration */}
+            <div className="shrink-0 w-[125px] min-[380px]:w-[142px] min-[410px]:w-[155px] sm:w-[175px] md:w-[200px] -mr-1 sm:-mr-1 flex justify-end items-center">
+              <img
+                src="/match.png"
+                alt="Helpu Smart Travel Match"
+                className="w-full h-auto object-contain drop-shadow-xs select-none pointer-events-none"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            </div>
+
           </div>
         </div>
 
@@ -484,7 +479,7 @@ export default function MyMatchesPage() {
                 className="px-6 py-3 bg-white border border-[#F4E3D8] hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs sm:text-sm rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-2"
               >
                 <Send className="w-4 h-4 text-[#FF572E]" />
-                <span>+ Request a Ride</span>
+                <span>+ Find a Ride</span>
               </button>
             </div>
           </div>

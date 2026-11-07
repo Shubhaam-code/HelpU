@@ -43,7 +43,7 @@ const ACTIVITY_CARDS = [
   },
   {
     id: 'request',
-    title: 'Request a Ride',
+    title: 'Find a Ride',
     subtitle: 'Looking for a ride to airport, station, or city? Find verified students heading your way.',
     path: '/rides/request',
     icon: MapPin,
@@ -114,42 +114,42 @@ export default function CreatePage() {
       <div className="w-full max-w-xl lg:max-w-4xl mx-auto px-4 sm:px-6 pt-1.5 pb-20 sm:pt-4 sm:pb-12 space-y-3 sm:space-y-3.5">
         
         {/* ========================================================================= */}
-        {/* HERO BANNER CARD (Exact match to reference)                               */}
+        {/* HERO BANNER CARD (Polished layout matching reference)                     */}
         {/* ========================================================================= */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.22 }}
-          className="relative bg-white rounded-[26px] sm:rounded-[30px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-5"
+          className="relative bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-5"
         >
           {/* Subtle warm cream background glow at top */}
-          <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/60 to-transparent pointer-events-none" />
+          <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/70 to-transparent pointer-events-none" />
 
           {/* Top Badge */}
-          <div className="relative z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-2.5 shadow-2xs">
+          <div className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-2 shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
             <span>HELPU CAMPUS ACTION</span>
           </div>
 
-          {/* Content Row: Heading on Left & post.png Illustration on Right */}
-          <div className="relative z-10 flex items-end justify-between gap-2 sm:gap-4">
+          {/* Content Row: Heading & Subtitle on Left, Illustration on Right */}
+          <div className="relative z-10 flex items-center justify-between gap-2 sm:gap-4">
             
             {/* Left: Heading & Subtitle */}
-            <div className="flex-1 min-w-0 pb-1 pt-0.5">
-              <h1 className="font-black text-[#17233C] text-[22px] sm:text-3xl leading-[1.18] tracking-tight">
+            <div className="flex-1 min-w-0">
+              <h1 className="font-black text-[#17233C] text-[21px] min-[390px]:text-[23px] sm:text-3xl leading-[1.18] tracking-tight">
                 Create Campus <br />
-                <span className="text-[#FF572E] relative inline-inline">
+                <span className="text-[#FF572E]">
                   Activity
                 </span>
               </h1>
 
-              <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium leading-relaxed mt-2 max-w-[190px] sm:max-w-xs">
+              <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium leading-relaxed mt-1.5 max-w-[190px] min-[390px]:max-w-[215px] sm:max-w-xs">
                 Share a ride, request a ride, find a match, or learn more about Helpu.
               </p>
             </div>
 
-            {/* Right: post.png Illustration */}
-            <div className="shrink-0 w-[145px] sm:w-[180px] md:w-[210px] -mr-2 -mb-2 flex justify-end items-end">
+            {/* Right: Prominent post.png Illustration */}
+            <div className="shrink-0 w-[160px] min-[380px]:w-[178px] min-[410px]:w-[195px] sm:w-[225px] md:w-[250px] -mr-1 sm:-mr-1 flex justify-end items-center">
               <img
                 src="/post.png"
                 alt="Helpu Campus Action"

@@ -80,7 +80,7 @@ export function RideCard({ travel, onPress }) {
               ? 'bg-[#FFF0E6] text-[#FF572E] border border-[#FFD9C7]'
               : 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]'
           }`}>
-            <span>{isOffer ? 'OFFER' : 'REQUEST'}</span>
+            <span>{isOffer ? 'OFFER' : 'FIND'}</span>
           </div>
 
           {travel.isMine && (
@@ -121,7 +121,7 @@ export function RideCard({ travel, onPress }) {
           ) : (
             <div className="bg-[#EFF6FF] rounded-2xl px-3.5 py-2 text-center border border-[#DBEAFE]">
               <div className="text-sm font-black text-[#2563EB] leading-none">Seeking</div>
-              <div className="text-[10px] font-bold text-[#6E7587] mt-1">Ride Request</div>
+              <div className="text-[10px] font-bold text-[#6E7587] mt-1">Find Ride</div>
             </div>
           )}
         </div>

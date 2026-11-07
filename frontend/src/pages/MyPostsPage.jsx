@@ -208,6 +208,7 @@ export default function MyPostsPage() {
       ? new Date(travel.travelDate).toISOString().split('T')[0]
       : '';
     const timeStr = minutesToTimeString(travel.departureTime);
+    const isFindPost = travel.type === 'request';
     setEditFormData({
       source: travel.source || '',
       destination: travel.destination || '',
@@ -215,7 +216,7 @@ export default function MyPostsPage() {
       timeStr,
       departureTime: travel.departureTime || 480,
       timeFlexibility: travel.timeFlexibility || 30,
-      seats: travel.seats || 1,
+      seats: isFindPost ? 1 : (travel.seats || 1),
       pricePerSeat: travel.pricePerSeat ?? 350,
       carModel: travel.carModel || '',
       status: travel.status || 'active',
@@ -234,6 +235,7 @@ export default function MyPostsPage() {
     setEditError('');
 
     const departureMinutes = timeStringToMinutes(editFormData.timeStr);
+    const isFindPost = editFormData.type === 'request';
 
     try {
       const payload = {
@@ -242,7 +244,7 @@ export default function MyPostsPage() {
         travelDate: editFormData.travelDate,
         departureTime: departureMinutes,
         timeFlexibility: Number(editFormData.timeFlexibility) || 30,
-        seats: Number(editFormData.seats) || 1,
+        seats: isFindPost ? 1 : (Number(editFormData.seats) || 1),
         pricePerSeat: Number(editFormData.pricePerSeat) || 0,
         carModel: editFormData.carModel.trim(),
         status: editFormData.status
@@ -321,7 +323,7 @@ export default function MyPostsPage() {
     { id: 'completed', label: 'Completed', count: counts.completed },
     { id: 'cancelled', label: 'Cancelled', count: counts.cancelled },
     { id: 'offers', label: 'Offers', count: counts.offers },
-    { id: 'requests', label: 'Requests', count: counts.requests },
+    { id: 'requests', label: 'Finds', count: counts.requests },
   ];
 
   // Helper to render consistent status badge
@@ -592,7 +594,7 @@ export default function MyPostsPage() {
                             ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
                             : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
                         }`}>
-                          {isOffer ? 'Offer' : 'Request'}
+                          {isOffer ? 'OFFER' : 'FIND'}
                         </span>
 
                         {renderRideStatusBadge(travel)}
@@ -790,7 +792,7 @@ export default function MyPostsPage() {
                       Edit Travel Post
                     </h3>
                     <p className="text-xs text-[#8C93A4] font-semibold">
-                      {editFormData.type === 'offer' ? 'Ride Offer' : 'Passenger Request'} • Updates saved to MongoDB
+                      {editFormData.type === 'offer' ? 'Ride Offer' : 'Find Post'} • Updates saved to MongoDB
                     </p>
                   </div>
                 </div>
@@ -890,17 +892,24 @@ export default function MyPostsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-black text-[#17233C] mb-1">
-                      {editFormData.type === 'offer' ? 'Total Available Seats' : 'Seats Needed'}
+                      {editFormData.type === 'offer' ? 'Total Available Seats (1–6)' : 'Passenger Seat'}
                     </label>
-                    <input
-                      type="number"
-                      required
-                      min={editFormData.bookedSeats || 1}
-                      max={8}
-                      value={editFormData.seats}
-                      onChange={(e) => setEditFormData({ ...editFormData, seats: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] text-xs font-bold text-[#17233C] focus:outline-none focus:border-[#FF572E]"
-                    />
+                    {editFormData.type === 'offer' ? (
+                      <input
+                        type="number"
+                        required
+                        min={editFormData.bookedSeats || 1}
+                        max={6}
+                        value={editFormData.seats}
+                        onChange={(e) => setEditFormData({ ...editFormData, seats: Math.min(6, Math.max(1, Number(e.target.value))) })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] text-xs font-bold text-[#17233C] focus:outline-none focus:border-[#FF572E]"
+                      />
+                    ) : (
+                      <div className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-500 flex items-center justify-between">
+                        <span>1 Seat</span>
+                        <span className="text-[10px] font-medium text-gray-400">Fixed for FIND</span>
+                      </div>
+                    )}
                   </div>
 
                   {editFormData.type === 'offer' ? (
@@ -1005,7 +1014,7 @@ export default function MyPostsPage() {
                 <div className="text-[11px] text-[#8C93A4] flex items-center gap-2 font-semibold">
                   <span>{formatTravelDate(postToCancel.travelDate)}</span>
                   <span>•</span>
-                  <span>{postToCancel.type === 'offer' ? 'Ride Offer' : 'Passenger Request'}</span>
+                  <span>{postToCancel.type === 'offer' ? 'Ride Offer' : 'Find Post'}</span>
                   {postToCancel.bookedSeats > 0 && (
                     <>
                       <span>•</span>
@@ -1085,7 +1094,7 @@ export default function MyPostsPage() {
                 <div className="text-[11px] text-[#8C93A4] flex items-center gap-2 font-semibold">
                   <span>{formatTravelDate(postToDelete.travelDate)}</span>
                   <span>•</span>
-                  <span>{postToDelete.type === 'offer' ? 'Ride Offer' : 'Passenger Request'}</span>
+                  <span>{postToDelete.type === 'offer' ? 'Ride Offer' : 'Find Post'}</span>
                   {postToDelete.pricePerSeat && (
                     <>
                       <span>•</span>

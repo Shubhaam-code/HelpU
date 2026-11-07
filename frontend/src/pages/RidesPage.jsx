@@ -13,7 +13,7 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getTravels } from '../lib/api';
 
-const TABS = ['All Matches', 'Matching Offers', 'Matching Requests'];
+const TABS = ['All Matches', 'Matching Offers', 'Matching Finds'];
 const SORT_OPTIONS = [
   { id: 'latest', label: 'Latest Posted' },
   { id: 'date_asc', label: 'Departure: Earliest' },
@@ -28,7 +28,7 @@ export default function RidesPage() {
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'offers' || tabParam === 'Matching Offers') return 'Matching Offers';
-    if (tabParam === 'requests' || tabParam === 'Matching Requests') return 'Matching Requests';
+    if (tabParam === 'requests' || tabParam === 'finds' || tabParam === 'Matching Requests' || tabParam === 'Matching Finds') return 'Matching Finds';
     return 'All Matches';
   });
 
@@ -45,8 +45,8 @@ export default function RidesPage() {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'offers' || tabParam === 'Matching Offers') {
       setActiveTab('Matching Offers');
-    } else if (tabParam === 'requests' || tabParam === 'Matching Requests') {
-      setActiveTab('Matching Requests');
+    } else if (tabParam === 'requests' || tabParam === 'finds' || tabParam === 'Matching Requests' || tabParam === 'Matching Finds') {
+      setActiveTab('Matching Finds');
     } else if (tabParam === 'all' || tabParam === 'All Matches') {
       setActiveTab('All Matches');
     }
@@ -62,7 +62,7 @@ export default function RidesPage() {
     try {
       const params = {};
       if (activeTab === 'Matching Offers') params.type = 'offer';
-      if (activeTab === 'Matching Requests') params.type = 'request';
+      if (activeTab === 'Matching Finds' || activeTab === 'Matching Requests') params.type = 'request';
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const res = await getTravels(params);

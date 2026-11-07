@@ -147,13 +147,19 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    // 6. Validation for seats
-    const numSeats = Number(seats);
-    if (!seats || isNaN(numSeats) || !Number.isInteger(numSeats) || numSeats < 1) {
-      return res.status(400).json({
-        success: false,
-        message: 'Seats must be an integer of at least 1'
-      });
+    // 6. Validation for seats (OFFER supports 1-6 seats; FIND/REQUEST is always exactly 1 seat)
+    let numSeats = Number(seats);
+    if (type === 'request') {
+      // FIND post: always save exactly 1 seat regardless of incoming value
+      numSeats = 1;
+    } else {
+      // OFFER post: must be an integer between 1 and 6
+      if (!seats || isNaN(numSeats) || !Number.isInteger(numSeats) || numSeats < 1 || numSeats > 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Seats for a ride offer must be an integer between 1 and 6'
+        });
+      }
     }
 
     // 7. Calculate expiry date in Asia/Kolkata timezone
@@ -999,12 +1005,15 @@ router.put('/:id', requireAuth, async (req, res) => {
     const bookedSeats = travel.bookedSeats || 0;
 
     // 4. Validate and handle seats safely: cannot reduce below bookedSeats
-    if (seats !== undefined && seats !== null) {
+    if (travel.type === 'request') {
+      // FIND post: always exactly 1 seat
+      travel.seats = 1;
+    } else if (seats !== undefined && seats !== null) {
       const numSeats = Number(seats);
-      if (isNaN(numSeats) || !Number.isInteger(numSeats) || numSeats < 1) {
+      if (isNaN(numSeats) || !Number.isInteger(numSeats) || numSeats < 1 || numSeats > 6) {
         return res.status(400).json({
           success: false,
-          message: 'Seats must be a positive integer of at least 1'
+          message: 'Seats for a ride offer must be an integer between 1 and 6'
         });
       }
       if (numSeats < bookedSeats) {

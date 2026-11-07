@@ -130,8 +130,19 @@ export default function OfferRidePage() {
   // Sync mode if route changes between /rides/offer and /rides/request
   useEffect(() => {
     const isReq = location.pathname.includes('/request') || searchParams.get('mode') === 'request';
-    setMode(isReq ? 'request' : 'offer');
+    const newMode = isReq ? 'request' : 'offer';
+    setMode(newMode);
+    if (newMode === 'request') {
+      setTravellers(1);
+    }
   }, [location.pathname, searchParams]);
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    if (newMode === 'request') {
+      setTravellers(1);
+    }
+  };
 
   const [fromLoc, setFromLoc] = useState('VIT, Bhopal');
   const [toLoc, setToLoc] = useState('Bhopal Railway Station');
@@ -218,16 +229,16 @@ export default function OfferRidePage() {
         });
         setShowSuccessModal(true);
       } else {
-        // For "request" mode — post a travel request
+        // For "request" (FIND) mode — post a travel request strictly with 1 seat
         const res = await createTravel({
           source: fromLoc.trim(),
           destination: toLoc.trim(),
           travelDate: date,
           departureTime: departureMinutes,
           timeFlexibility: 30,
-          seats: travellers,
+          seats: 1,
           pricePerSeat: 0,
-          carModel: 'Ride Request',
+          carModel: 'Find Ride',
           type: 'request',
           notes: notes.trim(),
           gender: gender || null,
@@ -245,9 +256,9 @@ export default function OfferRidePage() {
           destination: toLoc.trim(),
           travelDate: date,
           time: time || '08:00',
-          seats: travellers,
+          seats: 1,
           pricePerSeat: 0,
-          carModel: 'Ride Request',
+          carModel: 'Find Ride',
           gender: gender || null,
           notes: notes.trim(),
         });
@@ -362,7 +373,7 @@ export default function OfferRidePage() {
               <div className="inline-flex bg-white p-1 rounded-full border border-[#F4E3D8] shadow-2xs shrink-0">
                 <button
                   type="button"
-                  onClick={() => setMode('offer')}
+                  onClick={() => handleModeChange('offer')}
                   className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                     mode === 'offer'
                       ? 'bg-[#FF572E] text-white shadow-xs'
@@ -375,7 +386,7 @@ export default function OfferRidePage() {
 
                 <button
                   type="button"
-                  onClick={() => setMode('request')}
+                  onClick={() => handleModeChange('request')}
                   className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                     mode === 'request'
                       ? 'bg-[#FF572E] text-white shadow-xs'
@@ -383,7 +394,7 @@ export default function OfferRidePage() {
                   }`}
                 >
                   <Search className="w-3.5 h-3.5 stroke-[2.2]" />
-                  <span>Find / Request</span>
+                  <span>Find</span>
                 </button>
               </div>
 
@@ -421,7 +432,7 @@ export default function OfferRidePage() {
                 </div>
 
                 <span className="text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full bg-[#FFF6F0] border border-[#FF572E]/25 text-[#FF572E] shrink-0">
-                  {mode === 'offer' ? 'Offering' : 'Requesting'}
+                  {mode === 'offer' ? 'Offering' : 'Finding'}
                 </span>
               </div>
 
@@ -603,9 +614,11 @@ export default function OfferRidePage() {
                     </div>
                     <div>
                       <h4 className="font-black text-xs sm:text-sm text-[#17233C] leading-none">
-                        {mode === 'offer' ? 'Max. Co-travellers' : 'Seats Needed'}
+                        {mode === 'offer' ? 'Max. Co-travellers' : 'Passenger Seat'}
                       </h4>
-                      <p className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium mt-0.5">Available seats</p>
+                      <p className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium mt-0.5">
+                        {mode === 'offer' ? 'Available seats (1–6)' : 'Single passenger (1 seat)'}
+                      </p>
                     </div>
                   </div>
 
@@ -624,25 +637,31 @@ export default function OfferRidePage() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
-                        className="w-7 h-7 rounded-xl bg-white border border-[#F4E3D8] text-[#17233C] hover:bg-[#FFEBE0] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
-                      >
-                        −
-                      </button>
-                      <span className="font-black text-[#17233C] text-sm min-w-[16px] text-center">
-                        {travellers}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setTravellers((prev) => Math.min(8, prev + 1))}
-                        className="w-7 h-7 rounded-xl bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform shadow-xs"
-                      >
-                        +
-                      </button>
-                    </div>
+                    {mode === 'offer' ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
+                          className="w-7 h-7 rounded-xl bg-white border border-[#F4E3D8] text-[#17233C] hover:bg-[#FFEBE0] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                        >
+                          −
+                        </button>
+                        <span className="font-black text-[#17233C] text-sm min-w-[16px] text-center">
+                          {travellers}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setTravellers((prev) => Math.min(6, prev + 1))}
+                          className="w-7 h-7 rounded-xl bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform shadow-xs"
+                        >
+                          +
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-1 bg-[#F4F5F7] rounded-xl text-xs font-bold text-[#6E7587] border border-[#E5E7EB] shrink-0">
+                        1 Seat
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -652,7 +671,7 @@ export default function OfferRidePage() {
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-black text-[#17233C] flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span>{mode === 'offer' ? 'Ride Notes / Preferences' : 'Request Notes / Details'}</span>
+                      <span>{mode === 'offer' ? 'Ride Notes / Preferences' : 'Find Notes / Details'}</span>
                     </label>
                     <span className="text-[10px] font-bold text-[#8C93A4] bg-[#FFFBF8] px-2 py-0.5 rounded-full border border-[#F4E3D8]">
                       Optional

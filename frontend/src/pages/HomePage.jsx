@@ -16,9 +16,9 @@ import {
   useMyTravels, 
   useUserMatches, 
   useUnreadNotificationsCount,
-  useConfirmedBookings,
-  categorizeConfirmedRides
+  useConfirmedBookings
 } from '../hooks/useAppData';
+import { categorizeConfirmedRides } from '../lib/utils';
 
 // Crisp Car Outline Icon matching reference buttons
 function ButtonCarIcon({ className = "w-4 h-4 sm:w-5 sm:h-5" }) {
@@ -139,52 +139,48 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="relative bg-white rounded-[22px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden p-3.5 sm:p-5"
+          className="relative bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-5"
         >
           {/* Subtle warm cream background glow at top */}
-          <div className="absolute top-0 right-0 left-0 h-20 bg-gradient-to-b from-[#FFF5EE]/60 to-transparent pointer-events-none" />
+          <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/70 to-transparent pointer-events-none" />
 
           {/* Top Badge */}
-          <div className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider mb-1.5 shadow-2xs">
+          <div className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-2 shadow-2xs">
             <Sparkles className="w-3 h-3 text-[#FF572E]" />
             <span>Smart Campus Mobility</span>
           </div>
 
-          {/* Top Row: Heading on Left & Illustration on Right */}
-          <div className="relative z-10 flex items-end justify-between gap-1 sm:gap-4">
+          {/* Content Row: Heading & Description on Left, Illustration on Right */}
+          <div className="relative z-10 flex items-center justify-between gap-2 sm:gap-4">
             
             {/* Left: Heading & Subtitle */}
-            <div className="flex-1 min-w-0 pb-0.5 pt-0.5">
-              <h1 className="font-black text-[#17233C] text-[19px] sm:text-2xl md:text-3xl leading-[1.16] tracking-tight">
+            <div className="flex-1 min-w-0">
+              <h1 className="font-black text-[#17233C] text-[20px] min-[390px]:text-[22px] sm:text-2xl md:text-3xl leading-[1.18] tracking-tight">
                 Where are you <br />
                 going{' '}
-                <span className="text-[#FF572E] relative inline-inline">
+                <span className="text-[#FF572E]">
                   today?
                 </span>
               </h1>
 
-              <p className="text-[11px] sm:text-xs text-[#6E7587] font-medium leading-normal mt-1 max-w-[175px] sm:max-w-xs">
+              <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium leading-relaxed mt-1.5 max-w-[190px] min-[390px]:max-w-[215px] sm:max-w-xs">
                 Share rides, split travel costs, and commute with verified students.
               </p>
             </div>
 
-            {/* Right: Illustration aligned cleanly to bottom right */}
-            <div className="shrink-0 w-[155px] sm:w-[200px] md:w-[230px] -mr-2 -mb-1 flex justify-end items-end">
+            {/* Right: Illustration visually prominent and proportional */}
+            <div className="shrink-0 w-[160px] min-[380px]:w-[180px] min-[410px]:w-[195px] sm:w-[225px] md:w-[250px] -mr-1 sm:-mr-1 flex justify-end items-center">
               <img
                 src="/webpage.png"
                 alt="Helpu Student Travel"
-                className="block w-full h-auto object-contain select-none pointer-events-none drop-shadow-xs"
-                style={{
-                  transform: "translate(4px, -6px) scale(1.04)",
-                  transformOrigin: "bottom right"
-                }}
+                className="w-full h-auto object-contain select-none pointer-events-none drop-shadow-xs"
               />
             </div>
 
           </div>
 
           {/* Two Hero Action Buttons: Find a Ride & Offer a Ride */}
-          <div className="relative z-10 flex items-center gap-2 pt-2.5 mt-1">
+          <div className="relative z-10 flex items-center gap-2 pt-3 mt-1.5">
             <button
               type="button"
               onClick={() => {
@@ -195,7 +191,7 @@ export default function HomePage() {
                   navigate('/rides');
                 }
               }}
-              className="flex-1 py-2.5 px-3 bg-white hover:bg-[#FFF7F2] active:scale-[0.98] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              className="flex-1 py-2.5 sm:py-3 px-3.5 bg-white hover:bg-[#FFF7F2] active:scale-[0.98] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
             >
               <Search className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
               <span>Find a Ride</span>
@@ -204,7 +200,7 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => navigate('/rides/offer')}
-              className="flex-1 py-2.5 px-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+              className="flex-1 py-2.5 sm:py-3 px-3.5 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
             >
               <ButtonCarIcon className="w-3.5 h-3.5 text-white stroke-[2.5]" />
               <span>Offer a Ride</span>

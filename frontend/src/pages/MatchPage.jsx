@@ -511,7 +511,7 @@ export default function MatchPage() {
                       className="px-6 py-3 bg-white border border-[#F4E3D8] hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs sm:text-sm rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-2"
                     >
                       <Send className="w-4 h-4 text-[#8B5CF6]" />
-                      <span>+ Request a Ride</span>
+                      <span>+ Find a Ride</span>
                     </button>
                   </div>
                 </div>
@@ -537,7 +537,7 @@ export default function MatchPage() {
                                 ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
                                 : 'bg-[#F5F3FF] text-[#8B5CF6] border border-[#DDD6FE]'
                             }`}>
-                              {isOffer ? 'Ride Offer' : 'Passenger Request'}
+                              {isOffer ? 'Ride Offer' : 'Find Ride'}
                             </span>
 
                             {isOffer && travel.pricePerSeat > 0 && (
@@ -842,7 +842,7 @@ export default function MatchPage() {
                                 ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
                                 : 'bg-[#F5F3FF] text-[#8B5CF6] border border-[#DDD6FE]'
                             }`}>
-                              {isOffer ? 'Ride Offer' : 'Passenger Request'}
+                              {isOffer ? 'Ride Offer' : 'Find Ride'}
                             </span>
                           </div>
 

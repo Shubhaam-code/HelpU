@@ -65,7 +65,8 @@ const travelSchema = new mongoose.Schema(
     seats: {
       type: Number,
       required: [true, 'Seats count is required'],
-      min: [1, 'Seats must be at least 1']
+      min: [1, 'Seats must be at least 1'],
+      max: [6, 'Seats cannot exceed 6']
     },
     bookedSeats: {
       type: Number,
@@ -126,10 +127,13 @@ const travelSchema = new mongoose.Schema(
   }
 );
 
-// Pre-validate hook to automatically populate expiresAt if not set
+// Pre-validate hook to automatically populate expiresAt if not set and enforce exactly 1 seat for FIND (request) posts
 travelSchema.pre('validate', function () {
   if (this.travelDate && !this.expiresAt) {
     this.expiresAt = calculateExpiresAt(this.travelDate);
+  }
+  if (this.type === 'request') {
+    this.seats = 1;
   }
 });
 

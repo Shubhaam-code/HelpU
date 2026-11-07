@@ -436,7 +436,7 @@ export default function RideDetailsPage() {
       hideSidebarOnDesktop={true}
       customMobileHeader={
         <AppHeader 
-          title={isOffer ? 'Ride Offer Details' : 'Ride Request Details'} 
+          title={isOffer ? 'Ride Offer Details' : 'Find Ride Details'}
           backTo={-1} 
         />
       }
@@ -506,7 +506,7 @@ export default function RideDetailsPage() {
               <div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[11px] font-black text-[#FF572E] mb-2 shadow-2xs">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>{isOffer ? 'Ride Offer' : 'Passenger Request'}</span>
+                  <span>{isOffer ? 'Ride Offer' : 'Find Ride'}</span>
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-black text-[#17233C] tracking-tight">
                   {travel.source} → {travel.destination}
@@ -536,7 +536,7 @@ export default function RideDetailsPage() {
                         ? 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]' 
                         : 'bg-[#F5F3FF] text-[#8B5CF6] border border-[#DDD6FE]'
                     }`}>
-                      {isOffer ? '🚗 Ride Offer' : '🙋 Ride Request'}
+                      {isOffer ? '🚗 Ride Offer' : '🙋 Find Ride'}
                     </span>
                     {isOffer && (
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
@@ -840,7 +840,7 @@ export default function RideDetailsPage() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-[#6E7587]">
-                    {isOffer ? 'Ride Host' : 'Ride Requester'}
+                    {isOffer ? 'Ride Host' : 'Ride Finder'}
                   </span>
                   {Boolean(travel.student?.isVerified) && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#16A34A] bg-[#EDFAF3] px-2.5 py-0.5 rounded-full border border-[#BCECD4]">

@@ -11,11 +11,10 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { 
   useConfirmedBookings, 
-  categorizeConfirmedRides, 
   useUnreadNotificationsCount 
 } from '../hooks/useAppData';
 import { openWhatsAppChat } from '../lib/whatsapp';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, categorizeConfirmedRides } from '../lib/utils';
 
 /**
  * Format minutes from midnight into 12-hour AM/PM format (e.g. 08:30 AM)

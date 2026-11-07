@@ -87,7 +87,7 @@ export function MatchCard({ match, onPress, bookingStatus }) {
         <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FFF0E6] text-[#FF572E] border border-[#FFD9C7] shrink-0">
             <Target className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
-            <span>{isOffer ? 'Matching Offer' : 'Matching Request'}</span>
+            <span>{isOffer ? 'Matching Offer' : 'Matching Find'}</span>
           </div>
 
           {isVerified && (
