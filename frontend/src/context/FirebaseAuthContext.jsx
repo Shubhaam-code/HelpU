@@ -14,6 +14,7 @@ import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider } from '../lib/firebase';
 import { setTokenGetter } from '../lib/api';
 import { setActiveAuthUser } from '../mobile/pushNotifications';
+import { clearUserCache } from '../lib/queryClient';
 
 const FirebaseAuthContext = createContext(null);
 
@@ -225,6 +226,7 @@ export function FirebaseAuthProvider({ children }) {
   // Sign Out (Native Android + Web Firebase)
   const signOutUser = useCallback(async () => {
     try {
+      clearUserCache();
       if (Capacitor.isNativePlatform()) {
         try {
           await FirebaseAuthentication.signOut();

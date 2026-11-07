@@ -58,6 +58,12 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    gender: {
+      type: String,
+      enum: ['Male', 'Female', 'Prefer not to say', null],
+      default: null,
+      trim: true
+    },
     bio: {
       type: String,
       trim: true,

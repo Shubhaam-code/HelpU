@@ -4,14 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import {
   MapPin, Calendar, Clock, Users, ArrowUpDown,
-  Search, Check, Sparkles, ChevronDown,
+  Search, Check, Sparkles, ChevronDown, User,
   MoreHorizontal, ShieldCheck, ArrowRight, IndianRupee,
   CheckCircle2, X, FileText
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
+import { DatePickerModal } from '../components/ui/DatePickerModal';
 import { createTravel } from '../lib/api';
+import { invalidateRideQueries } from '../lib/queryClient';
 
 // Cute & Modern Vehicle SVG Thumbnails matching reference design
 function OmniCarIcon({ className = "w-8 sm:w-9 h-5 sm:h-6" }) {
@@ -137,8 +139,9 @@ export default function OfferRidePage() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   });
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [time, setTime] = useState('08:00');
-  const [preferredCar, setPreferredCar] = useState('Omni');
+  const [gender, setGender] = useState(''); // 'Male' | 'Female' | 'Prefer not to say' | ''
   const [travellers, setTravellers] = useState(1);
   const [pricePerSeat, setPricePerSeat] = useState('350');
   const [notes, setNotes] = useState('');
@@ -187,15 +190,17 @@ export default function OfferRidePage() {
           timeFlexibility: 30,
           seats: travellers,
           pricePerSeat: Number(pricePerSeat) || 350,
-          carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
+          carModel: 'Campus Ride',
           type: 'offer',
           notes: notes.trim(),
+          gender: gender || null,
           authorImage: user?.imageUrl || null,
           authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
           authorEmail: user?.primaryEmailAddress?.emailAddress || null,
         });
 
         const createdPost = res.data?.data || res.data;
+        invalidateRideQueries();
         setCreatedSummary({
           id: createdPost?._id,
           type: 'offer',
@@ -205,7 +210,8 @@ export default function OfferRidePage() {
           time: time || '08:00',
           seats: travellers,
           pricePerSeat: Number(pricePerSeat) || 350,
-          carModel: preferredCar === 'Other' ? 'Campus Ride' : preferredCar,
+          carModel: 'Campus Ride',
+          gender: gender || null,
           notes: notes.trim(),
         });
         setShowSuccessModal(true);
@@ -222,12 +228,14 @@ export default function OfferRidePage() {
           carModel: 'Ride Request',
           type: 'request',
           notes: notes.trim(),
+          gender: gender || null,
           authorImage: user?.imageUrl || null,
           authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
           authorEmail: user?.primaryEmailAddress?.emailAddress || null,
         });
 
         const createdPost = res.data?.data || res.data;
+        invalidateRideQueries();
         setCreatedSummary({
           id: createdPost?._id,
           type: 'request',
@@ -238,6 +246,7 @@ export default function OfferRidePage() {
           seats: travellers,
           pricePerSeat: 0,
           carModel: 'Ride Request',
+          gender: gender || null,
           notes: notes.trim(),
         });
         setShowSuccessModal(true);
@@ -479,8 +488,11 @@ export default function OfferRidePage() {
                 {/* Schedule Row: Date & Time side by side with Chevrons */}
                 <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
 
-                  {/* Date */}
-                  <div className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/40 focus-within:border-[#FF572E] transition-all cursor-pointer">
+                  {/* Date (Custom Helpu Date Picker - No Broken Native OS Dialog) */}
+                  <div 
+                    onClick={() => setShowDatePicker(true)}
+                    className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/60 focus-within:border-[#FF572E] active:scale-[0.98] transition-all cursor-pointer"
+                  >
                     <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-1">
                       <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
                       <span>Date</span>
@@ -491,13 +503,6 @@ export default function OfferRidePage() {
                       </span>
                       <ChevronDown className="w-4 h-4 text-[#17233C]/70 shrink-0" />
                     </div>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                      aria-label="Travel Date"
-                    />
                   </div>
 
                   {/* Time */}
@@ -524,97 +529,75 @@ export default function OfferRidePage() {
                 </div>
 
 
-                {/* Preferred Vehicle Selection */}
+                {/* Gender Selection (Optional) */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <ButtonCarIcon className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span className="font-black text-xs sm:text-sm text-[#17233C]">Preferred Vehicle</span>
+                      <User className="w-3.5 h-3.5 text-[#FF572E]" />
+                      <span className="font-black text-xs sm:text-sm text-[#17233C]">Gender</span>
                     </div>
-                    <span className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium">Select model</span>
+                    <span className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium">Optional</span>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
-                    {/* Omni */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                    {/* Male */}
                     <button
                       type="button"
-                      onClick={() => setPreferredCar('Omni')}
-                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
-                        preferredCar === 'Omni'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
+                      onClick={() => setGender(gender === 'Male' ? '' : 'Male')}
+                      className={`relative flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border transition-all cursor-pointer ${
+                        gender === 'Male'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs ring-1 ring-[#FF572E]'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
                       }`}
                     >
-                      {preferredCar === 'Omni' && (
+                      {gender === 'Male' && (
                         <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <OmniCarIcon className="w-7 sm:w-8 h-4.5 sm:h-5 mb-0.5" />
-                      <span className="text-[11px] font-extrabold text-[#17233C]">Omni</span>
+                      <span className="text-lg mb-0.5" role="img" aria-label="Male">👨</span>
+                      <span className="text-xs font-extrabold text-[#17233C]">Male</span>
                     </button>
 
-                    {/* Creta */}
+                    {/* Female */}
                     <button
                       type="button"
-                      onClick={() => setPreferredCar('Creta')}
-                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
-                        preferredCar === 'Creta'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
+                      onClick={() => setGender(gender === 'Female' ? '' : 'Female')}
+                      className={`relative flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border transition-all cursor-pointer ${
+                        gender === 'Female'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs ring-1 ring-[#FF572E]'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
                       }`}
                     >
-                      {preferredCar === 'Creta' && (
+                      {gender === 'Female' && (
                         <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <CretaCarIcon className="w-7 sm:w-8 h-4.5 sm:h-5 mb-0.5" />
-                      <span className="text-[11px] font-extrabold text-[#17233C]">Creta</span>
+                      <span className="text-lg mb-0.5" role="img" aria-label="Female">👩</span>
+                      <span className="text-xs font-extrabold text-[#17233C]">Female</span>
                     </button>
 
-                    {/* Eeco */}
+                    {/* Prefer not to say */}
                     <button
                       type="button"
-                      onClick={() => setPreferredCar('Eeco')}
-                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
-                        preferredCar === 'Eeco'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
+                      onClick={() => setGender(gender === 'Prefer not to say' ? '' : 'Prefer not to say')}
+                      className={`relative flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border transition-all cursor-pointer ${
+                        gender === 'Prefer not to say'
+                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs ring-1 ring-[#FF572E]'
                           : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
                       }`}
                     >
-                      {preferredCar === 'Eeco' && (
+                      {gender === 'Prefer not to say' && (
                         <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2 h-2 stroke-[3]" />
                         </div>
                       )}
-                      <EecoCarIcon className="w-7 sm:w-8 h-4.5 sm:h-5 mb-0.5" />
-                      <span className="text-[11px] font-extrabold text-[#17233C]">Eeco</span>
-                    </button>
-
-                    {/* Other */}
-                    <button
-                      type="button"
-                      onClick={() => setPreferredCar('Other')}
-                      className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer ${
-                        preferredCar === 'Other'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs'
-                          : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
-                    >
-                      {preferredCar === 'Other' && (
-                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2 h-2 stroke-[3]" />
-                        </div>
-                      )}
-                      <div className="w-7 sm:w-8 h-4.5 sm:h-5 flex items-center justify-center text-[#6E7587] mb-0.5">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </div>
-                      <span className="text-[11px] font-extrabold text-[#17233C]">Other</span>
+                      <span className="text-lg mb-0.5" role="img" aria-label="Private">🔒</span>
+                      <span className="text-[10px] sm:text-[11px] font-extrabold text-[#17233C] text-center leading-tight">Prefer not to say</span>
                     </button>
                   </div>
                 </div>
-
 
                 {/* Max. Co-travellers & Fuel Split Price */}
                 <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] flex items-center justify-between gap-2">
@@ -870,6 +853,18 @@ export default function OfferRidePage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modern Custom Date Picker Modal */}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        value={date}
+        onChange={(newDate) => {
+          setDate(newDate);
+          setShowDatePicker(false);
+        }}
+        title={mode === 'offer' ? 'Select Ride Date' : 'Select Travel Date'}
+      />
     </ResponsiveShell>
   );
 }

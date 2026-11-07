@@ -191,334 +191,363 @@ export default function ProfilePage() {
         />
       }
     >
-      <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      <div className="w-full max-w-4xl mx-auto px-4 sm:px-5 lg:px-6 py-3 sm:py-4 lg:py-5 space-y-3 sm:space-y-4 lg:space-y-4">
         
         {/* ========================================================================= */}
-        {/* 1. HERO PROFILE CARD                                                      */}
+        {/* 1. HERO PROFILE CARD (Matching Reference Image 1)                         */}
         {/* ========================================================================= */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white rounded-[32px] border border-[#F4E3D8]/90 shadow-xs overflow-hidden"
+          transition={{ duration: 0.25 }}
+          className="bg-white rounded-[22px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden"
         >
-          {/* Warm decorative cover banner with cta-road.png background */}
-          <div className="h-32 sm:h-40 bg-gradient-to-r from-[#FFF0E7] via-[#FFE5D8] to-[#FFF5ED] relative overflow-hidden">
-            {/* Background Image - positioned lower with increased opacity */}
+          {/* Campus Illustration Background Header */}
+          <div className="h-28 sm:h-36 lg:h-44 relative overflow-hidden bg-gradient-to-br from-[#FFF7F0] via-[#FFE8D6] to-[#FFF5ED]">
             <div 
-              className="absolute inset-0 opacity-50"
+              className="absolute inset-0 opacity-60"
               style={{
-                backgroundImage: 'url(/assets/cta-road.png)',
+                backgroundImage: 'url(/assets/footer-campus.png)',
                 backgroundSize: 'cover',
-                backgroundPosition: 'center bottom',
+                backgroundPosition: 'center center',
                 backgroundRepeat: 'no-repeat'
               }}
             />
-            {/* Lighter gradient overlay for better visibility */}
-            <div className="absolute right-0 top-0 bottom-0 w-2/3 bg-gradient-to-l from-white/20 to-transparent pointer-events-none" />
-            <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-[#FF572E]/8 blur-xl pointer-events-none" />
-            <div className="absolute top-4 right-5 sm:right-7 z-10">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 text-[#FF572E] text-xs font-black shadow-xs backdrop-blur-sm">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Verified Student</span>
-              </span>
-            </div>
+            {/* Soft gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/40 pointer-events-none" />
           </div>
 
-          {/* Profile Details Container */}
-          <div className="px-6 sm:px-8 pb-7 -mt-16 sm:-mt-20 relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-5">
-            
-            {/* Avatar & Names */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 text-center sm:text-left">
-              <div className="relative">
-                <Avatar 
-                  src={user?.imageUrl || profile?.imageUrl}
-                  name={profile?.name || user?.fullName}
-                  email={profile?.email || user?.primaryEmailAddress?.emailAddress}
-                  size={96}
-                  ring
-                  className="shadow-md border-4 border-white"
-                />
-                <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center text-white text-[10px] shadow-xs">
-                  ✓
+          {/* Profile Content */}
+          <div className="px-4 sm:px-6 pb-4 sm:pb-5 -mt-8 sm:-mt-12 lg:-mt-14 relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
+              
+              {/* Avatar + Name Details */}
+              <div className="flex items-center sm:items-end gap-3 sm:gap-4 min-w-0">
+                {/* Avatar with Orange Ring & Verified Checkmark Badge */}
+                <div className="relative shrink-0">
+                  <div className="w-18 h-18 sm:w-22 sm:h-22 lg:w-24 lg:h-24 rounded-full border-[3px] border-[#FF572E] bg-white p-[2px] shadow-md flex items-center justify-center">
+                    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[#FFF5ED]">
+                      <Avatar 
+                        src={user?.imageUrl || profile?.imageUrl}
+                        name={profile?.name || user?.fullName}
+                        email={profile?.email || user?.primaryEmailAddress?.emailAddress}
+                        size="full"
+                        className="w-full h-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 right-0 w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-md z-10">
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white stroke-[2.8]" />
+                  </div>
+                </div>
+
+                {/* Name, Badge, College, Email */}
+                <div className="min-w-0 text-left">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h1 className="font-black text-[#17233C] text-base sm:text-xl lg:text-2xl tracking-tight truncate">
+                      {profile?.name || user?.fullName || 'Campus Student'}
+                    </h1>
+                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-black text-white bg-[#16A34A] px-2.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                      <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[2.5]" />
+                      <span>Verified Student</span>
+                    </span>
+                  </div>
+
+                  <div className="space-y-0.5 text-xs text-[#6E7587]">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <GraduationCap className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
+                      <span className="font-bold text-[#17233C] text-[11px] sm:text-xs truncate">{profile?.college || 'VIT, Bhopal'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Mail className="w-3.5 h-3.5 text-[#8C93A4] shrink-0" />
+                      <span className="font-medium text-[10.5px] sm:text-xs truncate max-w-[220px] sm:max-w-xs md:max-w-md">
+                        {user?.primaryEmailAddress?.emailAddress || profile?.email}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="font-black text-[#17233C] text-xl sm:text-2xl tracking-tight">
-                    {profile?.name || user?.fullName || 'Campus Student'}
-                  </h1>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#3B82F6] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full border border-[#DBEAFE]">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>ID Verified</span>
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-[#6E7587]">
-                  <span className="flex items-center gap-1 font-semibold">
-                    <GraduationCap className="w-3.5 h-3.5 text-[#FF572E]" />
-                    <span>{profile?.college || 'VIT, Bhopal'}</span>
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1 font-semibold text-[#17233C]">
-                    <Mail className="w-3.5 h-3.5 text-[#8C93A4]" />
-                    <span className="truncate max-w-[200px]">{user?.primaryEmailAddress?.emailAddress || profile?.email}</span>
-                  </span>
-                </div>
+              {/* Edit Profile Button */}
+              <div className="shrink-0 flex justify-end pt-1 sm:pt-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2 bg-[#FF572E] hover:bg-[#E64A22] active:scale-95 text-white rounded-full text-xs font-black shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Edit Profile</span>
+                </button>
               </div>
-            </div>
 
-            {/* Edit Profile CTA */}
-            <div className="flex items-center justify-center sm:justify-end gap-2.5">
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-[#FFF7F2] text-[#17233C] hover:text-[#FF572E] border border-[#F4E3D8] hover:border-[#FF572E]/40 rounded-full text-xs font-bold shadow-2xs transition-all cursor-pointer"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-[#FF572E]" />
-                <span>Edit Profile</span>
-              </button>
             </div>
-
           </div>
         </motion.div>
 
 
         {/* ========================================================================= */}
-        {/* 2. STATS ROW (3 CLEAN CARDS)                                              */}
+        {/* 2. THREE STATISTIC CARDS (Side-by-side on all screens)                    */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           
-          <div className="bg-white rounded-[24px] p-5 border border-[#F4E3D8]/90 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center shrink-0">
-              <Car className="w-6 h-6 stroke-[2.2]" />
+          {/* Card 1: Rides Offered */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: 0.05 }}
+            className="bg-white rounded-[18px] sm:rounded-[22px] p-2.5 sm:p-4 border border-[#F4E3D8] shadow-xs flex flex-col items-center text-center justify-between"
+          >
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center shrink-0 mb-1 sm:mb-2">
+              <Car className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="font-black text-2xl text-[#17233C] block leading-tight">
+              <div className="font-black text-xl sm:text-2xl text-[#17233C] leading-none mb-1">
                 {ridesCount}
-              </span>
-              <span className="text-xs font-bold text-[#6E7587]">
+              </div>
+              <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] leading-tight">
                 Rides Offered
-              </span>
+              </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-[24px] p-5 border border-[#F4E3D8]/90 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
-              <Calendar className="w-6 h-6 stroke-[2.2]" />
+          {/* Card 2: Campus Bookings */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: 0.1 }}
+            className="bg-white rounded-[18px] sm:rounded-[22px] p-2.5 sm:p-4 border border-[#F4E3D8] shadow-xs flex flex-col items-center text-center justify-between"
+          >
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0 mb-1 sm:mb-2">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="font-black text-2xl text-[#17233C] block leading-tight">
+              <div className="font-black text-xl sm:text-2xl text-[#17233C] leading-none mb-1">
                 {bookingsCount}
-              </span>
-              <span className="text-xs font-bold text-[#6E7587]">
+              </div>
+              <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] leading-tight">
                 Campus Bookings
-              </span>
+              </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-[24px] p-5 border border-[#F4E3D8]/90 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-6 h-6 stroke-[2.2]" />
+          {/* Card 3: Student Verification (Active) */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: 0.15 }}
+            className="bg-white rounded-[18px] sm:rounded-[22px] p-2.5 sm:p-4 border border-[#F4E3D8] shadow-xs flex flex-col items-center text-center justify-between"
+          >
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0 mb-1 sm:mb-2">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="font-black text-2xl text-[#16A34A] block leading-tight">
+              <div className="font-black text-lg sm:text-2xl text-[#16A34A] leading-none mb-1">
                 Active
-              </span>
-              <span className="text-xs font-bold text-[#6E7587]">
+              </div>
+              <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] leading-tight">
                 Student Verification
-              </span>
+              </div>
             </div>
-          </div>
+          </motion.div>
 
         </div>
 
 
         {/* ========================================================================= */}
-        {/* 2.5. PERSONAL BIO SECTION (OPTIONAL)                                      */}
+        {/* 4. ABOUT ME SECTION (Responsive)                                           */}
         {/* ========================================================================= */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="bg-white rounded-[28px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs"
+          transition={{ duration: 0.3, delay: 0.25 }}
+          className="bg-white rounded-[16px] sm:rounded-[20px] lg:rounded-[24px] p-3 sm:p-4 lg:p-5 border border-[#F4E3D8]/90 shadow-sm hover:shadow-md transition-all"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center shrink-0">
-                <MessageCircle className="w-4.5 h-4.5 stroke-[2.2]" />
-              </div>
-              <div>
-                <h3 className="font-black text-[#17233C] text-sm sm:text-base">
-                  About Me
-                </h3>
-                <p className="text-[10px] sm:text-xs text-[#6E7587] font-medium">
-                  Share something about yourself (optional)
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-2.5 sm:mb-3">
+            <h3 className="font-black text-[#17233C] text-sm sm:text-base flex items-center gap-1.5">
+              <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF572E]" />
+              <span>About Me</span>
+            </h3>
             <button
               onClick={() => setIsEditing(true)}
-              className="text-xs font-bold text-[#FF572E] hover:underline cursor-pointer"
+              className="text-xs sm:text-sm font-bold text-[#FF572E] hover:underline cursor-pointer"
             >
               {profile?.bio ? 'Edit' : 'Add'}
             </button>
           </div>
 
           {profile?.bio ? (
-            <div className="p-4 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
-              <p className="text-sm text-[#17233C] font-medium leading-relaxed">
+            <div className="p-3 sm:p-3.5 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8]">
+              <p className="text-xs sm:text-sm text-[#17233C] font-medium leading-relaxed">
                 {profile.bio}
               </p>
             </div>
           ) : (
-            <div 
+            <button
               onClick={() => setIsEditing(true)}
-              className="p-4 bg-[#FFFBF8] rounded-2xl border border-dashed border-[#F4E3D8] hover:border-[#FF572E]/40 hover:bg-white cursor-pointer transition-all group"
+              className="w-full p-3 sm:p-3.5 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-dashed border-[#F4E3D8] hover:border-[#FF572E]/40 hover:bg-white cursor-pointer transition-all group"
             >
-              <p className="text-xs text-[#6E7587] group-hover:text-[#FF572E] font-medium text-center">
-                💬 Click to add a personal message about your travel preferences, hobbies, or campus life
+              <p className="text-xs sm:text-sm text-[#6E7587] group-hover:text-[#FF572E] font-medium text-center">
+                💬 Add something about yourself
               </p>
-            </div>
+            </button>
           )}
         </motion.div>
 
 
         {/* ========================================================================= */}
-        {/* 3. PROFILE INFORMATION & VERIFIED DETAILS CARD                            */}
+        {/* 5. ACADEMIC & CONTACT DETAILS (Responsive Layout)                          */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-[28px] p-6 sm:p-7 border border-[#F4E3D8]/90 shadow-xs space-y-5">
-          <div className="flex items-center justify-between border-b border-[#F4E3D8]/70 pb-4">
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-[#17233C]">
-                Academic & Contact Details
-              </h2>
-              <p className="text-xs text-[#6E7587] font-medium mt-0.5">
-                Verified campus credentials for carpooling and ridesharing trust.
-              </p>
-            </div>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+          className="bg-white rounded-[16px] sm:rounded-[20px] lg:rounded-[24px] p-3 sm:p-4 lg:p-5 border border-[#F4E3D8]/90 shadow-sm hover:shadow-md transition-all"
+        >
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h2 className="text-sm sm:text-base lg:text-lg font-black text-[#17233C]">
+              Academic & Contact Details
+            </h2>
             <button
               onClick={() => setIsEditing(true)}
-              className="text-xs font-bold text-[#FF572E] hover:underline cursor-pointer"
+              className="text-xs sm:text-sm font-bold text-[#FF572E] hover:underline cursor-pointer flex items-center gap-1"
             >
-              Edit Details
+              <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span>Edit</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2.5 text-xs sm:text-sm">
             
-            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
-                Full Name
-              </span>
-              <span className="font-extrabold text-[#17233C] text-sm block">
-                {profile?.name || user?.fullName || 'Campus Student'}
-              </span>
-            </div>
-
-            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
-                College Email Address
-              </span>
-              <span className="font-extrabold text-[#17233C] text-sm block truncate">
-                {user?.primaryEmailAddress?.emailAddress || profile?.email || 'student@vitbhopal.ac.in'}
-              </span>
-            </div>
-
-            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
-                WhatsApp Number
-              </span>
-              <div className="flex items-center gap-2">
-                <img
-                  src="/whatsapp.svg"
-                  alt="WhatsApp"
-                  className="w-4 h-4 object-contain shrink-0"
-                />
-                <span className="font-extrabold text-[#17233C] text-sm block">
-                  {profile?.whatsappNumber || profile?.phone || 'Not added yet'}
-                </span>
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  Full Name
+                </div>
+                <div className="font-black text-[#17233C] truncate">
+                  {profile?.name || user?.fullName || 'Campus Student'}
+                </div>
               </div>
             </div>
 
-            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8]">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
-                College / Institution
-              </span>
-              <span className="font-extrabold text-[#17233C] text-sm block">
-                {profile?.college || 'VIT, Bhopal'}
-              </span>
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  College Email
+                </div>
+                <div className="font-black text-[#17233C] truncate">
+                  {user?.primaryEmailAddress?.emailAddress || profile?.email || 'student@vitbhopal.ac.in'}
+                </div>
+              </div>
             </div>
 
-            <div className="p-3.5 bg-[#FFFBF8] rounded-2xl border border-[#F4E3D8] sm:col-span-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#6E7587] block mb-1">
-                Program & Course
-              </span>
-              <span className="font-extrabold text-[#17233C] text-sm block">
-                {profile?.course || 'B.Tech - Computer Science & Engineering'}
-              </span>
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  WhatsApp Number
+                </div>
+                <div className="font-black text-[#17233C] flex items-center gap-1.5">
+                  <img
+                    src="/whatsapp.svg"
+                    alt="WhatsApp"
+                    className="w-3.5 h-3.5 object-contain"
+                  />
+                  <span className="truncate">{profile?.whatsappNumber || profile?.phone || 'Not added yet'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  College / Institution
+                </div>
+                <div className="font-black text-[#17233C] truncate">
+                  {profile?.college || 'VIT, Bhopal'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors lg:col-span-2">
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  Program & Course
+                </div>
+                <div className="font-black text-[#17233C]">
+                  {profile?.course || 'B.Tech - Computer Science & Engineering'}
+                </div>
+              </div>
             </div>
 
           </div>
-        </div>
+        </motion.div>
 
 
         {/* ========================================================================= */}
-        {/* 4. QUICK LINKS / MENU                                                     */}
+        {/* 6. QUICK NAVIGATION (Responsive Grid)                                      */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-[28px] p-5 sm:p-6 border border-[#F4E3D8]/90 shadow-xs">
-          <h3 className="font-black text-[#17233C] text-base mb-4 px-2">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.35 }}
+          className="bg-white rounded-[16px] sm:rounded-[20px] lg:rounded-[24px] p-3 sm:p-4 lg:p-5 border border-[#F4E3D8]/90 shadow-sm hover:shadow-md transition-all"
+        >
+          <h3 className="font-black text-[#17233C] text-sm sm:text-base lg:text-lg mb-3 sm:mb-3.5">
             Quick Navigation
           </h3>
 
-          <div className="divide-y divide-[#F4E3D8]/60">
-            {navMenuItems.map((item) => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+            {navMenuItems.map((item, index) => {
               const Icon = item.icon;
               return (
-                <div
+                <button
                   key={item.label}
                   onClick={() => {
                     if (item.onClick) item.onClick();
                     else if (item.path) navigate(item.path);
                   }}
-                  className="flex items-center justify-between p-3.5 hover:bg-[#FFFBF8] rounded-2xl transition-all cursor-pointer group"
+                  className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 hover:bg-[#FFFBF8] rounded-lg sm:rounded-xl transition-all cursor-pointer group border border-transparent hover:border-[#F4E3D8]"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-[#FFF4ED] text-[#FF572E] group-hover:bg-[#FF572E] group-hover:text-white flex items-center justify-center shrink-0 transition-all">
-                      <Icon className="w-4.5 h-4.5 stroke-[2.2]" />
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-[#17233C] text-xs sm:text-sm group-hover:text-[#FF572E] transition-colors">
-                        {item.label}
-                      </h4>
-                      <p className="text-[11px] text-[#6E7587]">
-                        {item.subtitle}
-                      </p>
-                    </div>
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#FFF4ED] text-[#FF572E] group-hover:bg-[#FF572E] group-hover:text-white flex items-center justify-center shrink-0 transition-all">
+                    <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.5]" />
                   </div>
-
-                  <div className="w-7 h-7 rounded-full bg-white border border-[#F4E3D8] flex items-center justify-center text-[#6E7587] group-hover:text-[#FF572E] group-hover:border-[#FF572E]/40 shadow-2xs transition-all">
-                    <ChevronRight className="w-3.5 h-3.5" />
+                  <div className="flex-1 text-left">
+                    <h4 className="font-black text-xs sm:text-sm text-[#17233C] group-hover:text-[#FF572E] transition-colors">
+                      {item.label}
+                    </h4>
+                    <p className="text-[10px] sm:text-xs text-[#6E7587] font-medium line-clamp-1">
+                      {item.subtitle}
+                    </p>
                   </div>
-                </div>
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-[#6E7587] group-hover:text-[#FF572E] transition-colors shrink-0" />
+                </button>
               );
             })}
           </div>
-        </div>
+        </motion.div>
 
 
         {/* ========================================================================= */}
-        {/* 5. LOGOUT BUTTON                                                          */}
+        {/* 7. SIGN OUT BUTTON (Responsive)                                            */}
         {/* ========================================================================= */}
-        <div className="pt-2 flex justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+          className="pt-1 pb-3 sm:pb-4 flex justify-center"
+        >
           <button
             onClick={() => signOut()}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs sm:text-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 font-black text-xs sm:text-sm border border-red-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
           >
-            <LogOut className="w-4 h-4" />
-            <span>Sign Out of Account</span>
+            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Sign Out</span>
           </button>
-        </div>
+        </motion.div>
 
       </div>
 

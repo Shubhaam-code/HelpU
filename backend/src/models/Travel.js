@@ -99,6 +99,15 @@ const travelSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    gender: {
+      type: String,
+      enum: {
+        values: ['Male', 'Female', 'Prefer not to say', null],
+        message: 'Gender must be Male, Female, or Prefer not to say'
+      },
+      default: null,
+      trim: true
+    },
     status: {
       type: String,
       enum: {

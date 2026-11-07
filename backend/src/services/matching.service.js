@@ -90,13 +90,31 @@ export function isSameDirection(sourceA, destA, sourceB, destB) {
 }
 
 /**
- * Checks if two Date objects/strings fall on the exact same calendar day in Asia/Kolkata timezone.
+ * Normalizes any date representation (Date object, ISO string, YYYY-MM-DD, DD/MM/YYYY, timestamp)
+ * into a canonical calendar day string 'YYYY-MM-DD' in Asia/Kolkata timezone.
+ * Prevents accidental date mismatches caused by UTC vs IST offset transitions.
  */
-export function isSameCalendarDay(date1, date2) {
-  if (!date1 || !date2) return false;
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return false;
+export function getCanonicalCalendarDate(dateInput) {
+  if (!dateInput) return null;
+
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    // Format YYYY-MM-DD (e.g. "2026-11-07" or "2026-11-07T00:00:00.000Z")
+    const ymdMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (ymdMatch && !trimmed.includes('T')) {
+      const [, y, m, d] = ymdMatch;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    // Format DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (dmyMatch) {
+      const [, d, m, y] = dmyMatch;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
 
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -104,7 +122,18 @@ export function isSameCalendarDay(date1, date2) {
     month: '2-digit',
     day: '2-digit'
   });
-  return formatter.format(d1) === formatter.format(d2);
+  return formatter.format(d);
+}
+
+/**
+ * Checks if two Date objects/strings fall on the exact same calendar day in Asia/Kolkata timezone.
+ * Guaranteed to return false for different calendar dates (e.g. 7 Nov vs 9 Nov).
+ */
+export function isSameCalendarDay(date1, date2) {
+  const d1 = getCanonicalCalendarDate(date1);
+  const d2 = getCanonicalCalendarDate(date2);
+  if (!d1 || !d2) return false;
+  return d1 === d2;
 }
 
 /**
@@ -210,6 +239,7 @@ export async function findMatchesForTravel(travelPost) {
       availableSeats: candAvailableSeats,
       matchedWithPostId: travelPost._id,
       matchedWithPostType: travelPost.type,
+      matchedWithTravelDate: travelPost.travelDate,
       matchedWithRoute: `${travelPost.source} → ${travelPost.destination}`,
       matchingReason: candidate.type === 'request'
         ? `Passenger request for your ride (${travelPost.source} → ${travelPost.destination})`

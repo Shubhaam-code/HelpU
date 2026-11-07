@@ -11,6 +11,7 @@ import {
   findMatchesForUser,
   isSameDirection, 
   isSameCalendarDay, 
+  getCanonicalCalendarDate,
   areLocationsMatching, 
   normalizeLocation 
 } from '../services/matching.service.js';
@@ -67,7 +68,7 @@ const router = express.Router();
  */
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { source, destination, travelDate, departureTime, timeFlexibility, seats, type, carModel, pricePerSeat, authorImage, authorName, authorEmail, notes, description } = req.body;
+    const { source, destination, travelDate, departureTime, timeFlexibility, seats, type, carModel, pricePerSeat, authorImage, authorName, authorEmail, notes, description, gender } = req.body;
 
     // 1. Validation for travel type
     if (!type || !['offer', 'request'].includes(type)) {
@@ -92,7 +93,7 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    // 3. Validation for travel date
+    // 3. Validation and normalization for travel date
     if (!travelDate) {
       return res.status(400).json({
         success: false,
@@ -100,13 +101,25 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    const parsedDate = new Date(travelDate);
+    const canonicalDateStr = getCanonicalCalendarDate(travelDate);
+    if (!canonicalDateStr) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid travel date'
+      });
+    }
+
+    const parsedDate = new Date(`${canonicalDateStr}T00:00:00.000Z`);
     if (isNaN(parsedDate.getTime())) {
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid travel date'
       });
     }
+
+    // Optional gender validation
+    const allowedGenders = ['Male', 'Female', 'Prefer not to say'];
+    const validGender = allowedGenders.includes(gender) ? gender : null;
 
     // 4. Validation for departure time (minutes from midnight: 0 to 1439)
     if (departureTime === undefined || departureTime === null || isNaN(Number(departureTime))) {
@@ -162,6 +175,7 @@ router.post('/', requireAuth, async (req, res) => {
       authorImage: authorImage ? String(authorImage).trim() : null,
       authorName: authorName ? String(authorName).trim() : null,
       authorEmail: authorEmail ? String(authorEmail).trim() : null,
+      gender: validGender,
       status: 'active',
       expiresAt
     });
@@ -236,11 +250,23 @@ router.get('/', requireAuth, async (req, res) => {
     await expireOverdueRidesAndNotify(req.userId);
 
     // 1. Check if authenticated user has created any active offer or request
-    const myActiveTravels = await Travel.find({
+    let myActiveTravels = await Travel.find({
       userId: req.userId,
       status: 'active',
       expiresAt: { $gt: now }
     }).lean();
+
+    // Allow filtering matches for a specific post or travel date
+    const targetTravelId = req.query.travelId || req.query.postId;
+    const targetDateStr = req.query.travelDate || req.query.date;
+
+    if (targetTravelId && mongoose.Types.ObjectId.isValid(targetTravelId)) {
+      myActiveTravels = myActiveTravels.filter(t => t._id.toString() === targetTravelId.toString());
+    }
+
+    if (targetDateStr) {
+      myActiveTravels = myActiveTravels.filter(t => isSameCalendarDay(t.travelDate, targetDateStr));
+    }
 
     // STRICT RULE: If the user hasn't posted an offer/request yet, show 0 matches
     if (myActiveTravels.length === 0) {
@@ -419,10 +445,11 @@ router.get('/', requireAuth, async (req, res) => {
           name: s?.name || t.authorName || 'Campus Student',
           email: s?.email || t.authorEmail || '',
           phone: peerPhone,
+          gender: t.gender || s?.gender || null,
           imageUrl: s?.imageUrl || t.authorImage || null,
           avatarId: s?.avatarId || 'm1',
           college: s?.college || 'VIT, Bhopal',
-          isVerified: s?.isVerified ?? true
+          isVerified: Boolean(s?.isVerified)
         }
       };
     });
@@ -622,6 +649,8 @@ router.get('/:id', requireAuth, async (req, res) => {
           email: student?.email || travel.authorEmail || '',
           imageUrl: student?.imageUrl || travel.authorImage || null,
           college: student?.college || 'VIT, Bhopal',
+          gender: travel.gender || student?.gender || null,
+          isVerified: Boolean(student?.isVerified),
           // Strictly withhold phone number if viewing own post to prevent self WhatsApp contact
           phone: isMine ? '' : (student?.phone || '')
         }
@@ -945,7 +974,8 @@ router.put('/:id', requireAuth, async (req, res) => {
       seats,
       pricePerSeat,
       carModel,
-      status
+      status,
+      gender
     } = req.body;
 
     // Do not allow reactivating an inactive ride through edit
@@ -992,8 +1022,20 @@ router.put('/:id', requireAuth, async (req, res) => {
     let isDateChanged = false;
     let newParsedDate = null;
 
+    if (gender !== undefined) {
+      const allowedGenders = ['Male', 'Female', 'Prefer not to say'];
+      travel.gender = allowedGenders.includes(gender) ? gender : null;
+    }
+
     if (travelDate) {
-      newParsedDate = new Date(travelDate);
+      const canonicalDateStr = getCanonicalCalendarDate(travelDate);
+      if (!canonicalDateStr) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid travel date format'
+        });
+      }
+      newParsedDate = new Date(`${canonicalDateStr}T00:00:00.000Z`);
       if (isNaN(newParsedDate.getTime())) {
         return res.status(400).json({
           success: false,

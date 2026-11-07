@@ -14,6 +14,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { getTravelById, getProfile, createBooking, getMyBookings } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
+import { invalidateBookingQueries } from '../lib/queryClient';
 
 export default function BookSeatPage() {
   const { id } = useParams();
@@ -261,6 +262,7 @@ export default function BookSeatPage() {
 
       const res = await createBooking(bookingPayload);
       const createdBooking = res.data?.data || res.data;
+      invalidateBookingQueries();
 
       // Navigate to My Posts page with success state
       navigate('/posts', {

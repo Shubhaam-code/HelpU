@@ -1,23 +1,21 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import { 
   Search, Users, ArrowRight, Calendar, Clock, 
-  ShieldCheck, Sparkles, ChevronRight, RefreshCw, AlertCircle,
-  Zap, SlidersHorizontal
+  Sparkles, ChevronRight, Zap, SlidersHorizontal
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { 
-  getProfile, 
-  getMyTravels,
-  getUserMatches,
-  getUnreadCount
-} from '../lib/api';
+  useUserProfile, 
+  useMyTravels, 
+  useUserMatches, 
+  useUnreadNotificationsCount 
+} from '../hooks/useAppData';
 
 // Crisp Car Outline Icon matching reference buttons
 function ButtonCarIcon({ className = "w-4 h-4 sm:w-5 sm:h-5" }) {
@@ -32,7 +30,7 @@ function ButtonCarIcon({ className = "w-4 h-4 sm:w-5 sm:h-5" }) {
 }
 
 // 3D Styled Calendar Notepad Illustration for Recent Matches empty state
-function CalendarIllustration({ className = "w-18 h-18" }) {
+function CalendarIllustration({ className = "w-14 h-14" }) {
   return (
     <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       {/* 3 Radiating Orange Spark Lines */}
@@ -92,53 +90,13 @@ function formatTravelDate(dateStr) {
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useUser();
-  
-  const [profile, setProfile] = useState(null);
-  const [myTravels, setMyTravels] = useState([]);
-  const [userMatches, setUserMatches] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchVal, setSearchVal] = useState('');
 
-  // Fetch real authenticated user dashboard data
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [profileRes, travelsRes, matchesRes, notifRes] = await Promise.allSettled([
-        getProfile(),
-        getMyTravels(),
-        getUserMatches(),
-        getUnreadCount()
-      ]);
-
-      if (profileRes.status === 'fulfilled') {
-        setProfile(profileRes.value.data?.data || null);
-      }
-      if (travelsRes.status === 'fulfilled') {
-        const tList = travelsRes.value.data?.data || travelsRes.value.data?.travels || travelsRes.value.data || [];
-        setMyTravels(Array.isArray(tList) ? tList : []);
-      }
-      if (matchesRes.status === 'fulfilled') {
-        const mData = matchesRes.value.data || {};
-        const mList = Array.isArray(mData.data) ? mData.data : [];
-        setUserMatches(mList);
-      }
-      if (notifRes.status === 'fulfilled') {
-        setUnreadCount(notifRes.value.data?.data?.count || 0);
-      }
-    } catch (err) {
-      console.error('Dashboard data fetch error:', err);
-      setError(err.message || 'Failed to refresh your dashboard.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Cached global data queries (instant navigation without full-page reloads)
+  const { data: profile } = useUserProfile();
+  const { data: myTravels = [], isLoading: travelsLoading } = useMyTravels();
+  const { data: userMatches = [], isLoading: matchesLoading } = useUserMatches();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -162,65 +120,64 @@ export default function HomePage() {
         />
       }
     >
-      <div className="w-full max-w-xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-1.5 pb-20 sm:pt-4 sm:pb-12 space-y-3 sm:space-y-3.5">
+      <div className="w-full max-w-xl lg:max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 pt-1 pb-6 sm:pt-3 sm:pb-8 space-y-2.5 sm:space-y-3">
         
         {/* ========================================================================= */}
         {/* 1. HERO CARD                                                              */}
         {/* ========================================================================= */}
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22 }}
-          className="relative bg-white rounded-[26px] sm:rounded-[30px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-5"
+          transition={{ duration: 0.2 }}
+          className="relative bg-white rounded-[22px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden p-3.5 sm:p-5"
         >
           {/* Subtle warm cream background glow at top */}
-          <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/60 to-transparent pointer-events-none" />
+          <div className="absolute top-0 right-0 left-0 h-20 bg-gradient-to-b from-[#FFF5EE]/60 to-transparent pointer-events-none" />
 
           {/* Top Badge */}
-          <div className="relative z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-2.5 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
+          <div className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider mb-1.5 shadow-2xs">
+            <Sparkles className="w-3 h-3 text-[#FF572E]" />
             <span>Smart Campus Mobility</span>
           </div>
 
           {/* Top Row: Heading on Left & Illustration on Right */}
-          <div className="relative z-10 flex items-end justify-between gap-1.5 sm:gap-4">
+          <div className="relative z-10 flex items-end justify-between gap-1 sm:gap-4">
             
             {/* Left: Heading & Subtitle */}
-            <div className="flex-1 min-w-0 pb-1 pt-0.5">
-              <h1 className="font-black text-[#17233C] text-[22px] sm:text-3xl leading-[1.18] tracking-tight">
+            <div className="flex-1 min-w-0 pb-0.5 pt-0.5">
+              <h1 className="font-black text-[#17233C] text-[19px] sm:text-2xl md:text-3xl leading-[1.16] tracking-tight">
                 Where are you <br />
                 going{' '}
                 <span className="text-[#FF572E] relative inline-inline">
                   today?
-                  {/* Cute radiating orange spark rays matching reference */}
-                  <span className="inline-block text-[#FF572E] text-base font-black ml-1 select-none">
+                  <span className="inline-block text-[#FF572E] text-sm sm:text-base font-black ml-0.5 select-none">
                     ∿
                   </span>
                 </span>
               </h1>
 
-              <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium leading-relaxed mt-2 max-w-[185px] sm:max-w-xs">
+              <p className="text-[11px] sm:text-xs text-[#6E7587] font-medium leading-normal mt-1 max-w-[175px] sm:max-w-xs">
                 Share rides, split travel costs, and commute with verified students.
               </p>
             </div>
 
-            {/* Right: Original webpage.png illustration with increased size & aligned to bottom */}
-<div className="shrink-0 w-[185px] sm:w-[230px] md:w-[260px] -mr-2.5 -mb-1 flex justify-end items-end">
-  <img
-    src="/webpage.png"
-    alt="Helpu Student Travel"
-    className="block w-full h-auto object-contain select-none pointer-events-none drop-shadow-xs"
-    style={{
-      transform: "translate(8px, -10px) scale(1.08)",
-      transformOrigin: "bottom right"
-    }}
-  />
-</div>
+            {/* Right: Illustration aligned cleanly to bottom right */}
+            <div className="shrink-0 w-[155px] sm:w-[200px] md:w-[230px] -mr-2 -mb-1 flex justify-end items-end">
+              <img
+                src="/webpage.png"
+                alt="Helpu Student Travel"
+                className="block w-full h-auto object-contain select-none pointer-events-none drop-shadow-xs"
+                style={{
+                  transform: "translate(4px, -6px) scale(1.04)",
+                  transformOrigin: "bottom right"
+                }}
+              />
+            </div>
 
           </div>
 
           {/* Two Hero Action Buttons: Find a Ride & Offer a Ride */}
-          <div className="relative z-10 flex items-center gap-2.5 pt-3.5 mt-2">
+          <div className="relative z-10 flex items-center gap-2 pt-2.5 mt-1">
             <button
               type="button"
               onClick={() => {
@@ -231,20 +188,20 @@ export default function HomePage() {
                   navigate('/rides');
                 }
               }}
-              className="flex-1 py-3 px-3 bg-white hover:bg-[#FFF7F2] active:scale-[0.98] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+              className="flex-1 py-2.5 px-3 bg-white hover:bg-[#FFF7F2] active:scale-[0.98] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
             >
-              <Search className="w-4 h-4 text-[#FF572E] stroke-[2.5]" />
+              <Search className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
               <span>Find a Ride</span>
             </button>
 
             <button
               type="button"
               onClick={() => navigate('/rides/offer')}
-              className="flex-1 py-3 px-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+              className="flex-1 py-2.5 px-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white rounded-full font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
             >
-              <ButtonCarIcon className="w-4 h-4 text-white stroke-[2.5]" />
+              <ButtonCarIcon className="w-3.5 h-3.5 text-white stroke-[2.5]" />
               <span>Offer a Ride</span>
-              <ArrowRight className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+              <ArrowRight className="w-3 h-3 text-white stroke-[2.5]" />
             </button>
           </div>
 
@@ -255,8 +212,8 @@ export default function HomePage() {
         {/* 2. ROUTE SEARCH BAR WITH FILTER ICON                                      */}
         {/* ========================================================================= */}
         <form onSubmit={handleSearchSubmit} className="relative w-full">
-          <div className="bg-white rounded-2xl py-3 px-4 border border-[#F4E3D8] shadow-xs flex items-center justify-between gap-2.5 focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
-            <Search className="w-4.5 h-4.5 text-[#8C93A4] shrink-0" />
+          <div className="bg-white rounded-xl py-2.5 px-3.5 border border-[#F4E3D8] shadow-xs flex items-center justify-between gap-2 focus-within:border-[#FF572E] focus-within:ring-2 focus-within:ring-[#FF572E]/15 transition-all">
+            <Search className="w-4 h-4 text-[#8C93A4] shrink-0" />
             
             <input
               id="home-search-input"
@@ -273,7 +230,7 @@ export default function HomePage() {
               title="Filter Rides"
               className="p-1 text-[#FF572E] hover:bg-[#FFF4ED] rounded-lg transition-colors cursor-pointer shrink-0"
             >
-              <SlidersHorizontal className="w-4.5 h-4.5 stroke-[2.2]" />
+              <SlidersHorizontal className="w-4 h-4 stroke-[2.2]" />
             </button>
           </div>
         </form>
@@ -282,35 +239,35 @@ export default function HomePage() {
         {/* ========================================================================= */}
         {/* 3. ACTIVITY SUMMARY (2 SIDE-BY-SIDE CARDS: MY POSTS & MY MATCHES)         */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           
           {/* Card 1: My Posts */}
           <div
             onClick={() => navigate('/posts')}
-            className="bg-white rounded-[22px] p-3.5 sm:p-4 border border-[#F4E3D8] shadow-xs hover:shadow-sm relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between"
+            className="bg-white rounded-[18px] p-3 sm:p-3.5 border border-[#F4E3D8] shadow-xs hover:shadow-sm relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between"
           >
             {/* Subtle bottom wave gradient */}
-            <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#FFEBE0]/50 to-transparent pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-[#FFEBE0]/50 to-transparent pointer-events-none" />
 
             {/* Top Row: Icon + Chevron */}
             <div className="flex items-center justify-between">
-              <div className="w-9 h-9 rounded-xl bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
-                <ButtonCarIcon className="w-4.5 h-4.5 stroke-[2.2]" />
+              <div className="w-8 h-8 rounded-lg bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
+                <ButtonCarIcon className="w-4 h-4 stroke-[2.2]" />
               </div>
-              <div className="w-6 h-6 rounded-full bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
+              <div className="w-5.5 h-5.5 rounded-full bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
                 <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Content */}
-            <div className="mt-2.5 relative z-10">
-              <h3 className="font-extrabold text-xs sm:text-sm text-[#17233C] leading-none">
+            <div className="mt-2 relative z-10">
+              <h3 className="font-extrabold text-[11px] sm:text-xs text-[#17233C] leading-none">
                 My Posts
               </h3>
-              <div className="font-black text-2xl text-[#17233C] my-1 leading-none">
-                {loading ? '...' : myTravels.length}
+              <div className="font-black text-xl sm:text-2xl text-[#17233C] my-0.5 leading-none">
+                {travelsLoading ? '...' : myTravels.length}
               </div>
-              <p className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium leading-none">
+              <p className="text-[10px] text-[#6E7587] font-medium leading-none">
                 {myTravels.length === 1 ? 'Published post' : 'Published posts'}
               </p>
             </div>
@@ -319,30 +276,30 @@ export default function HomePage() {
           {/* Card 2: My Matches */}
           <div
             onClick={() => navigate('/matches')}
-            className="bg-white rounded-[22px] p-3.5 sm:p-4 border border-[#F4E3D8] shadow-xs hover:shadow-sm relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between"
+            className="bg-white rounded-[18px] p-3 sm:p-3.5 border border-[#F4E3D8] shadow-xs hover:shadow-sm relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between"
           >
             {/* Subtle bottom wave gradient */}
-            <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#EBF9F1]/60 to-transparent pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-[#EBF9F1]/60 to-transparent pointer-events-none" />
 
             {/* Top Row: Icon + Chevron */}
             <div className="flex items-center justify-between">
-              <div className="w-9 h-9 rounded-xl bg-[#EAF8F0] text-[#16A34A] flex items-center justify-center shrink-0">
-                <Users className="w-4.5 h-4.5 stroke-[2.2]" />
+              <div className="w-8 h-8 rounded-lg bg-[#EAF8F0] text-[#16A34A] flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 stroke-[2.2]" />
               </div>
-              <div className="w-6 h-6 rounded-full bg-[#EAF8F0] text-[#16A34A] flex items-center justify-center shrink-0">
+              <div className="w-5.5 h-5.5 rounded-full bg-[#EAF8F0] text-[#16A34A] flex items-center justify-center shrink-0">
                 <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Content */}
-            <div className="mt-2.5 relative z-10">
-              <h3 className="font-extrabold text-xs sm:text-sm text-[#17233C] leading-none">
+            <div className="mt-2 relative z-10">
+              <h3 className="font-extrabold text-[11px] sm:text-xs text-[#17233C] leading-none">
                 My Matches
               </h3>
-              <div className="font-black text-2xl text-[#17233C] my-1 leading-none">
-                {loading ? '...' : userMatches.length}
+              <div className="font-black text-xl sm:text-2xl text-[#17233C] my-0.5 leading-none">
+                {matchesLoading ? '...' : userMatches.length}
               </div>
-              <p className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium leading-none">
+              <p className="text-[10px] text-[#6E7587] font-medium leading-none">
                 Compatible peers
               </p>
             </div>
@@ -352,72 +309,44 @@ export default function HomePage() {
 
 
         {/* ========================================================================= */}
-        {/* 4. RECENT MATCHES SECTION (Clean White Card matching reference)           */}
+        {/* 4. RECENT MATCHES SECTION                                                 */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs relative overflow-hidden">
+        <div className="bg-white rounded-[20px] p-3 sm:p-4 border border-[#F4E3D8] shadow-xs relative overflow-hidden">
           
-          <div className="flex items-start justify-between gap-3">
-            {/* Left Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-7 h-7 rounded-lg bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
-                  <Zap className="w-4 h-4 fill-[#FF572E]/10 stroke-[2.5]" />
+          {userMatches.length > 0 ? (
+            /* Active Matches Found: Clean header and active connection list */
+            <div>
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#F4E3D8]/60">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-6 rounded-md bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
+                    <Zap className="w-3.5 h-3.5 fill-[#FF572E]/10 stroke-[2.5]" />
+                  </div>
+                  <h3 className="font-black text-xs sm:text-sm text-[#17233C]">
+                    Recent Matches ({userMatches.length})
+                  </h3>
                 </div>
-                <h3 className="font-black text-sm sm:text-base text-[#17233C] leading-tight">
-                  Recent Matches
-                </h3>
-              </div>
-              
-              <p className="text-xs text-[#6E7587] font-medium leading-relaxed max-w-[210px] sm:max-w-xs">
-                No new matches yet. Your matching updates will appear here.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => navigate('/posts')}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#FF572E] hover:text-[#E64A22] transition-colors mt-3 cursor-pointer group"
-              >
-                <span>View My Posts</span>
-                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
-              </button>
-            </div>
-
-            {/* Right: 3D Calendar Graphic */}
-            <div className="shrink-0 flex items-center justify-center pt-1">
-              <CalendarIllustration className="w-18 h-18 sm:w-20 sm:h-20" />
-            </div>
-          </div>
-
-          {/* Active Matches (if any exist) */}
-          {userMatches.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-[#F4E3D8]/70 space-y-3">
-              <div className="flex items-center justify-between pb-1">
-                <span className="text-[11px] font-black text-[#17233C] uppercase tracking-wider">
-                  Active Connections ({userMatches.length})
-                </span>
                 <button
                   type="button"
                   onClick={() => navigate('/matches')}
-                  className="text-xs font-black text-[#FF572E] hover:underline"
+                  className="text-xs font-black text-[#FF572E] hover:underline cursor-pointer"
                 >
                   See All →
                 </button>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {userMatches.slice(0, 2).map((match) => {
                   const student = match.student || match.creator || {};
                   const isOffer = (match.type || 'offer') === 'offer';
                   const dateDisplay = formatTravelDate(match.travelDate);
-                  const timeDisplay = formatMinutesToTime(match.departureTime);
 
                   return (
                     <div
                       key={match._id}
                       onClick={() => navigate('/matches')}
-                      className="p-3 rounded-xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 flex items-center justify-between gap-3 cursor-pointer transition-all"
+                      className="p-2.5 rounded-xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] transition-all"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
                         <Avatar
                           avatarId={student?.avatarId || 'm1'}
                           src={student?.imageUrl}
@@ -446,6 +375,38 @@ export default function HomePage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          ) : (
+            /* Empty State: Compact friendly banner when no matches exist yet */
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-6 h-6 rounded-md bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
+                    <Zap className="w-3.5 h-3.5 fill-[#FF572E]/10 stroke-[2.5]" />
+                  </div>
+                  <h3 className="font-black text-xs sm:text-sm text-[#17233C] leading-tight">
+                    Recent Matches
+                  </h3>
+                </div>
+                
+                <p className="text-[11px] text-[#6E7587] font-medium leading-relaxed max-w-[210px] sm:max-w-xs">
+                  No new matches yet. Your matching updates will appear here.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/posts')}
+                  className="inline-flex items-center gap-1 text-[11px] font-black text-[#FF572E] hover:text-[#E64A22] transition-colors mt-2 cursor-pointer group"
+                >
+                  <span>View My Posts</span>
+                  <ArrowRight className="w-3 h-3 stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
+
+              {/* Right: 3D Calendar Graphic */}
+              <div className="shrink-0 flex items-center justify-center">
+                <CalendarIllustration className="w-14 h-14 sm:w-16 sm:h-16" />
               </div>
             </div>
           )}

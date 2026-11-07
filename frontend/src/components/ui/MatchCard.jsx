@@ -24,17 +24,31 @@ export function MatchCard({ match, onPress }) {
           <div className="flex items-center gap-2.5 min-w-0">
             <Avatar avatarId={avatar} name={studentName} size="md" className="ring-2 ring-[#FF572E]/10 shrink-0" />
             <div className="min-w-0">
-              <div className="font-extrabold text-[#17233C] text-sm truncate">{studentName}</div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-extrabold text-[#17233C] text-sm truncate">{studentName}</span>
+                {Boolean(student?.isVerified) && (
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" title="Verified Student" />
+                )}
+                {(match?.gender || student?.gender) && 
+                  (match.gender || student.gender) !== 'Prefer not to say' && (
+                  <span className="px-1.5 py-0.2 rounded-md text-[9px] font-bold bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]">
+                    {match.gender || student.gender}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1.5 text-xs text-[#6E7587]">
                 <span className="flex items-center gap-0.5 text-amber-500 font-bold">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                   <span>{match?.rating || '4.9'}</span>
                 </span>
-                <span>•</span>
-                <span className="inline-flex items-center gap-0.5 text-[#16A34A] font-bold">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>Verified</span>
-                </span>
+                {Boolean(student?.isVerified) && (
+                  <>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-0.5 text-[#16A34A] font-bold">
+                      <span>Verified</span>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

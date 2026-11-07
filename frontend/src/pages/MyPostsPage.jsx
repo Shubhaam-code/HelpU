@@ -13,6 +13,7 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { DatePickerModal } from '../components/ui/DatePickerModal';
 import { getMyTravels, updateTravel, deleteTravel, cancelTravel } from '../lib/api';
 
 /**
@@ -151,6 +152,7 @@ export default function MyPostsPage() {
 
   // Post editing states
   const [postToEdit, setPostToEdit] = useState(null);
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
   const [editFormData, setEditFormData] = useState({
     source: '',
     destination: '',
@@ -835,15 +837,19 @@ export default function MyPostsPage() {
                     <label className="block text-xs font-black text-[#17233C] mb-1">
                       Travel Date
                     </label>
-                    <input
-                      type="date"
-                      required
-                      min={new Date().toISOString().split('T')[0]}
-                      disabled={editFormData.bookedSeats > 0}
-                      value={editFormData.travelDate}
-                      onChange={(e) => setEditFormData({ ...editFormData, travelDate: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] text-xs font-bold text-[#17233C] focus:outline-none focus:border-[#FF572E] disabled:bg-gray-100 disabled:text-gray-400"
-                    />
+                    <div
+                      onClick={() => {
+                        if (editFormData.bookedSeats === 0) {
+                          setShowEditDatePicker(true);
+                        }
+                      }}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] text-xs font-bold text-[#17233C] flex items-center justify-between ${
+                        editFormData.bookedSeats > 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'cursor-pointer hover:border-[#FF572E]'
+                      }`}
+                    >
+                      <span>{editFormData.travelDate ? formatTravelDate(editFormData.travelDate) : 'Select Date'}</span>
+                      <Calendar className="w-4 h-4 text-[#FF572E]" />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-black text-[#17233C] mb-1">
@@ -1101,6 +1107,18 @@ export default function MyPostsPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modern Date Picker Modal for Ride Editing */}
+      <DatePickerModal
+        isOpen={showEditDatePicker}
+        onClose={() => setShowEditDatePicker(false)}
+        value={editFormData.travelDate}
+        onChange={(newDate) => {
+          setEditFormData({ ...editFormData, travelDate: newDate });
+          setShowEditDatePicker(false);
+        }}
+        title="Select New Travel Date"
+      />
     </ResponsiveShell>
   );
 }

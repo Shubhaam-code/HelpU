@@ -35,11 +35,19 @@ export function RideCard({ travel, onPress, onFavorite, showFav = true }) {
               ring
             />
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-extrabold text-[#17233C] text-sm truncate">
                   {travel?.studentName || travel?.student?.name || 'Campus Student'}
                 </span>
-                <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                {Boolean(travel?.student?.isVerified) && (
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" title="Verified Student" />
+                )}
+                {(travel?.gender || travel?.student?.gender) && 
+                  (travel.gender || travel.student?.gender) !== 'Prefer not to say' && (
+                  <span className="px-1.5 py-0.2 rounded-md text-[9px] font-bold bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]">
+                    {travel.gender || travel.student?.gender}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-[#6E7587] mt-0.5">
                 <span>{travel?.student?.college || 'VIT, Bhopal'}</span>

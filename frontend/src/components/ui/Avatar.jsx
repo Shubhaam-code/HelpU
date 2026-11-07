@@ -19,6 +19,7 @@ export function Avatar({
   ring = false 
 }) {
   const [imgError, setImgError] = useState(false);
+  const isFull = size === 'full' || (className.includes('w-full') && className.includes('h-full'));
   const px = typeof size === 'number' ? size : sizes[size] || 48;
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function Avatar({
       className={`relative inline-flex items-center justify-center shrink-0 rounded-full overflow-hidden select-none transition-all ${
         ring ? 'ring-2 ring-coral/80 ring-offset-1 ring-offset-white' : ''
       } ${className}`}
-      style={{ width: px, height: px }}
+      style={isFull ? {} : { width: px, height: px }}
     >
       {hasValidImage ? (
         <img 

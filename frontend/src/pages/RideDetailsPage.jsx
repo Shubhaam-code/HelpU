@@ -799,10 +799,18 @@ export default function RideDetailsPage() {
                   <span className="text-xs font-extrabold uppercase tracking-wider text-[#6E7587]">
                     {isOffer ? 'Ride Host' : 'Ride Requester'}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#3B82F6] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full border border-[#DBEAFE]">
-                    <ShieldCheck className="w-3 h-3" />
-                    <span>Verified Student</span>
-                  </span>
+                  {Boolean(travel.student?.isVerified) && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#16A34A] bg-[#EDFAF3] px-2.5 py-0.5 rounded-full border border-[#BCECD4]">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Verified Student</span>
+                    </span>
+                  )}
+                  {(travel.gender || travel.student?.gender) && 
+                    (travel.gender || travel.student?.gender) !== 'Prefer not to say' && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#FF572E] bg-[#FFF4ED] px-2.5 py-0.5 rounded-full border border-[#FDE0D0]">
+                      <span>{travel.gender || travel.student?.gender}</span>
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3.5">
