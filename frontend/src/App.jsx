@@ -33,6 +33,16 @@ import GetHelpPage from './pages/GetHelpPage';
 import AboutPage from './pages/AboutPage';
 import StaticInfoPage from './pages/StaticInfoPage';
 
+// Find Your Slot Friend Feature Module
+import { 
+  SlotFriendProvider, 
+  SlotFriendHomePage, 
+  CreateSlotPostPage, 
+  MySlotPostsPage, 
+  SlotMatchesPage, 
+  SlotStudentProfilePage 
+} from './features/slot-friend';
+
 // PWA Utilities & Banners
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
@@ -181,12 +191,13 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProfileProvider>
-        <MobileBridgeInitializer />
-        <OfflineBanner />
-        <InstallPwaPrompt />
-        <InAppNotificationBanner />
-        <TokenInjector />
-        <Routes>
+        <SlotFriendProvider>
+          <MobileBridgeInitializer />
+          <OfflineBanner />
+          <InstallPwaPrompt />
+          <InAppNotificationBanner />
+          <TokenInjector />
+          <Routes>
           {/* Public Landing & Authentication */}
           <Route path="/" element={<OnboardingPage />} />
           <Route path="/auth" element={<AuthPage />} />
@@ -237,9 +248,23 @@ export default function App() {
           <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
           <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
 
+          {/* SlotMate Routes (aliases supported for /slotmate and /slot-friend) */}
+          <Route path="/slotmate" element={<ProtectedRoute><SlotFriendHomePage /></ProtectedRoute>} />
+          <Route path="/slotmate/create" element={<ProtectedRoute><CreateSlotPostPage /></ProtectedRoute>} />
+          <Route path="/slotmate/my-posts" element={<ProtectedRoute><MySlotPostsPage /></ProtectedRoute>} />
+          <Route path="/slotmate/matches" element={<ProtectedRoute><SlotMatchesPage /></ProtectedRoute>} />
+          <Route path="/slotmate/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
+
+          <Route path="/slot-friend" element={<ProtectedRoute><SlotFriendHomePage /></ProtectedRoute>} />
+          <Route path="/slot-friend/create" element={<ProtectedRoute><CreateSlotPostPage /></ProtectedRoute>} />
+          <Route path="/slot-friend/my-posts" element={<ProtectedRoute><MySlotPostsPage /></ProtectedRoute>} />
+          <Route path="/slot-friend/matches" element={<ProtectedRoute><SlotMatchesPage /></ProtectedRoute>} />
+          <Route path="/slot-friend/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
+
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </SlotFriendProvider>
       </AuthProfileProvider>
     </ErrorBoundary>
   );

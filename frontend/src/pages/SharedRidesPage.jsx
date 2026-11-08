@@ -385,12 +385,6 @@ export default function SharedRidesPage() {
           {/* Subtle warm cream background glow at top */}
           <div className="absolute top-0 right-0 left-0 h-28 bg-gradient-to-b from-[#FFF5EE]/80 to-transparent pointer-events-none" />
 
-          {/* Top Pill Badge */}
-          <div className="relative z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-2.5 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
-            <span>Smart Campus Mobility</span>
-          </div>
-
           {/* Content Row: Text + Buttons on Left, Hero Illustration on Right */}
           <div className="relative z-10 flex items-center justify-between gap-3 sm:gap-6">
             

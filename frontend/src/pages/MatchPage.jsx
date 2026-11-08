@@ -568,9 +568,14 @@ export default function MatchPage() {
                 </div>
               ) : myTravels.length === 0 ? (
                 /* No active posts found */
-                <div className="bg-white rounded-[28px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-xl mx-auto space-y-4 shadow-sm">
-                  <div className="w-16 h-16 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
-                    <Car className="w-8 h-8 text-[#FF572E]" />
+                <div className="bg-white rounded-[32px] p-6 sm:p-10 text-center border border-[#F4E3D8] max-w-xl mx-auto space-y-4 shadow-sm">
+                  <div className="w-full flex justify-center items-center py-1 sm:py-2">
+                    <img
+                      src="/car.png"
+                      alt="No active rides"
+                      className="w-full max-w-[270px] min-[390px]:max-w-[310px] sm:max-w-[360px] h-auto max-h-[220px] sm:max-h-[260px] object-contain drop-shadow-md select-none pointer-events-none mb-2"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
                   </div>
                   <div>
                     <h4 className="font-black text-xl text-[#17233C]">

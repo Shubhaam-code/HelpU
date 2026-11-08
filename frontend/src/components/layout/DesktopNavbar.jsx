@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, Car, Users, CarTaxiFront, Info, Search, Bell, Menu, X, LogOut, User, FileText, Download, CheckCircle2
+  Home, Car, Users, CarTaxiFront, Info, Search, Bell, Menu, X, LogOut, User, FileText, Download, CheckCircle2, CalendarDays
 } from 'lucide-react';
 import { useUser, useFirebaseAuth } from '../../context/FirebaseAuthContext';
 import { Avatar } from '../ui/Avatar';
@@ -256,6 +256,15 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
                   >
                     <User className="w-4 h-4 text-[#FF572E]" />
                     <span>My Profile</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { navigate('/slot-friend'); setProfileDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-[#17233C] hover:bg-[#FFF8F3] transition-colors cursor-pointer text-left"
+                  >
+                    <CalendarDays className="w-4 h-4 text-[#0284C7]" />
+                    <span className="flex-1">SlotMate</span>
+                    <span className="text-[9px] font-black uppercase bg-[#EAF5FF] text-[#0284C7] px-1.5 py-0.2 rounded-full">New</span>
                   </button>
                   <button
                     type="button"

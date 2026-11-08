@@ -388,39 +388,59 @@ export default function MyPostsPage() {
       <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
         
         {/* ========================================================================= */}
-        {/* PAGE HEADER & PRIMARY ACTION                                              */}
+        {/* PAGE HEADER & PRIMARY ACTION WITH RESPONSIVE POST.PNG ILLUSTRATION        */}
         {/* ========================================================================= */}
-        <div className="bg-gradient-to-r from-[#FFF0E6] via-[#FFF6EE] to-[#FFFBF8] rounded-[28px] sm:rounded-[32px] p-6 sm:p-7 border border-[#F4E3D8] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 border border-[#F4E3D8] text-[11px] font-black text-[#FF572E] uppercase tracking-wider mb-2.5 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Campus Mobility Hub</span>
+        <div className="relative bg-white rounded-[24px] sm:rounded-[32px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-6 lg:p-7">
+          {/* Subtle warm cream background glow at top */}
+          <div className="absolute top-0 right-0 left-0 h-28 bg-gradient-to-b from-[#FFF5EE]/80 to-transparent pointer-events-none" />
+
+          {/* Content Row: Text + Buttons on Left, Hero Illustration on Right */}
+          <div className="relative z-10 flex items-center justify-between gap-3 sm:gap-6">
+            
+            {/* Left Content */}
+            <div className="flex-1 min-w-0">
+              <h1 className="font-black text-[#17233C] text-[22px] min-[390px]:text-[24px] sm:text-3xl md:text-4xl leading-[1.18] tracking-tight">
+                My <span className="text-[#FF572E]">Rides &amp; Posts</span>
+              </h1>
+
+              <p className="text-xs sm:text-[13px] md:text-sm text-[#6E7587] font-medium leading-relaxed mt-1.5 max-w-[210px] min-[390px]:max-w-[250px] sm:max-w-md">
+                Track your published ride offers, travel requests, manage bookings, and review historical rides.
+              </p>
+
+              {/* Action Buttons Row */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-3.5 mt-0.5">
+                <button
+                  onClick={fetchPosts}
+                  disabled={loading}
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white border border-[#F4E3D8] text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2] flex items-center justify-center shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                  title="Refresh your posts"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#FF572E]' : ''}`} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/rides/offer')}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white rounded-full font-black text-xs sm:text-sm shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Create New Post</span>
+                </button>
+              </div>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#17233C] tracking-tight leading-tight">
-              My <span className="text-[#FF572E]">Rides &amp; Posts</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-[#6E7587] font-medium mt-1.5 leading-relaxed">
-              Track your published ride offers, travel requests, manage bookings, and review historical rides.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={fetchPosts}
-              disabled={loading}
-              className="w-11 h-11 rounded-2xl bg-white border border-[#F4E3D8] text-[#17233C] hover:text-[#FF572E] hover:bg-[#FFF7F2] flex items-center justify-center shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-              title="Refresh your posts"
+            {/* Right Illustration: post.png */}
+            <div 
+              className="shrink-0 w-[135px] min-[360px]:w-[155px] min-[390px]:w-[170px] min-[470px]:w-[200px] sm:w-[240px] md:w-[280px] -mr-1 min-[360px]:-mr-2 sm:-mr-3 flex justify-end items-center"
+              style={{ maxWidth: '50%' }}
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#FF572E]' : ''}`} />
-            </button>
-
-            <button
-              onClick={() => navigate('/rides/offer')}
-              className="inline-flex items-center gap-2 px-5 sm:px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Create New Post</span>
-            </button>
+              <img
+                src="/post.png"
+                alt="My Rides & Posts"
+                className="w-full h-auto max-h-[120px] sm:max-h-[165px] object-contain select-none pointer-events-none drop-shadow-xs"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            </div>
           </div>
         </div>
 

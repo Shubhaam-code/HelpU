@@ -272,12 +272,6 @@ export default function MyMatchesPage() {
           {/* Subtle warm cream background glow at top */}
           <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/70 to-transparent pointer-events-none" />
 
-          {/* Top Badge */}
-          <div className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[10px] sm:text-[11px] font-black text-[#FF572E] uppercase tracking-wider mb-2 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-[#FF572E]" />
-            <span>Helpu Smart Matching</span>
-          </div>
-
           {/* Content Row: Heading, Subtitle & Actions on Left, Prominent Illustration on Right */}
           <div className="relative z-10 flex items-center justify-between gap-2.5 sm:gap-5">
             
@@ -490,12 +484,12 @@ export default function MyMatchesPage() {
           </div>
         ) : !hasPostedTravel || myTravels.length === 0 ? (
           /* Case 1: Logged-in user has NOT created any offer or request */
-          <div className="bg-white rounded-[32px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4 shadow-sm">
-            <div className="w-full flex justify-center items-center">
+          <div className="bg-white rounded-[32px] p-6 sm:p-10 text-center border border-[#F4E3D8] max-w-xl mx-auto space-y-4 shadow-sm">
+            <div className="w-full flex justify-center items-center py-1 sm:py-2">
               <img
                 src="/car.png"
                 alt="Post a ride"
-                className="w-auto max-h-[140px] sm:max-h-[160px] object-contain drop-shadow-sm select-none pointer-events-none mb-1"
+                className="w-full max-w-[270px] min-[390px]:max-w-[310px] sm:max-w-[360px] h-auto max-h-[220px] sm:max-h-[260px] object-contain drop-shadow-md select-none pointer-events-none mb-2"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             </div>
@@ -526,12 +520,12 @@ export default function MyMatchesPage() {
           </div>
         ) : filteredMatches.length === 0 ? (
           /* Case 2: Logged-in user HAS active travel, but 0 matches found right now */
-          <div className="bg-white rounded-[32px] p-8 sm:p-12 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4 shadow-sm">
-            <div className="w-full flex justify-center items-center">
+          <div className="bg-white rounded-[32px] p-6 sm:p-10 text-center border border-[#F4E3D8] max-w-xl mx-auto space-y-4 shadow-sm">
+            <div className="w-full flex justify-center items-center py-1 sm:py-2">
               <img
                 src="/match.png"
                 alt="Searching campus matches"
-                className="w-auto max-h-[140px] sm:max-h-[160px] object-contain drop-shadow-sm select-none pointer-events-none mb-1"
+                className="w-full max-w-[270px] min-[390px]:max-w-[310px] sm:max-w-[360px] h-auto max-h-[220px] sm:max-h-[260px] object-contain drop-shadow-md select-none pointer-events-none mb-2"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             </div>

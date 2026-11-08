@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, Car, Users, CarTaxiFront, Info, FileText, CheckCircle2, User, Heart
+  Home, Car, Users, CarTaxiFront, Info, FileText, CheckCircle2, User, Heart, CalendarDays
 } from 'lucide-react';
 
 /**
@@ -20,6 +20,7 @@ export function DesktopSidebar({ onCloseMobile }) {
   ];
 
   const secondaryItems = [
+    { label: 'SlotMate', path: '/slot-friend', icon: CalendarDays },
     { label: 'My Posts', path: '/posts', icon: FileText },
     { label: 'Confirmed Rides', path: '/confirmed-rides', icon: CheckCircle2 },
     { label: 'My Profile', path: '/profile', icon: User },

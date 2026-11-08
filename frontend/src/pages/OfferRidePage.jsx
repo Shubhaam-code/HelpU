@@ -892,30 +892,6 @@ export default function OfferRidePage() {
             {/* SIDEBAR COLUMN (5 COLS ON DESKTOP, STACKED BELOW ON MOBILE) */}
             <div className="lg:col-span-5 space-y-4">
               
-              {/* POPULAR ROUTE PRESETS CARD */}
-              <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-[#F4E3D8]/60">
-                  <h3 className="font-black text-sm text-[#17233C]">
-                    Frequent Campus Routes
-                  </h3>
-                  <span className="text-[11px] font-bold text-[#FF572E]">1-Tap Fill</span>
-                </div>
-
-                <div className="space-y-1.5">
-                  {ROUTE_PRESETS.map((p, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => applyPreset(p)}
-                      className="w-full p-2.5 rounded-xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:bg-[#FFEBE0]/40 text-left transition-all cursor-pointer flex items-center justify-between text-xs font-bold text-[#17233C] group"
-                    >
-                      <span className="group-hover:text-[#FF572E]">{p.label}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-[#FF572E] opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* MY ACTIVE RIDES QUICK PREVIEW CARD */}
               <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-[#F4E3D8]/60">
