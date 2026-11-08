@@ -4,16 +4,35 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
 
 // Determine API Base URL
-// When developing on localhost/127.0.0.1, prioritize local backend on port 5000 so new local APIs work out of the box
+// In Android/iOS native app (Capacitor), ALWAYS use production backend URL.
+// In local web development (npm run dev on localhost), allow local backend fallback.
 const getBaseUrl = () => {
   if (typeof window !== 'undefined' && window.localStorage?.getItem('VITE_API_URL')) {
     return window.localStorage.getItem('VITE_API_URL');
   }
 
-  const envUrl = import.meta.env.VITE_API_URL;
+  const envUrl = import.meta.env.VITE_API_URL || 'https://helpu.onrender.com';
 
-  // If running in browser on localhost or 127.0.0.1
+  // 1. Native mobile platform (Android APK / iOS via Capacitor)
+  // ALWAYS use production backend. Under NO circumstances should native APK hit localhost:5000!
+  let isNative = false;
+  try {
+    isNative = Boolean(
+      Capacitor?.isNativePlatform?.() ||
+      (typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.())
+    );
+  } catch {
+    isNative = false;
+  }
+
+  if (isNative) {
+    return envUrl;
+  }
+
+  // 2. Web browser during local development (`npm run dev`)
+  // Only use localhost:5000 if in Vite DEV mode on localhost and no explicit onrender override requested
   if (
+    import.meta.env.DEV &&
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ) {
@@ -23,7 +42,7 @@ const getBaseUrl = () => {
     return 'http://localhost:5000';
   }
 
-  return envUrl || 'http://localhost:5000';
+  return envUrl;
 };
 
 const BASE_URL = getBaseUrl();
@@ -32,7 +51,7 @@ const BASE_URL = getBaseUrl();
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15000,
+  timeout: 45000, // 45 seconds to accommodate Render free-tier cold start latency
 });
 
 // Token getter ref (set by AuthProvider)
@@ -52,6 +71,24 @@ apiClient.interceptors.request.use(async (config) => {
     // Direct fallback: obtain fresh token from Firebase Auth currentUser
     if (!token && auth?.currentUser) {
       token = await auth.currentUser.getIdToken(false);
+    }
+    // Direct fallback on native platform via Capacitor Firebase Authentication
+    if (!token) {
+      try {
+        let isNative = false;
+        try {
+          isNative = Boolean(
+            Capacitor?.isNativePlatform?.() ||
+            (typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.())
+          );
+        } catch {}
+        if (isNative) {
+          const res = await FirebaseAuthentication.getIdToken({ forceRefresh: false });
+          token = res?.token;
+        }
+      } catch (nativeErr) {
+        // Continue if native token retrieval fails
+      }
     }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -279,6 +316,10 @@ export const acceptGroupInvitation = (requestId) =>
   apiClient.post(`/api/groups/invitations/${requestId}/accept`);
 export const rejectGroupInvitation = (requestId) =>
   apiClient.post(`/api/groups/invitations/${requestId}/reject`);
+export const directJoinSharedRideGroup = (groupId, data) =>
+  apiClient.post(`/api/groups/${groupId}/join`, data);
+export const leaveSharedRideGroup = (groupId) =>
+  apiClient.post(`/api/groups/${groupId}/leave`);
 
 export default apiClient;
 

@@ -5,81 +5,22 @@ import { useUser } from '../context/FirebaseAuthContext';
 import {
   MapPin, Calendar, Clock, Users, ArrowUpDown,
   Search, Check, Sparkles, ChevronDown, User,
-  MoreHorizontal, ShieldCheck, ArrowRight, IndianRupee,
-  CheckCircle2, X, FileText
+  ShieldCheck, ArrowRight, IndianRupee,
+  CheckCircle2, X, FileText, Car, CarTaxiFront,
+  Pencil, Trash2, Ban, RefreshCw, AlertCircle
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { DatePickerModal } from '../components/ui/DatePickerModal';
 import { TimePickerModal } from '../components/ui/TimePickerModal';
-import { createTravel } from '../lib/api';
+import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
+import { Card } from '../components/ui/Card';
+import { LocationInput } from '../components/ui/LocationInput';
+import { createTravel, updateTravel, deleteTravel, cancelTravel } from '../lib/api';
+import { useMyTravels } from '../hooks/useAppData';
 import { invalidateRideQueries } from '../lib/queryClient';
-
-// Cute & Modern Vehicle SVG Thumbnails matching reference design
-function OmniCarIcon({ className = "w-8 sm:w-9 h-5 sm:h-6" }) {
-  return (
-    <svg viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <rect x="6" y="8" width="50" height="24" rx="4" fill="#F3F4F6" stroke="#9CA3AF" strokeWidth="1.5" />
-      <path d="M6 16 L20 8 H52 L56 16" fill="#E5E7EB" />
-      <rect x="9" y="10" width="10" height="9" rx="1.5" fill="#17233C" opacity="0.8" />
-      <rect x="22" y="10" width="13" height="9" rx="1.5" fill="#17233C" opacity="0.8" />
-      <rect x="38" y="10" width="14" height="9" rx="1.5" fill="#17233C" opacity="0.8" />
-      <line x1="36" y1="10" x2="36" y2="28" stroke="#9CA3AF" strokeWidth="1" strokeDasharray="1 1" />
-      <rect x="4" y="24" width="3" height="4" rx="1" fill="#FF572E" />
-      <circle cx="7" cy="22" r="2" fill="#FBBF24" />
-      <circle cx="16" cy="33" r="6" fill="#1F2937" />
-      <circle cx="16" cy="33" r="2.5" fill="#9CA3AF" />
-      <circle cx="46" cy="33" r="6" fill="#1F2937" />
-      <circle cx="46" cy="33" r="2.5" fill="#9CA3AF" />
-    </svg>
-  );
-}
-
-function CretaCarIcon({ className = "w-8 sm:w-9 h-5 sm:h-6" }) {
-  return (
-    <svg viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <path d="M8 22 L14 12 L26 8 H42 L52 14 L58 20 V28 H8 Z" fill="#F9FAFB" stroke="#9CA3AF" strokeWidth="1.5" />
-      <line x1="24" y1="6" x2="44" y2="6" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M16 13 L24 10 H34 V19 H13 Z" fill="#17233C" opacity="0.85" />
-      <path d="M37 10 H43 L49 15 V19 H37 Z" fill="#17233C" opacity="0.85" />
-      <rect x="54" y="21" width="4" height="3" rx="1" fill="#3B82F6" />
-      <circle cx="17" cy="31" r="6.5" fill="#1F2937" />
-      <circle cx="17" cy="31" r="3" fill="#D1D5DB" />
-      <circle cx="47" cy="31" r="6.5" fill="#1F2937" />
-      <circle cx="47" cy="31" r="3" fill="#D1D5DB" />
-    </svg>
-  );
-}
-
-function EecoCarIcon({ className = "w-8 sm:w-9 h-5 sm:h-6" }) {
-  return (
-    <svg viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <rect x="7" y="10" width="49" height="22" rx="3.5" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="1.5" />
-      <path d="M7 17 L16 11 H50 L54 17" fill="#D1D5DB" />
-      <rect x="10" y="12" width="11" height="8" rx="1" fill="#17233C" opacity="0.8" />
-      <rect x="24" y="12" width="13" height="8" rx="1" fill="#17233C" opacity="0.8" />
-      <rect x="40" y="12" width="13" height="8" rx="1" fill="#17233C" opacity="0.8" />
-      <line x1="8" y1="23" x2="55" y2="23" stroke="#0284C7" strokeWidth="1.5" />
-      <circle cx="16" cy="33" r="5.5" fill="#1F2937" />
-      <circle cx="16" cy="33" r="2.5" fill="#9CA3AF" />
-      <circle cx="47" cy="33" r="5.5" fill="#1F2937" />
-      <circle cx="47" cy="33" r="2.5" fill="#9CA3AF" />
-    </svg>
-  );
-}
-
-// Crisp Car Outline Icon matching the reference buttons and tabs
-function ButtonCarIcon({ className = "w-4 h-4 sm:w-5 sm:h-5" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-      <circle cx="7" cy="17" r="2" />
-      <path d="M9 17h6" />
-      <circle cx="17" cy="17" r="2" />
-    </svg>
-  );
-}
 
 const POPULAR_LOCATIONS = [
   'VIT, Bhopal',
@@ -93,7 +34,13 @@ const POPULAR_LOCATIONS = [
   'Ashta Toll Plaza',
 ];
 
-// Date and Time display formatters matching exact mobile UI
+const ROUTE_PRESETS = [
+  { from: 'VIT, Bhopal', to: 'Bhopal Railway Station', label: 'Campus ➔ Bhopal Station' },
+  { from: 'VIT, Bhopal', to: 'Bhopal Airport (BHO)', label: 'Campus ➔ Airport' },
+  { from: 'Bhopal Railway Station', to: 'VIT, Bhopal', label: 'Bhopal Station ➔ Campus' },
+  { from: 'VIT, Bhopal', to: 'Indore (Bhawarkua / Bypass)', label: 'Campus ➔ Indore' },
+];
+
 function formatDateDisplay(dStr) {
   if (!dStr) return 'Select Date';
   const parts = dStr.split('-');
@@ -110,7 +57,7 @@ function formatTimeDisplay(tStr) {
   if (parts.length >= 2) {
     let hh = parseInt(parts[0], 10);
     const mm = parts[1].padStart(2, '0');
-    const ampm = hh >= 12 ? 'pm' : 'am';
+    const ampm = hh >= 12 ? 'PM' : 'AM';
     hh = hh % 12;
     if (hh === 0) hh = 12;
     return `${hh}:${mm} ${ampm}`;
@@ -118,63 +65,162 @@ function formatTimeDisplay(tStr) {
   return tStr;
 }
 
+/**
+ * Format travel date string nicely (e.g. Thu, 6 Nov)
+ */
+function formatTravelDate(dateStr) {
+  if (!dateStr) return 'Upcoming';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Upcoming';
+    return d.toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    });
+  } catch {
+    return 'Upcoming';
+  }
+}
+
+function formatMinutesToTime(minutes) {
+  const minNum = Number(minutes);
+  if (typeof minutes === 'undefined' || minutes === null || isNaN(minNum)) return 'Flexible';
+  const h = Math.floor(minNum / 60);
+  const m = minNum % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 export default function OfferRidePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
-  const [searchParams] = useSearchParams();
-  const isRequestPath = location.pathname.includes('/request') || searchParams.get('mode') === 'request';
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [mode, setMode] = useState(isRequestPath ? 'request' : 'offer'); // 'offer' | 'request'
+  // Mode: 'offer' | 'find' | 'my-rides'
+  const initialMode = 
+    searchParams.get('tab') === 'my-rides' || searchParams.get('mode') === 'my-rides'
+      ? 'my-rides'
+      : (location.pathname.includes('/request') || searchParams.get('mode') === 'request' || searchParams.get('mode') === 'find')
+      ? 'find'
+      : 'offer';
 
-  // Sync mode if route changes between /rides/offer and /rides/request
+  const [activeTab, setActiveTab] = useState(initialMode);
+
+  // Sync mode with route and URL query params
   useEffect(() => {
-    const isReq = location.pathname.includes('/request') || searchParams.get('mode') === 'request';
-    const newMode = isReq ? 'request' : 'offer';
-    setMode(newMode);
-    if (newMode === 'request') {
-      setTravellers(1);
+    if (searchParams.get('tab') === 'my-rides' || searchParams.get('mode') === 'my-rides') {
+      setActiveTab('my-rides');
+    } else if (location.pathname.includes('/request') || searchParams.get('mode') === 'request' || searchParams.get('mode') === 'find') {
+      setActiveTab('find');
+    } else {
+      setActiveTab('offer');
     }
   }, [location.pathname, searchParams]);
 
-  const handleModeChange = (newMode) => {
-    setMode(newMode);
-    if (newMode === 'request') {
-      setTravellers(1);
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'offer') {
+      setSearchParams({ mode: 'offer' });
+    } else if (tab === 'find') {
+      setSearchParams({ mode: 'find' });
+    } else {
+      setSearchParams({ tab: 'my-rides' });
     }
   };
 
-  const [fromLoc, setFromLoc] = useState('VIT, Bhopal');
-  const [toLoc, setToLoc] = useState('Bhopal Railway Station');
+  // Form states with persistent draft & URL search param support
+  const [fromLoc, setFromLoc] = useState(() => {
+    const urlFrom = searchParams.get('from');
+    if (urlFrom) return urlFrom;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem('helpu_active_route_draft') || '{}');
+      if (draft.from) return draft.from;
+    } catch {}
+    return 'VIT, Bhopal';
+  });
+
+  const [toLoc, setToLoc] = useState(() => {
+    const urlTo = searchParams.get('to') || searchParams.get('search');
+    if (urlTo) return urlTo;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem('helpu_active_route_draft') || '{}');
+      if (draft.to) return draft.to;
+    } catch {}
+    return 'Bhopal Railway Station';
+  });
+
+  // Keep session route draft in sync with user edits
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('helpu_active_route_draft', JSON.stringify({ from: fromLoc, to: toLoc }));
+    } catch {}
+  }, [fromLoc, toLoc]);
+
+  // Sync route if URL query parameters change (e.g. from Home shortcuts)
+  useEffect(() => {
+    const urlFrom = searchParams.get('from');
+    const urlTo = searchParams.get('to') || searchParams.get('search');
+    if (urlFrom) setFromLoc(urlFrom);
+    if (urlTo) setToLoc(urlTo);
+  }, [searchParams]);
+
   const [date, setDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   });
+  const [time, setTime] = useState('08:00');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [time, setTime] = useState('08:00');
-  const [gender, setGender] = useState(''); // 'Male' | 'Female' | 'Prefer not to say' | ''
-  const [travellers, setTravellers] = useState(1);
+  const [gender, setGender] = useState('');
+  const [travellers, setTravellers] = useState(2); // Seats for offer mode
   const [pricePerSeat, setPricePerSeat] = useState('350');
+  const [vehicleModel, setVehicleModel] = useState('Car');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [feedbackMsg, setFeedbackMsg] = useState(null);
+
+  // Post success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdSummary, setCreatedSummary] = useState(null);
 
-  // Swap From & To locations
+  // My Rides query & state
+  const { data: rawTravels, isLoading: travelsLoading, refetch: refetchTravels } = useMyTravels();
+  const myTravels = Array.isArray(rawTravels) ? rawTravels : [];
+  const [postToEdit, setPostToEdit] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    date: '',
+    timeStr: '08:00',
+    seats: 1,
+    pricePerSeat: 350,
+    notes: ''
+  });
+
   const handleSwapLocations = () => {
     const temp = fromLoc;
     setFromLoc(toLoc);
     setToLoc(temp);
   };
 
-  // Submit Handler: Posts real ride or searches
+  const applyPreset = (preset) => {
+    setFromLoc(preset.from);
+    setToLoc(preset.to);
+  };
+
+  // Submit Handler: Posts real ride Offer or Find request
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!fromLoc.trim() || !toLoc.trim()) {
       setError('Please specify departure and destination locations.');
+      return;
+    }
+    if (fromLoc.trim().toLowerCase() === toLoc.trim().toLowerCase()) {
+      setError('Departure and destination locations must be different.');
       return;
     }
     if (!date) {
@@ -186,711 +232,923 @@ export default function OfferRidePage() {
     setError('');
 
     try {
-      // Convert HH:MM time string to minutes from midnight (backend format)
-      let departureMinutes = 480; // default 8:00 AM
+      let departureMinutes = 480;
       if (time) {
         const [hh, mm] = time.split(':').map(Number);
         departureMinutes = hh * 60 + (mm || 0);
       }
 
-      if (mode === 'offer') {
-        // POST to backend — use correct field names matching Travel schema
-        const res = await createTravel({
-          source: fromLoc.trim(),
-          destination: toLoc.trim(),
-          travelDate: date,
-          departureTime: departureMinutes,
-          timeFlexibility: 30,
-          seats: travellers,
-          pricePerSeat: Number(pricePerSeat) || 350,
-          carModel: 'Campus Ride',
-          type: 'offer',
-          notes: notes.trim(),
-          gender: gender || null,
-          authorImage: user?.imageUrl || null,
-          authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
-          authorEmail: user?.primaryEmailAddress?.emailAddress || null,
-        });
+      const isOffer = activeTab === 'offer';
 
-        const createdPost = res.data?.data || res.data;
-        invalidateRideQueries();
-        setCreatedSummary({
-          id: createdPost?._id,
-          type: 'offer',
-          source: fromLoc.trim(),
-          destination: toLoc.trim(),
-          travelDate: date,
-          time: time || '08:00',
-          seats: travellers,
-          pricePerSeat: Number(pricePerSeat) || 350,
-          carModel: 'Campus Ride',
-          gender: gender || null,
-          notes: notes.trim(),
-        });
-        setShowSuccessModal(true);
-      } else {
-        // For "request" (FIND) mode — post a travel request strictly with 1 seat
-        const res = await createTravel({
-          source: fromLoc.trim(),
-          destination: toLoc.trim(),
-          travelDate: date,
-          departureTime: departureMinutes,
-          timeFlexibility: 30,
-          seats: 1,
-          pricePerSeat: 0,
-          carModel: 'Find Ride',
-          type: 'request',
-          notes: notes.trim(),
-          gender: gender || null,
-          authorImage: user?.imageUrl || null,
-          authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
-          authorEmail: user?.primaryEmailAddress?.emailAddress || null,
-        });
+      const payload = {
+        source: fromLoc.trim(),
+        destination: toLoc.trim(),
+        travelDate: date,
+        departureTime: departureMinutes,
+        timeFlexibility: 30,
+        seats: isOffer ? Number(travellers) : 1, // FIND is strictly 1 seat
+        pricePerSeat: isOffer ? (Number(pricePerSeat) || 0) : 0,
+        carModel: isOffer ? (vehicleModel.trim() || 'Campus Ride') : 'Find Ride',
+        type: isOffer ? 'offer' : 'request',
+        notes: notes.trim(),
+        gender: gender || null,
+        authorImage: user?.imageUrl || null,
+        authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
+        authorEmail: user?.primaryEmailAddress?.emailAddress || null,
+      };
 
-        const createdPost = res.data?.data || res.data;
-        invalidateRideQueries();
-        setCreatedSummary({
-          id: createdPost?._id,
-          type: 'request',
-          source: fromLoc.trim(),
-          destination: toLoc.trim(),
-          travelDate: date,
-          time: time || '08:00',
-          seats: 1,
-          pricePerSeat: 0,
-          carModel: 'Find Ride',
-          gender: gender || null,
-          notes: notes.trim(),
-        });
-        setShowSuccessModal(true);
-      }
+      const res = await createTravel(payload);
+      const createdPost = res.data?.data || res.data;
+      invalidateRideQueries();
+
+      setCreatedSummary({
+        id: createdPost?._id,
+        type: isOffer ? 'offer' : 'request',
+        source: fromLoc.trim(),
+        destination: toLoc.trim(),
+        travelDate: date,
+        time: time || '08:00',
+        seats: isOffer ? Number(travellers) : 1,
+        pricePerSeat: isOffer ? (Number(pricePerSeat) || 0) : 0,
+        carModel: isOffer ? (vehicleModel.trim() || 'Campus Ride') : 'Find Ride',
+        gender: gender || null,
+        notes: notes.trim(),
+      });
+
+      setShowSuccessModal(true);
     } catch (err) {
       console.error('Ride post error:', err);
-      setError(err.message || 'Failed to post ride. Please try again.');
+      setError(err.response?.data?.message || err.message || 'Failed to post ride. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Cancel ride post
+  const handleCancelPost = async (travelId) => {
+    if (!window.confirm('Are you sure you want to cancel this ride post? Any bookings will be notified.')) {
+      return;
+    }
+    try {
+      await cancelTravel(travelId);
+      invalidateRideQueries();
+      refetchTravels();
+      setFeedbackMsg({ type: 'success', text: 'Ride post cancelled successfully.' });
+    } catch (err) {
+      setFeedbackMsg({ type: 'error', text: err.response?.data?.message || 'Failed to cancel post.' });
+    }
+  };
+
+  // Delete ride post
+  const handleDeletePost = async (travelId) => {
+    if (!window.confirm('Are you sure you want to delete this ride post completely?')) {
+      return;
+    }
+    try {
+      await deleteTravel(travelId);
+      invalidateRideQueries();
+      refetchTravels();
+      setFeedbackMsg({ type: 'success', text: 'Ride post deleted.' });
+    } catch (err) {
+      setFeedbackMsg({ type: 'error', text: err.response?.data?.message || 'Failed to delete post.' });
+    }
+  };
+
+  // Open edit modal
+  const handleOpenEdit = (travel) => {
+    let formattedDate = '';
+    if (travel?.travelDate) {
+      try {
+        const d = new Date(travel.travelDate);
+        if (!isNaN(d.getTime())) {
+          formattedDate = d.toISOString().split('T')[0];
+        }
+      } catch {
+        formattedDate = '';
+      }
+    }
+    const totalMinutes = typeof travel?.departureTime === 'number' && !isNaN(travel.departureTime) ? travel.departureTime : 480;
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+    setEditFormData({
+      date: formattedDate,
+      timeStr,
+      seats: travel?.type === 'request' ? 1 : (travel?.seats || 1),
+      pricePerSeat: travel?.pricePerSeat ?? 350,
+      notes: travel?.notes || ''
+    });
+    setPostToEdit(travel);
+  };
+
+  // Save edited ride post
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!postToEdit) return;
+    setIsEditing(true);
+    try {
+      const [hh, mm] = editFormData.timeStr.split(':').map(Number);
+      const departureMinutes = hh * 60 + (mm || 0);
+
+      await updateTravel(postToEdit._id, {
+        travelDate: editFormData.date,
+        departureTime: departureMinutes,
+        seats: postToEdit.type === 'request' ? 1 : Number(editFormData.seats),
+        pricePerSeat: postToEdit.type === 'request' ? 0 : Number(editFormData.pricePerSeat),
+        notes: editFormData.notes.trim()
+      });
+
+      invalidateRideQueries();
+      refetchTravels();
+      setPostToEdit(null);
+      setFeedbackMsg({ type: 'success', text: 'Ride updated successfully!' });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update ride.');
+    } finally {
+      setIsEditing(false);
     }
   };
 
   return (
     <ResponsiveShell
       hideSidebarOnDesktop={true}
-      customMobileHeader={<AppHeader title="Offer a Ride" backTo="/rides" />}
+      customMobileHeader={
+        <AppHeader 
+          title="Ride" 
+          backTo="/home"
+        />
+      }
     >
-      <div className="w-full max-w-xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-1.5 pb-20 sm:pt-4 sm:pb-12">
+      <div className="w-full max-w-xl lg:max-w-6xl xl:max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 pt-2 pb-6 sm:pt-4 sm:pb-10 space-y-4 sm:space-y-6">
 
         {/* ========================================================================= */}
-        {/* RESPONSIVE LAYOUT CONTAINER (2 Columns on Desktop, Stacked on Mobile)      */}
+        {/* TOP SEGMENT TABS: OFFER A RIDE | FIND A RIDE | MY RIDES                   */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-6 items-start">
+        <div className="bg-white rounded-[22px] p-1.5 border border-[#F4E3D8] shadow-xs flex items-center justify-between gap-1 max-w-md mx-auto">
+          {/* Tab 1: Offer a Ride */}
+          <button
+            type="button"
+            onClick={() => handleTabChange('offer')}
+            className={`flex-1 py-2.5 px-2 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 select-none ${
+              activeTab === 'offer'
+                ? 'bg-[#FF572E] text-white shadow-sm shadow-[#FF572E]/25'
+                : 'text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F3]'
+            }`}
+          >
+            <Car className="w-4 h-4" />
+            <span>Offer a Ride</span>
+          </button>
 
-          {/* ----------------------------------------------------------------------- */}
-          {/* HERO CARD (Share Your Ride introductory card)                           */}
-          {/* ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-5 space-y-3.5">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs p-4 sm:p-5 relative overflow-hidden"
-            >
-              <div className="flex items-start justify-between gap-2 sm:gap-4">
-                {/* Left text column */}
-                <div className="flex-1 min-w-0 pt-1">
-                  <h1 className="text-2xl sm:text-3xl font-black text-[#17233C] leading-tight tracking-tight">
-                    {mode === 'offer' ? (
-                      <>
-                        Share Your <span className="text-[#FF572E]">Ride</span>
-                      </>
-                    ) : (
-                      <>
-                        Find Your <span className="text-[#FF572E]">Ride</span>
-                      </>
-                    )}
-                  </h1>
-                  <p className="text-xs sm:text-[13px] text-[#6E7587] font-medium leading-relaxed mt-2 max-w-[210px] sm:max-w-[280px]">
-                    {mode === 'offer'
-                      ? 'Share empty seats, split travel costs, and travel with verified students.'
-                      : 'Discover fellow students heading along your route and journey together safely.'}
+          {/* Tab 2: Find a Ride */}
+          <button
+            type="button"
+            onClick={() => handleTabChange('find')}
+            className={`flex-1 py-2.5 px-2 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 select-none ${
+              activeTab === 'find'
+                ? 'bg-[#FF572E] text-white shadow-sm shadow-[#FF572E]/25'
+                : 'text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F3]'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            <span>Find a Ride</span>
+          </button>
+
+          {/* Tab 3: My Rides */}
+          <button
+            type="button"
+            onClick={() => handleTabChange('my-rides')}
+            className={`flex-1 py-2.5 px-2 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 select-none ${
+              activeTab === 'my-rides'
+                ? 'bg-[#FF572E] text-white shadow-sm shadow-[#FF572E]/25'
+                : 'text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F3]'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>My Rides ({myTravels.length})</span>
+          </button>
+        </div>
+
+        {/* Global Feedback Banner */}
+        {feedbackMsg && (
+          <div className={`p-3 rounded-2xl text-xs font-bold text-center border animate-in fade-in duration-200 ${
+            feedbackMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+          }`}>
+            {feedbackMsg.text}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 1: MY RIDES TAB                                                      */}
+        {/* ========================================================================= */}
+        {activeTab === 'my-rides' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-1 border-b border-[#F4E3D8]/60">
+              <div>
+                <h2 className="font-black text-[#17233C] text-lg sm:text-xl">
+                  My Published Rides
+                </h2>
+                <p className="text-xs text-[#6E7587] font-medium">
+                  Review your active travel plans, manage passenger bookings, and discover matching peers.
+                </p>
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleTabChange('offer')}
+                leftIcon={<Car className="w-3.5 h-3.5" />}
+              >
+                Post New Ride
+              </Button>
+            </div>
+
+            {travelsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-44 bg-white rounded-[24px] border border-[#F4E3D8] animate-pulse" />
+                ))}
+              </div>
+            ) : myTravels.length === 0 ? (
+              <div className="bg-white rounded-[28px] border border-[#F4E3D8] p-8 text-center space-y-3 max-w-md mx-auto shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto text-2xl">
+                  🚗
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-[#17233C]">No Rides Published Yet</h3>
+                  <p className="text-xs text-[#6E7587] mt-1">
+                    You haven't posted any travel offers or passenger requests. Share your route to find matching peers!
                   </p>
                 </div>
-
-                {/* Right illustration column - Large and prominent matching reference */}
-                <div className="shrink-0 w-[140px] sm:w-[175px] md:w-[195px] -mt-1 -mr-1 flex justify-end items-center">
-                  <img
-                    src="/car-hero.png"
-                    alt="Helpu campus ride illustration"
-                    className="w-full h-auto object-contain select-none pointer-events-none drop-shadow-xs"
-                    onError={(e) => {
-                      e.currentTarget.src = '/car.png';
-                    }}
-                  />
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <Button variant="primary" size="sm" onClick={() => handleTabChange('offer')}>
+                    Offer a Ride
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleTabChange('find')}>
+                    Find a Ride
+                  </Button>
                 </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {myTravels.map((travel) => {
+                  const isOffer = travel.type === 'offer';
+                  const dateDisplay = formatTravelDate(travel.travelDate);
+                  const timeDisplay = formatMinutesToTime(travel.departureTime);
+                  const isCancelled = travel.status === 'cancelled';
+                  const isCompleted = travel.status === 'completed';
+                  const isExpired = travel.status === 'expired';
+                  const isActive = travel.status === 'active';
 
-              {/* Feature Badges Row - Clean pills with NO divider line */}
-              <div className="flex flex-wrap items-center gap-2 pt-3 mt-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF8F3] border border-[#FEE6D8] text-xs font-bold text-[#17233C]">
-                  <MapPin className="w-3.5 h-3.5 text-[#FF572E]" />
-                  <span>Same Route</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF8F3] border border-[#FEE6D8] text-xs font-bold text-[#17233C]">
-                  <IndianRupee className="w-3.5 h-3.5 text-[#FF572E]" />
-                  <span>Split Fuel</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#EBF9F1] border border-[#C2EED7] text-xs font-bold text-[#17233C]">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>Verified Campus</span>
-                </span>
-              </div>
-            </motion.div>
+                  return (
+                    <motion.div
+                      key={travel._id}
+                      layout
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white rounded-[24px] border border-[#F4E3D8] hover:border-[#FF572E]/40 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3.5"
+                    >
+                      <div className="space-y-3">
+                        {/* Top: Type Badge & Status Badge */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isOffer
+                              ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]'
+                              : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
+                          }`}>
+                            {isOffer ? `Offer (${travel.bookedSeats || 0}/${travel.seats} Booked)` : 'Find Request (1 Seat)'}
+                          </span>
 
-            {/* Desktop-only secondary trust badge */}
-            <div className="hidden lg:flex bg-white rounded-2xl p-4 border border-[#F4E3D8] items-center gap-3.5 shadow-2xs">
-              <div className="w-10 h-10 rounded-xl bg-[#EAF8F0] border border-[#C6EFD9] text-[#16A34A] flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isActive
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : isCancelled
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : isCompleted
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : 'bg-gray-100 text-gray-600 border border-gray-200'
+                          }`}>
+                            {travel.status}
+                          </span>
+                        </div>
+
+                        {/* Route Box */}
+                        <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/80 text-xs space-y-2">
+                          <div className="flex items-center gap-2 font-black text-sm text-[#17233C]">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                            <span className="truncate">{travel.source}</span>
+                            <span className="text-[#FF572E]">→</span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                            <span className="truncate">{travel.destination}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] text-[#6E7587] pt-1.5 border-t border-[#F4E3D8]/60 font-semibold">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                              <span>{dateDisplay}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[#17233C]">
+                              <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
+                              <span>{timeDisplay}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Details */}
+                        {isOffer && (
+                          <div className="flex items-center justify-between text-xs text-[#6E7587] font-bold px-1">
+                            <span>Vehicle: {travel.carModel || 'Campus Ride'}</span>
+                            <span className="text-[#FF572E] font-black">₹{travel.pricePerSeat}/seat</span>
+                          </div>
+                        )}
+
+                        {travel.notes && (
+                          <p className="text-[11px] text-[#6E7587] italic px-1 truncate">
+                            "{travel.notes}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action Bar */}
+                      <div className="pt-2.5 border-t border-[#F4E3D8]/70 flex items-center justify-between gap-2">
+                        {/* Primary Action: Find Matches */}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/match')}
+                          className="flex-1 py-2 px-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          <span>Find Matches</span>
+                        </button>
+
+                        {/* Secondary Actions */}
+                        {isActive && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(travel)}
+                              title="Edit Ride"
+                              className="p-2 rounded-xl border border-[#F4E3D8] hover:bg-[#FFF9F5] text-[#17233C] cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelPost(travel._id)}
+                              title="Cancel Ride"
+                              className="p-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+
+                        {(isCancelled || isCompleted || isExpired) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePost(travel._id)}
+                            title="Delete Post"
+                            className="p-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="font-extrabold text-[#17233C] text-sm block leading-snug">
-                  Verified Campus Network
-                </span>
-                <span className="text-xs text-[#6E7587] font-medium block mt-0.5 leading-relaxed">
-                  Direct coordination with verified students once matched.
-                </span>
-              </div>
-            </div>
+            )}
           </div>
-
-
-          {/* ----------------------------------------------------------------------- */}
-          {/* TRAVEL DETAILS FORM CARD & SELECTOR                                     */}
-          {/* ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-7 space-y-3 sm:space-y-3.5">
-
-            {/* Offer a Ride | Find / Request Selector (Positioned immediately above Travel Details) */}
-            <div className="flex items-center justify-between gap-2">
-              {/* Mode Switcher Pill */}
-              <div className="inline-flex bg-white p-1 rounded-full border border-[#F4E3D8] shadow-2xs shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('offer')}
-                  className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    mode === 'offer'
-                      ? 'bg-[#FF572E] text-white shadow-xs'
-                      : 'text-[#17233C] hover:text-[#FF572E]'
-                  }`}
-                >
-                  <ButtonCarIcon className="w-3.5 h-3.5 stroke-[2.2]" />
-                  <span>Offer a Ride</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('request')}
-                  className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    mode === 'request'
-                      ? 'bg-[#FF572E] text-white shadow-xs'
-                      : 'text-[#17233C] hover:text-[#FF572E]'
-                  }`}
-                >
-                  <Search className="w-3.5 h-3.5 stroke-[2.2]" />
-                  <span>Find</span>
-                </button>
-              </div>
-
-              {/* Quick link button to Match Page */}
-              <button
-                type="button"
-                onClick={() => navigate('/match')}
-                className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 bg-white rounded-full border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] hover:text-[#FF572E] text-xs font-bold shadow-2xs hover:bg-[#FFF7F2] transition-all cursor-pointer shrink-0"
+        ) : (
+          /* ========================================================================= */
+          /* VIEW 2: FORM FOR OFFER OR FIND A RIDE                                     */
+          /* ========================================================================= */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+            
+            {/* MAIN FORM COLUMN (7 COLS ON DESKTOP, FULL WIDTH ON MOBILE) */}
+            <div className="lg:col-span-7 space-y-4">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs p-4 sm:p-6 space-y-4"
               >
-                <span>Find Matches</span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#FF572E]" />
-              </button>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.22, delay: 0.05 }}
-              className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs p-4 sm:p-5"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#F4E3D8]/70">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
-                    <MapPin className="w-4 h-4 stroke-[2.5]" />
-                  </div>
-                  <div>
-                    <h2 className="font-black text-[#17233C] text-sm sm:text-base leading-tight">
-                      Your Travel Details
-                    </h2>
-                    <p className="text-[11px] sm:text-xs text-[#6E7587] font-medium">
-                      Enter route, schedule and vehicle preference
-                    </p>
-                  </div>
-                </div>
-
-                <span className="text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full bg-[#FFF6F0] border border-[#FF572E]/25 text-[#FF572E] shrink-0">
-                  {mode === 'offer' ? 'Offering' : 'Finding'}
-                </span>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
-
-                {/* Route Section: From & To Box with Central Floating Swap */}
-                <div className="relative bg-white rounded-2xl border border-[#F4E3D8] overflow-hidden">
-
-                  {/* Departure Location */}
-                  <div className="p-3 pr-11 border-b border-[#F4E3D8] focus-within:bg-[#FFFBF8] transition-colors">
-                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                      <span>Departure Location</span>
-                    </div>
-                    <input
-                      type="text"
-                      list="from-locations"
-                      value={fromLoc}
-                      onChange={(e) => setFromLoc(e.target.value)}
-                      placeholder="VIT, Bhopal"
-                      className="w-full bg-transparent text-xs sm:text-sm font-extrabold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none"
-                    />
-                    <datalist id="from-locations">
-                      {POPULAR_LOCATIONS.map((loc) => (
-                        <option key={loc} value={loc} />
-                      ))}
-                    </datalist>
-                  </div>
-
-                  {/* Swap Button (Floating on the right edge over the divider) */}
-                  <button
-                    type="button"
-                    onClick={handleSwapLocations}
-                    title="Swap Departure and Destination"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] hover:bg-[#FFF7F2] active:scale-90 shadow-sm flex items-center justify-center cursor-pointer transition-all"
-                  >
-                    <ArrowUpDown className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
-                  </button>
-
-                  {/* Destination */}
-                  <div className="p-3 pr-11 focus-within:bg-[#FFFBF8] transition-colors">
-                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-[#17233C] shrink-0" />
-                      <span>Destination</span>
-                    </div>
-                    <input
-                      type="text"
-                      list="to-locations"
-                      value={toLoc}
-                      onChange={(e) => setToLoc(e.target.value)}
-                      placeholder="Bhopal Railway Station"
-                      className="w-full bg-transparent text-xs sm:text-sm font-extrabold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none"
-                    />
-                    <datalist id="to-locations">
-                      {POPULAR_LOCATIONS.map((loc) => (
-                        <option key={loc} value={loc} />
-                      ))}
-                    </datalist>
-                  </div>
-
-                </div>
-
-
-                {/* Schedule Row: Date & Time side by side with Chevrons */}
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-
-                  {/* Date (Custom Helpu Date Picker - No Broken Native OS Dialog) */}
-                  <div 
-                    onClick={() => setShowDatePicker(true)}
-                    className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/60 focus-within:border-[#FF572E] active:scale-[0.98] transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-1">
-                      <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span>Date</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs sm:text-sm text-[#17233C]">
-                        {formatDateDisplay(date)}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-[#17233C]/70 shrink-0" />
-                    </div>
-                  </div>
-
-                  {/* Time (Custom Helpu Time Picker - No Oversized Native Dialog) */}
-                  <div 
-                    onClick={() => setShowTimePicker(true)}
-                    className="relative bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] hover:border-[#FF572E]/60 focus-within:border-[#FF572E] active:scale-[0.98] transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#6E7587] uppercase tracking-wider mb-1">
-                      <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span>Time (Optional)</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs sm:text-sm text-[#17233C]">
-                        {formatTimeDisplay(time)}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-[#17233C]/70 shrink-0" />
-                    </div>
-                  </div>
-
-                </div>
-
-
-                {/* Gender Selection (Optional) */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span className="font-black text-xs sm:text-sm text-[#17233C]">Gender</span>
-                    </div>
-                    <span className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium">Optional</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-                    {/* Male */}
-                    <button
-                      type="button"
-                      onClick={() => setGender(gender === 'Male' ? '' : 'Male')}
-                      className={`relative flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border transition-all cursor-pointer ${
-                        gender === 'Male'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs ring-1 ring-[#FF572E]'
-                          : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
-                    >
-                      {gender === 'Male' && (
-                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2 h-2 stroke-[3]" />
-                        </div>
-                      )}
-                      <span className="text-lg mb-0.5" role="img" aria-label="Male">👨</span>
-                      <span className="text-xs font-extrabold text-[#17233C]">Male</span>
-                    </button>
-
-                    {/* Female */}
-                    <button
-                      type="button"
-                      onClick={() => setGender(gender === 'Female' ? '' : 'Female')}
-                      className={`relative flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border transition-all cursor-pointer ${
-                        gender === 'Female'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs ring-1 ring-[#FF572E]'
-                          : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
-                    >
-                      {gender === 'Female' && (
-                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2 h-2 stroke-[3]" />
-                        </div>
-                      )}
-                      <span className="text-lg mb-0.5" role="img" aria-label="Female">👩</span>
-                      <span className="text-xs font-extrabold text-[#17233C]">Female</span>
-                    </button>
-
-                    {/* Prefer not to say */}
-                    <button
-                      type="button"
-                      onClick={() => setGender(gender === 'Prefer not to say' ? '' : 'Prefer not to say')}
-                      className={`relative flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border transition-all cursor-pointer ${
-                        gender === 'Prefer not to say'
-                          ? 'border-[#FF572E] bg-[#FFF8F3] shadow-2xs ring-1 ring-[#FF572E]'
-                          : 'border-[#F4E3D8] bg-white hover:border-[#FF572E]/40'
-                      }`}
-                    >
-                      {gender === 'Prefer not to say' && (
-                        <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2 h-2 stroke-[3]" />
-                        </div>
-                      )}
-                      <span className="text-lg mb-0.5" role="img" aria-label="Private">🔒</span>
-                      <span className="text-[10px] sm:text-[11px] font-extrabold text-[#17233C] text-center leading-tight">Prefer not to say</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Max. Co-travellers & Fuel Split Price */}
-                <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-[#F4E3D8] flex items-center justify-between gap-2">
+                {/* Form Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-[#F4E3D8]/70">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
-                      <Users className="w-4 h-4 stroke-[2.2]" />
+                    <div className="w-9 h-9 rounded-2xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
+                      {activeTab === 'offer' ? <Car className="w-5 h-5 stroke-[2.4]" /> : <Search className="w-5 h-5 stroke-[2.4]" />}
                     </div>
                     <div>
-                      <h4 className="font-black text-xs sm:text-sm text-[#17233C] leading-none">
-                        {mode === 'offer' ? 'Max. Co-travellers' : 'Passenger Seat'}
-                      </h4>
-                      <p className="text-[10px] sm:text-[11px] text-[#6E7587] font-medium mt-0.5">
-                        {mode === 'offer' ? 'Available seats (1–6)' : 'Single passenger (1 seat)'}
+                      <h2 className="font-black text-[#17233C] text-base sm:text-lg leading-tight">
+                        {activeTab === 'offer' ? 'Offer a Vehicle Ride' : 'Find a Passenger Ride'}
+                      </h2>
+                      <p className="text-[11px] sm:text-xs text-[#6E7587] font-medium">
+                        {activeTab === 'offer' 
+                          ? 'Share available seats in your car or bike with verified campus peers.' 
+                          : 'Post a travel request for single passenger seat matching.'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {mode === 'offer' && (
-                      <div className="flex items-center gap-1 bg-[#FFFBF8] rounded-xl px-2.5 py-1.5 border border-[#F4E3D8]">
-                        <span className="font-black text-[#FF572E] text-xs sm:text-sm">₹</span>
-                        <input
-                          type="number"
-                          value={pricePerSeat}
-                          onChange={(e) => setPricePerSeat(e.target.value)}
-                          placeholder="350"
-                          title="Price per seat"
-                          className="w-12 text-xs sm:text-sm font-black text-[#17233C] focus:outline-none bg-transparent"
-                        />
-                      </div>
-                    )}
-
-                    {mode === 'offer' ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
-                          className="w-7 h-7 rounded-xl bg-white border border-[#F4E3D8] text-[#17233C] hover:bg-[#FFEBE0] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
-                        >
-                          −
-                        </button>
-                        <span className="font-black text-[#17233C] text-sm min-w-[16px] text-center">
-                          {travellers}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setTravellers((prev) => Math.min(6, prev + 1))}
-                          className="w-7 h-7 rounded-xl bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform shadow-xs"
-                        >
-                          +
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="px-3 py-1 bg-[#F4F5F7] rounded-xl text-xs font-bold text-[#6E7587] border border-[#E5E7EB] shrink-0">
-                        1 Seat
-                      </div>
-                    )}
-                  </div>
+                  <span className={`text-[10px] sm:text-[11px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 ${
+                    activeTab === 'offer' ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]' : 'bg-[#FFF4ED] text-[#FF572E] border border-[#FDE0D0]'
+                  }`}>
+                    {activeTab === 'offer' ? 'Offering Seats' : 'Requesting Seat'}
+                  </span>
                 </div>
 
+                <form onSubmit={handleSubmit} className="space-y-4">
 
-                {/* Optional Message / Personal Notes Box */}
-                <div className="bg-white rounded-2xl p-3 border border-[#F4E3D8] space-y-1.5 focus-within:border-[#FF572E] transition-all">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-black text-[#17233C] flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-[#FF572E]" />
-                      <span>{mode === 'offer' ? 'Ride Notes / Preferences' : 'Find Notes / Details'}</span>
+                  {/* Route Box: From & To with Floating Central Swap */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-[#17233C]">
+                      Route <span className="text-[#FF572E]">*</span>
                     </label>
-                    <span className="text-[10px] font-bold text-[#8C93A4] bg-[#FFFBF8] px-2 py-0.5 rounded-full border border-[#F4E3D8]">
-                      Optional
-                    </span>
+
+                    <div className="relative bg-white rounded-2xl border border-[#F4E3D8] shadow-2xs">
+                      {/* From Departure */}
+                      <LocationInput
+                        id="from-location-input"
+                        label="Departure Location"
+                        value={fromLoc}
+                        onChange={setFromLoc}
+                        placeholder="VIT, Bhopal"
+                        dotColor="green"
+                        required={true}
+                        locations={POPULAR_LOCATIONS}
+                        className="border-b border-[#F4E3D8]"
+                      />
+
+                      {/* Swap Button */}
+                      <button
+                        type="button"
+                        onClick={handleSwapLocations}
+                        title="Swap Origin and Destination"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-[#F4E3D8] text-[#FF572E] hover:bg-[#FFF7F2] active:scale-90 shadow-sm flex items-center justify-center cursor-pointer transition-all"
+                      >
+                        <ArrowUpDown className="w-4 h-4 stroke-[2.4]" />
+                      </button>
+
+                      {/* To Destination */}
+                      <LocationInput
+                        id="to-location-input"
+                        label="Destination Location"
+                        value={toLoc}
+                        onChange={setToLoc}
+                        placeholder="Bhopal Railway Station"
+                        dotColor="orange"
+                        required={true}
+                        locations={POPULAR_LOCATIONS}
+                      />
+                    </div>
                   </div>
-                  <textarea
-                    rows={2}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder={
-                      mode === 'offer'
-                        ? 'Add any extra details (e.g. AC available, trunk space for 1 luggage, leaving sharp on time)...'
-                        : 'Add any extra details (e.g. Carrying 1 backpack, flexible by 15 mins, will wait near gate 2)...'
-                    }
-                    className="w-full text-xs font-semibold text-[#17233C] placeholder:text-[#A0A6B5] focus:outline-none bg-transparent resize-none leading-relaxed"
-                    maxLength={300}
-                  />
-                  {notes.length > 0 && (
-                    <div className="text-right text-[10px] font-bold text-[#A0A6B5]">
-                      {notes.length}/300
+
+                  {/* Schedule: Travel Date & Departure Time Pickers */}
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
+                    {/* Date Picker Button */}
+                    <div 
+                      onClick={() => setShowDatePicker(true)}
+                      className="bg-white rounded-2xl p-3 border border-[#F4E3D8] hover:border-[#FF572E]/60 active:scale-[0.98] transition-all cursor-pointer shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-1">
+                        <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                        <span>Travel Date</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-xs sm:text-sm text-[#17233C]">
+                          {formatDateDisplay(date)}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-[#8C93A4] shrink-0" />
+                      </div>
+                    </div>
+
+                    {/* Time Picker Button */}
+                    <div 
+                      onClick={() => setShowTimePicker(true)}
+                      className="bg-white rounded-2xl p-3 border border-[#F4E3D8] hover:border-[#FF572E]/60 active:scale-[0.98] transition-all cursor-pointer shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-[#6E7587] uppercase tracking-wider mb-1">
+                        <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
+                        <span>Departure Time</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-xs sm:text-sm text-[#17233C]">
+                          {formatTimeDisplay(time)}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-[#8C93A4] shrink-0" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Capacity & Price Row */}
+                  {activeTab === 'offer' ? (
+                    <div className="bg-white rounded-2xl p-3.5 border border-[#F4E3D8] flex items-center justify-between gap-3 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center shrink-0">
+                          <Users className="w-4 h-4 stroke-[2.4]" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-xs sm:text-sm text-[#17233C] leading-none">
+                            Available Seats
+                          </h4>
+                          <p className="text-[11px] text-[#6E7587] font-medium mt-0.5">
+                            Max seats for co-travellers
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Stepper + Price Input */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 bg-[#FFFBF8] rounded-xl px-2.5 py-1 border border-[#F4E3D8]">
+                          <span className="font-black text-[#FF572E] text-xs">₹</span>
+                          <input
+                            type="number"
+                            value={pricePerSeat}
+                            onChange={(e) => setPricePerSeat(e.target.value)}
+                            placeholder="350"
+                            className="w-12 text-xs font-black text-[#17233C] focus:outline-none bg-transparent"
+                            title="Fuel Contribution per seat"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setTravellers((prev) => Math.max(1, prev - 1))}
+                            className="w-7 h-7 rounded-lg bg-white border border-[#F4E3D8] text-[#17233C] hover:bg-[#FFEBE0] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95"
+                          >
+                            −
+                          </button>
+                          <span className="font-black text-[#17233C] text-sm min-w-[18px] text-center">
+                            {travellers}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setTravellers((prev) => Math.min(6, prev + 1))}
+                            className="w-7 h-7 rounded-lg bg-[#FF572E] text-white hover:bg-[#E64A22] font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Find Mode: Fixed Strictly to 1 Seat. No Seat Selector shown */
+                    <div className="bg-[#FFFBF8] rounded-2xl p-3.5 border border-[#F4E3D8] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0">
+                          <Users className="w-4 h-4 stroke-[2.4]" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-xs sm:text-sm text-[#17233C] leading-none">
+                            Passenger Request
+                          </h4>
+                          <p className="text-[11px] text-[#6E7587] font-medium mt-0.5">
+                            FIND requests are strictly for 1 individual passenger
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="px-3 py-1 rounded-xl bg-[#EDFAF3] border border-[#BCECD4] text-[#16A34A] text-xs font-black shadow-2xs">
+                        1 Seat Only
+                      </span>
                     </div>
                   )}
+
+                  {/* Gender Preference */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#17233C]">
+                      Co-traveler Gender Preference <span className="text-[#8C93A4] font-normal">(Optional)</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Male Only', val: 'Male', emoji: '👨' },
+                        { label: 'Female Only', val: 'Female', emoji: '👩' },
+                        { label: 'Any / Flexible', val: '', emoji: '🤝' },
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => setGender(gender === item.val ? '' : item.val)}
+                          className={`py-2 px-2 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            gender === item.val
+                              ? 'border-[#FF572E] bg-[#FFF8F3] text-[#FF572E] ring-1 ring-[#FF572E]'
+                              : 'border-[#F4E3D8] bg-white text-[#17233C] hover:border-[#FF572E]/40'
+                          }`}
+                        >
+                          <span>{item.emoji}</span>
+                          <span>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Notes / Luggage / Pickup Points */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-[#17233C]">
+                      Trip Notes & Instructions <span className="text-[#8C93A4] font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder={
+                        activeTab === 'offer'
+                          ? 'Add luggage capacity, exact campus gate pickup, or AC availability...'
+                          : 'Mention backpack/trolley size, flexibility in timing, or preferred pickup spot...'
+                      }
+                      maxLength={300}
+                      className="w-full rounded-xl bg-white border border-[#F4E3D8] p-3 text-xs font-semibold text-[#17233C] placeholder:text-[#8C93A4] placeholder:font-normal focus:border-[#FF572E] focus:ring-2 focus:ring-[#FF572E]/15 outline-none transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Error Notification */}
+                  {error && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold rounded-xl text-center flex items-center justify-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    fullWidth={true}
+                    isLoading={loading}
+                    leftIcon={activeTab === 'offer' ? <Car className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+                  >
+                    {activeTab === 'offer' ? 'Publish Ride Offer →' : 'Publish Ride Request →'}
+                  </Button>
+
+                </form>
+              </motion.div>
+            </div>
+
+            {/* SIDEBAR COLUMN (5 COLS ON DESKTOP, STACKED BELOW ON MOBILE) */}
+            <div className="lg:col-span-5 space-y-4">
+              
+              {/* POPULAR ROUTE PRESETS CARD */}
+              <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-[#F4E3D8]/60">
+                  <h3 className="font-black text-sm text-[#17233C]">
+                    Frequent Campus Routes
+                  </h3>
+                  <span className="text-[11px] font-bold text-[#FF572E]">1-Tap Fill</span>
                 </div>
 
+                <div className="space-y-1.5">
+                  {ROUTE_PRESETS.map((p, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => applyPreset(p)}
+                      className="w-full p-2.5 rounded-xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:bg-[#FFEBE0]/40 text-left transition-all cursor-pointer flex items-center justify-between text-xs font-bold text-[#17233C] group"
+                    >
+                      <span className="group-hover:text-[#FF572E]">{p.label}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[#FF572E] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                {/* Error Banner */}
-                {error && (
-                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl text-center">
-                    {error}
-                  </div>
-                )}
-
-
-                {/* Primary CTA Submit Action Button */}
-                <div className="pt-1">
+              {/* MY ACTIVE RIDES QUICK PREVIEW CARD */}
+              <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-[#F4E3D8]/60">
+                  <h3 className="font-black text-sm text-[#17233C]">
+                    Your Published Rides ({myTravels.length})
+                  </h3>
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3.5 px-6 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-[#FF572E]/25 transition-all cursor-pointer disabled:opacity-60"
+                    type="button"
+                    onClick={() => handleTabChange('my-rides')}
+                    className="text-xs font-extrabold text-[#FF572E] hover:underline cursor-pointer"
                   >
-                    <ButtonCarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    <span>
-                      {loading
-                        ? 'Processing...'
-                        : mode === 'offer'
-                          ? 'Offer Ride →'
-                          : 'Find Rides →'}
-                    </span>
+                    View All →
                   </button>
                 </div>
 
-              </form>
+                {myTravels.slice(0, 2).map((t) => (
+                  <div
+                    key={t._id}
+                    onClick={() => handleTabChange('my-rides')}
+                    className="p-2.5 rounded-xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 cursor-pointer space-y-1 transition-all"
+                  >
+                    <div className="flex items-center justify-between text-xs font-black text-[#17233C]">
+                      <span className="truncate">{t.source} → {t.destination}</span>
+                      <span className="text-[10px] font-bold text-[#FF572E] shrink-0 uppercase">{t.type}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-[#6E7587]">
+                      <span>{formatTravelDate(t.travelDate)} • {formatMinutesToTime(t.departureTime)}</span>
+                      <span className="font-bold text-[#16A34A]">{t.status}</span>
+                    </div>
+                  </div>
+                ))}
 
-            </motion.div>
+                {myTravels.length === 0 && (
+                  <p className="text-xs text-[#8C93A4] py-1 text-center font-medium">
+                    No rides published yet.
+                  </p>
+                )}
+              </div>
+
+              {/* CAMPUS TRAVEL GUIDELINE */}
+              <div className="bg-[#FFF8F3] rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] space-y-2">
+                <div className="flex items-center gap-2 text-xs font-black text-[#17233C]">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Student Safety Standards</span>
+                </div>
+                <p className="text-xs text-[#6E7587] leading-relaxed font-medium">
+                  All Helpu drivers and passengers are verified university students. Co-ordinate easily via WhatsApp once your booking or group match is confirmed.
+                </p>
+              </div>
+
+            </div>
+
           </div>
-
-        </div>
+        )}
 
       </div>
 
       {/* ========================================================================= */}
-      {/* POST SUCCESS CONFIRMATION POPUP / MODAL                                   */}
+      {/* SUCCESS CONFIRMATION MODAL                                                */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {showSuccessModal && createdSummary && (
-          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full border border-[#F4E3D8] shadow-2xl relative overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[28px] max-w-md w-full p-6 border border-[#F4E3D8] shadow-2xl space-y-4"
             >
-              {/* Close 'X' Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSuccessModal(false);
-                  navigate('/posts');
-                }}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#FFFBF8] border border-[#F4E3D8] text-[#8C93A4] hover:text-[#17233C] hover:bg-[#F4E3D8]/50 flex items-center justify-center cursor-pointer transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              {/* Animated Celebration Icon & Header */}
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-[#EDFAF3] border-2 border-[#BCECD4] text-[#16A34A] flex items-center justify-center mx-auto mb-3.5 shadow-sm">
-                  <CheckCircle2 className="w-9 h-9 stroke-[2.4]" />
+              <div className="text-center space-y-2">
+                <div className="w-14 h-14 rounded-2xl bg-[#EDFAF3] border border-[#BCECD4] text-[#16A34A] flex items-center justify-center mx-auto shadow-xs">
+                  <CheckCircle2 className="w-8 h-8 stroke-[2.4]" />
                 </div>
-
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EDFAF3] border border-[#BCECD4] text-[10px] font-black uppercase tracking-wider text-[#16A34A] mb-2 shadow-2xs">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Successfully Published</span>
-                </div>
-
-                <h3 className="font-black text-xl sm:text-2xl text-[#17233C] tracking-tight">
-                  {createdSummary.type === 'offer'
-                    ? 'Ride Offer Successfully Posted!'
-                    : 'Ride Request Successfully Posted!'}
+                <h3 className="font-black text-xl text-[#17233C]">
+                  {createdSummary.type === 'offer' ? 'Ride Offer Published!' : 'Ride Request Published!'}
                 </h3>
-
-                <p className="text-xs sm:text-sm text-[#6E7587] font-medium mt-1.5 leading-relaxed">
-                  Aapki ride live publish ho chuki hai. Verified campus peers traveling on this route can now discover and connect with you!
+                <p className="text-xs text-[#6E7587] leading-relaxed font-medium">
+                  Your trip is live! Verified students travelling on your route can now discover you or join your group.
                 </p>
               </div>
 
-              {/* Post Details Card */}
-              <div className="mt-5 bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8]/90 space-y-3">
-                {/* Route */}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
-                    <span className="font-extrabold text-[#17233C] truncate">{createdSummary.source}</span>
-                  </div>
-                  <div className="px-2 text-[#FF572E] font-bold">➔</div>
-                  <div className="flex items-center justify-end gap-2 min-w-0 flex-1 text-right">
-                    <span className="font-extrabold text-[#17233C] truncate">{createdSummary.destination}</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
-                  </div>
+              <div className="bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8] space-y-2.5 text-xs">
+                <div className="flex items-center justify-between font-black text-[#17233C]">
+                  <span className="truncate">{createdSummary.source}</span>
+                  <span className="text-[#FF572E] px-2">→</span>
+                  <span className="truncate">{createdSummary.destination}</span>
                 </div>
-
-                {/* Date & Time Divider */}
-                <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between text-[11px] font-bold text-[#6E7587]">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
-                    <span>{createdSummary.travelDate} • {createdSummary.time}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[#16A34A]">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{createdSummary.seats} Seat(s)</span>
-                  </div>
+                <div className="flex items-center justify-between pt-2 border-t border-[#F4E3D8]/60 text-[#6E7587] font-semibold text-[11px]">
+                  <span>{formatTravelDate(createdSummary.travelDate)} • {createdSummary.time}</span>
+                  <span className="font-black text-[#FF572E]">{createdSummary.seats} {createdSummary.seats === 1 ? 'Seat' : 'Seats'}</span>
                 </div>
-
-                {/* Vehicle & Price */}
-                {createdSummary.type === 'offer' && (
-                  <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-[#6E7587]">Vehicle: {createdSummary.carModel}</span>
-                    <span className="text-[#FF572E] font-black text-sm">₹{createdSummary.pricePerSeat}/seat</span>
-                  </div>
-                )}
-
-                {/* Notes if provided */}
-                {createdSummary.notes && (
-                  <div className="pt-2 border-t border-[#F4E3D8]/60 text-[11px] text-[#6E7587] flex items-start gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-[#FF572E] shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold text-[#17233C]">Notes: </span>
-                      <span className="text-[#6E7587] italic break-words">{createdSummary.notes}</span>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-6 space-y-2.5">
-                <button
-                  type="button"
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => {
                     setShowSuccessModal(false);
-                    navigate('/posts');
+                    handleTabChange('my-rides');
                   }}
-                  className="w-full py-3 px-5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-[#FF572E]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <FileText className="w-4 h-4" />
-                  <span>View in My Posts</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
+                  View My Rides
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={() => {
                     setShowSuccessModal(false);
                     navigate('/match');
                   }}
-                  className="w-full py-2.5 px-5 bg-white hover:bg-[#FFF7F2] text-[#17233C] font-bold text-xs sm:text-sm rounded-xl border border-[#F4E3D8] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  leftIcon={<Search className="w-4 h-4" />}
                 >
-                  <Sparkles className="w-4 h-4 text-[#FF572E]" />
-                  <span>Find Campus Matches</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                  }}
-                  className="w-full py-2 text-[#8C93A4] hover:text-[#17233C] font-bold text-xs transition-colors cursor-pointer text-center"
-                >
-                  Post another ride
-                </button>
+                  Find Matches
+                </Button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Modern Custom Date Picker Modal */}
+      {/* ========================================================================= */}
+      {/* EDIT MODAL FOR PUBLISHED RIDE                                             */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={Boolean(postToEdit)}
+        onClose={() => setPostToEdit(null)}
+        title="Edit Ride Post"
+        subtitle={postToEdit ? `${postToEdit.source} → ${postToEdit.destination}` : ''}
+      >
+        {postToEdit && (
+          <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
+            <div>
+              <label className="block text-xs font-bold text-[#17233C] mb-1">Travel Date</label>
+              <input
+                type="date"
+                required
+                value={editFormData.date}
+                onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                className="w-full rounded-xl bg-white border border-[#F4E3D8] p-2.5 font-bold text-[#17233C] outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#17233C] mb-1">Departure Time (HH:MM)</label>
+              <input
+                type="time"
+                required
+                value={editFormData.timeStr}
+                onChange={(e) => setEditFormData({ ...editFormData, timeStr: e.target.value })}
+                className="w-full rounded-xl bg-white border border-[#F4E3D8] p-2.5 font-bold text-[#17233C] outline-none"
+              />
+            </div>
+
+            {postToEdit.type === 'offer' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1">Seats Available</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    required
+                    value={editFormData.seats}
+                    onChange={(e) => setEditFormData({ ...editFormData, seats: e.target.value })}
+                    className="w-full rounded-xl bg-white border border-[#F4E3D8] p-2.5 font-bold text-[#17233C] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] mb-1">Price / Seat (₹)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editFormData.pricePerSeat}
+                    onChange={(e) => setEditFormData({ ...editFormData, pricePerSeat: e.target.value })}
+                    className="w-full rounded-xl bg-white border border-[#F4E3D8] p-2.5 font-bold text-[#17233C] outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-[#17233C] mb-1">Notes</label>
+              <textarea
+                rows={2}
+                value={editFormData.notes}
+                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                maxLength={300}
+                className="w-full rounded-xl bg-white border border-[#F4E3D8] p-2.5 font-semibold text-[#17233C] outline-none resize-none"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <Button variant="secondary" size="sm" onClick={() => setPostToEdit(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" type="submit" isLoading={isEditing}>
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Date & Time Picker Modals */}
       <DatePickerModal
         isOpen={showDatePicker}
         onClose={() => setShowDatePicker(false)}
         value={date}
+        selectedDate={date}
         onChange={(newDate) => {
           setDate(newDate);
           setShowDatePicker(false);
         }}
-        title={mode === 'offer' ? 'Select Ride Date' : 'Select Travel Date'}
+        onSelectDate={(newDate) => {
+          setDate(newDate);
+          setShowDatePicker(false);
+        }}
       />
 
-      {/* Modern Custom Time Picker Modal */}
       <TimePickerModal
         isOpen={showTimePicker}
         onClose={() => setShowTimePicker(false)}
         value={time}
+        selectedTime={time}
         onChange={(newTime) => {
           setTime(newTime);
           setShowTimePicker(false);
         }}
-        title="Select Departure Time"
+        onSelectTime={(newTime) => {
+          setTime(newTime);
+          setShowTimePicker(false);
+        }}
       />
     </ResponsiveShell>
   );

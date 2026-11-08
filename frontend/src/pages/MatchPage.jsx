@@ -12,13 +12,16 @@ import {
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
+import { Modal } from '../components/ui/Modal';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { openWhatsAppChat } from '../lib/whatsapp';
 import { 
   getMyTravels, 
   getTravelMatches, 
   getMyBookings, 
   getReceivedBookings,
-  createGroupJoinRequest
+  directJoinSharedRideGroup,
+  createGroupFromFindMatch
 } from '../lib/api';
 import { invalidateGroupQueries } from '../lib/queryClient';
 
@@ -62,8 +65,11 @@ export default function MatchPage() {
   const [selectedPost, setSelectedPost] = useState(null);
   const [matches, setMatches] = useState([]);
   const [sharedGroups, setSharedGroups] = useState([]);
-  const [requestingGroupId, setRequestingGroupId] = useState(null);
-  const [requestedGroupIds, setRequestedGroupIds] = useState(new Set());
+  const [compatibleFinds, setCompatibleFinds] = useState([]);
+  const [joiningGroupId, setJoiningGroupId] = useState(null);
+  const [joinedGroupIds, setJoinedGroupIds] = useState(new Set());
+  const [creatingGroupId, setCreatingGroupId] = useState(null);
+  const [confirmJoinGroup, setConfirmJoinGroup] = useState(null);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [matchesError, setMatchesError] = useState(null);
   const [fetchingPostId, setFetchingPostId] = useState(null);
@@ -188,8 +194,10 @@ export default function MatchPage() {
       const res = await getTravelMatches(postId);
       const data = res?.data?.data || [];
       const groups = res?.data?.sharedRideGroups || [];
+      const rawFinds = res?.data?.compatibleFinds || [];
       setMatches(Array.isArray(data) ? data : []);
       setSharedGroups(Array.isArray(groups) ? groups : []);
+      setCompatibleFinds(Array.isArray(rawFinds) ? rawFinds : []);
 
       // Scroll smoothly to the results section
       setTimeout(() => {
@@ -204,6 +212,7 @@ export default function MatchPage() {
       );
       setMatches([]);
       setSharedGroups([]);
+      setCompatibleFinds([]);
     } finally {
       setLoadingMatches(false);
       setFetchingPostId(null);
@@ -215,35 +224,70 @@ export default function MatchPage() {
     setSelectedPost(null);
     setMatches([]);
     setSharedGroups([]);
+    setCompatibleFinds([]);
     setMatchesError(null);
   };
 
-  // Handle requesting to join a discovered Shared Ride Group
-  const handleRequestToJoin = async (group) => {
-    const groupId = group._id || group.groupId;
-    if (!groupId || !selectedPost?._id || requestedGroupIds.has(groupId) || requestingGroupId === groupId) return;
-
-    setRequestingGroupId(groupId);
+  // Handle creating group together with a compatible FIND student
+  const handleCreateGroupWithPeer = async (peerTravel) => {
+    if (!selectedPost?._id || !peerTravel?._id) return;
+    const peerId = peerTravel._id.toString();
+    setCreatingGroupId(peerId);
     try {
-      await createGroupJoinRequest(groupId, {
-        travelId: selectedPost._id,
-        message: `Hi, I am travelling on the same route (${selectedPost.source} → ${selectedPost.destination}) and would like to join your cab group!`
-      });
-      setRequestedGroupIds((prev) => new Set([...prev, groupId]));
-      setToastMsg({
-        type: 'success',
-        text: 'Join request sent to the group organizer! You will be notified when they accept.'
+      const res = await createGroupFromFindMatch({
+        originatingTravelId: selectedPost._id,
+        candidateTravelId: peerTravel._id,
+        targetCapacity: 4
       });
       invalidateGroupQueries();
+      const group = res?.data?.data?.group || res?.data?.group;
+      const isExisting = res?.data?.data?.isExisting || res?.data?.isExisting;
+      setToastMsg({
+        type: 'success',
+        text: isExisting
+          ? 'Opened existing shared ride group for this match proposal!'
+          : 'Shared Ride Group created! Invitation sent to the student.'
+      });
+      if (group?._id) {
+        navigate(`/groups/${group._id}`);
+      }
     } catch (err) {
-      console.error('Error sending join request:', err);
-      const msg = err.response?.data?.message || err.message || 'Failed to send join request';
+      console.error('Error creating group with peer:', err);
+      setToastMsg({
+        type: 'error',
+        text: err.response?.data?.message || 'Failed to create group proposal.'
+      });
+    } finally {
+      setCreatingGroupId(null);
+    }
+  };
+
+  // Handle direct join into a discovered Shared Ride Group
+  const handleJoinGroup = async (group) => {
+    const groupId = group._id || group.groupId;
+    if (!groupId || !selectedPost?._id || joinedGroupIds.has(groupId) || joiningGroupId === groupId) return;
+
+    setJoiningGroupId(groupId);
+    try {
+      await directJoinSharedRideGroup(groupId, {
+        travelId: selectedPost._id
+      });
+      setJoinedGroupIds((prev) => new Set([...prev, groupId]));
+      setToastMsg({
+        type: 'success',
+        text: 'Successfully joined the group! You are now a confirmed member.'
+      });
+      invalidateGroupQueries();
+      navigate(`/groups/${groupId}`);
+    } catch (err) {
+      console.error('Error joining group:', err);
+      const msg = err.response?.data?.message || err.message || 'Failed to join group';
       setToastMsg({
         type: 'error',
         text: msg
       });
     } finally {
-      setRequestingGroupId(null);
+      setJoiningGroupId(null);
     }
   };
 
@@ -849,20 +893,38 @@ export default function MatchPage() {
                     </div>
 
                     {matches.length === 0 ? (
-                      <div className="bg-white rounded-[24px] p-8 text-center border border-[#F4E3D8] max-w-md mx-auto space-y-3 shadow-2xs">
-                        <div className="w-12 h-12 rounded-full bg-[#FFEBE0] text-[#FF572E] flex items-center justify-center mx-auto">
-                          <Car className="w-6 h-6 text-[#FF572E]" />
+                      <div className="bg-white rounded-[26px] p-6 sm:p-8 text-center border border-[#F4E3D8] max-w-lg mx-auto space-y-4 shadow-xs">
+                        <div className="w-14 h-14 rounded-full bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center mx-auto shadow-2xs">
+                          <Car className="w-7 h-7 text-[#FF572E]" />
                         </div>
-                        <div>
-                          <h4 className="font-black text-base text-[#17233C]">
-                            No direct vehicle offers found yet
-                          </h4>
-                          <p className="text-xs text-[#6E7587] mt-1 leading-relaxed">
+                        <div className="space-y-1.5">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-black uppercase tracking-wider">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Request Active & Live
+                          </span>
+                          <h4 className="font-black text-base sm:text-lg text-[#17233C]">
                             {selectedPost.type === 'request'
-                              ? 'No drivers have published a matching ride offer right now. You can join a student group below or wait for a vehicle offer!'
-                              : 'No students have requested a ride matching your route right now.'}
+                              ? 'Waiting for an Offer from a Driver'
+                              : 'No Passenger Requests Yet'}
+                          </h4>
+                          <p className="text-xs sm:text-[13px] text-[#6E7587] leading-relaxed max-w-md mx-auto">
+                            {selectedPost.type === 'request'
+                              ? 'Your ride request remains active on campus! Vehicle owners heading your way can discover your post. You will receive an instant notification as soon as a driver offers a matching ride.'
+                              : 'No students have requested a ride on your route yet. We will notify you when a request matches!'}
                           </p>
                         </div>
+                        {selectedPost.type === 'request' && (
+                          <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                            <div className="px-3.5 py-1.5 rounded-xl bg-[#FFF9F5] border border-[#FDE0D0] text-[11px] font-bold text-[#17233C] inline-flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>FIND post is active (not cancelled)</span>
+                            </div>
+                            <div className="px-3.5 py-1.5 rounded-xl bg-[#FFF9F5] border border-[#FDE0D0] text-[11px] font-bold text-[#FF572E] inline-flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Explore groups or peers below</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -957,10 +1019,18 @@ export default function MatchPage() {
                                     </span>
                                   )}
                                 </div>
+
+                                {/* Active Booking Status (if already booked) */}
+                                {activeBookingStatusByTravelId[travelId] && (
+                                  <div className="px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-black flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Booking {activeBookingStatusByTravelId[travelId]}</span>
+                                  </div>
+                                )}
                               </div>
 
-                              {/* Match Card Action: View Details button */}
-                              <div className="pt-2 border-t border-[#F4E3D8]/70">
+                              {/* Match Card Actions: View Details + Existing Booking action */}
+                              <div className="pt-2 border-t border-[#F4E3D8]/70 grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -970,10 +1040,23 @@ export default function MatchPage() {
                                       navigate('/rides/offer');
                                     }
                                   }}
-                                  className="w-full py-2.5 px-4 bg-[#FFF4ED] hover:bg-[#FF572E] text-[#FF572E] hover:text-white border border-[#FDE0D0] hover:border-[#FF572E] font-extrabold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
+                                  className="py-2.5 px-3 bg-white hover:bg-[#FFF7F2] text-[#17233C] hover:text-[#FF572E] border border-[#F4E3D8] hover:border-[#FF572E]/40 font-bold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1"
                                 >
                                   <span>View Details</span>
-                                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (travelId && /^[0-9a-fA-F]{24}$/.test(travelId)) {
+                                      navigate(`/book/${travelId}`);
+                                    } else {
+                                      navigate('/rides/offer');
+                                    }
+                                  }}
+                                  className="py-2.5 px-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-black text-xs rounded-xl shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                                >
+                                  <Car className="w-3.5 h-3.5" />
+                                  <span>Book Seat</span>
                                 </button>
                               </div>
                             </motion.div>
@@ -1029,8 +1112,8 @@ export default function MatchPage() {
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                           {sharedGroups.map((group) => {
-                            const isRequesting = requestingGroupId === group._id;
-                            const hasRequested = requestedGroupIds.has(group._id);
+                            const isJoining = joiningGroupId === group._id;
+                            const hasJoined = joinedGroupIds.has(group._id);
                             const memberCount = group.confirmedMemberCount || group.members?.length || 1;
                             const capacity = group.targetCapacity || 4;
                             const availableSpots = group.availableSpots ?? Math.max(0, capacity - memberCount);
@@ -1133,32 +1216,167 @@ export default function MatchPage() {
 
                                   <button
                                     type="button"
-                                    disabled={hasRequested || isRequesting || availableSpots <= 0}
-                                    onClick={() => handleRequestToJoin(group)}
+                                    disabled={hasJoined || isJoining || availableSpots <= 0}
+                                    onClick={() => setConfirmJoinGroup(group)}
                                     className={`py-2.5 px-3 font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 ${
-                                      hasRequested
+                                      hasJoined
                                         ? 'bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] cursor-default'
                                         : availableSpots <= 0
                                         ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                         : 'bg-[#FF572E] hover:bg-[#E64A22] text-white cursor-pointer active:scale-95'
                                     }`}
                                   >
-                                    {isRequesting ? (
+                                    {isJoining ? (
                                       <>
                                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                        <span>Sending...</span>
+                                        <span>Joining...</span>
                                       </>
-                                    ) : hasRequested ? (
+                                    ) : hasJoined ? (
                                       <>
                                         <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
-                                        <span>Request Pending</span>
+                                        <span>Joined</span>
                                       </>
                                     ) : availableSpots <= 0 ? (
                                       <span>Full</span>
                                     ) : (
                                       <>
                                         <CarTaxiFront className="w-3.5 h-3.5" />
-                                        <span>Request to Join</span>
+                                        <span>Join Group</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ================================================================= */}
+                  {/* CATEGORY C: COMPATIBLE STUDENTS (Raw Compatible FIND Posts)        */}
+                  {/* ================================================================= */}
+                  {selectedPost.type === 'request' && (
+                    <div className="space-y-4 pt-4 border-t border-[#F4E3D8]">
+                      <div className="flex items-center justify-between px-1">
+                        <div>
+                          <h3 className="text-lg sm:text-xl font-black text-[#17233C] tracking-tight flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-[#FF572E]" />
+                            <span>Category C: Compatible Students</span>
+                          </h3>
+                          <p className="text-xs text-[#6E7587]">
+                            Students seeking a ride on your exact route and time window. Team up and create a shared group!
+                          </p>
+                        </div>
+
+                        <span className="px-3 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[#FF572E] text-xs font-black">
+                          {compatibleFinds.length} {compatibleFinds.length === 1 ? 'Student' : 'Students'}
+                        </span>
+                      </div>
+
+                      {compatibleFinds.length === 0 ? (
+                        <div className="bg-white rounded-[24px] p-8 text-center border border-[#F4E3D8] max-w-md mx-auto space-y-3 shadow-2xs">
+                          <div className="w-12 h-12 rounded-full bg-[#FFF4ED] text-[#FF572E] flex items-center justify-center mx-auto">
+                            <Sparkles className="w-6 h-6 text-[#FF572E]" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-base text-[#17233C]">
+                              No compatible students found yet
+                            </h4>
+                            <p className="text-xs text-[#6E7587] mt-1 leading-relaxed">
+                              When other students post a FIND request on your same route and date within 7 hours, they will appear here so you can create a shared ride group together!
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                          {compatibleFinds.map((peer) => {
+                            const isCreating = creatingGroupId === peer._id;
+                            const peerStudent = peer.student || {};
+                            return (
+                              <motion.div
+                                key={peer._id}
+                                layout
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-white rounded-[24px] border border-[#F4E3D8] hover:border-[#FF572E]/40 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                              >
+                                <div className="space-y-3.5">
+                                  {/* Student Profile Header */}
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="w-10 h-10 rounded-full bg-[#FFEBE0] border border-[#FDD0BE] text-[#FF572E] font-black flex items-center justify-center text-sm shrink-0 overflow-hidden">
+                                        {peerStudent.imageUrl ? (
+                                          <img
+                                            src={peerStudent.imageUrl}
+                                            alt={peerStudent.name}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          peerStudent.name?.charAt(0)?.toUpperCase() || 'S'
+                                        )}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <h4 className="font-extrabold text-[#17233C] text-sm truncate">
+                                            {peerStudent.name || 'Campus Student'}
+                                          </h4>
+                                          {peerStudent.isVerified && (
+                                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                          )}
+                                        </div>
+                                        <span className="text-[11px] font-semibold text-[#8C93A4] truncate block">
+                                          {peerStudent.college || 'VIT, Bhopal'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <span className="shrink-0 px-2.5 py-1 rounded-full bg-[#FFF4ED] border border-[#FDE0D0] text-[#FF572E] text-[11px] font-black shadow-2xs">
+                                      Compatible
+                                    </span>
+                                  </div>
+
+                                  {/* Route Box */}
+                                  <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/80 text-xs space-y-2">
+                                    <div className="flex items-center gap-2 font-bold text-[#17233C]">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                                      <span className="truncate">{peer.source}</span>
+                                      <span className="text-[#FF572E]">→</span>
+                                      <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                                      <span className="truncate">{peer.destination}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[11px] text-[#6E7587] pt-1.5 border-t border-[#F4E3D8]/60">
+                                      <div className="flex items-center gap-1 truncate">
+                                        <Calendar className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
+                                        <span>{formatTravelDate(peer.travelDate)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 font-medium text-[#17233C]">
+                                        <Clock className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
+                                        <span>{formatMinutesToTime(peer.departureTime)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Create Group Together Action */}
+                                <div className="pt-2 border-t border-[#F4E3D8]/70">
+                                  <button
+                                    type="button"
+                                    disabled={isCreating}
+                                    onClick={() => handleCreateGroupWithPeer(peer)}
+                                    className="w-full py-2.5 px-3 bg-[#FF572E] hover:bg-[#E64A22] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                  >
+                                    {isCreating ? (
+                                      <>
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Creating Group...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Users className="w-3.5 h-3.5" />
+                                        <span>Create Group Together</span>
                                       </>
                                     )}
                                   </button>
@@ -1179,6 +1397,102 @@ export default function MatchPage() {
         </div>
 
       </div>
+
+      {/* Join Confirmation Dialog */}
+      <Modal
+        isOpen={Boolean(confirmJoinGroup)}
+        onClose={() => setConfirmJoinGroup(null)}
+        title="Confirm Group Join"
+        subtitle="Review ride details before joining this active shared group"
+        actions={
+          confirmJoinGroup ? (
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => setConfirmJoinGroup(null)}
+                className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={joiningGroupId === confirmJoinGroup._id}
+                onClick={() => {
+                  const grp = confirmJoinGroup;
+                  setConfirmJoinGroup(null);
+                  handleJoinGroup(grp);
+                }}
+                className="py-2.5 px-4 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {joiningGroupId === confirmJoinGroup._id ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Joining...</span>
+                  </>
+                ) : (
+                  <span>Confirm & Join</span>
+                )}
+              </button>
+            </div>
+          ) : null
+        }
+      >
+        {confirmJoinGroup && (
+          <div className="space-y-3">
+            <p className="text-xs text-[#6E7587]">
+              You are about to directly join this active Shared Ride Group. Please review the trip details below:
+            </p>
+
+            {/* Details Box */}
+            <div className="bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8] space-y-3 text-xs">
+              {/* Route */}
+              <div className="flex items-center gap-2 font-black text-sm text-[#17233C]">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
+                <span className="truncate">{confirmJoinGroup.source}</span>
+                <span className="text-[#FF572E]">→</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
+                <span className="truncate">{confirmJoinGroup.destination}</span>
+              </div>
+
+              {/* Date & Departure */}
+              <div className="flex items-center justify-between text-[#6E7587] pt-2 border-t border-[#F4E3D8]/60">
+                <div className="flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <span>{formatTravelDate(confirmJoinGroup.travelDate)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-bold text-[#17233C]">
+                  <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <span>{formatMinutesToTime(confirmJoinGroup.departureTime)}</span>
+                </div>
+              </div>
+
+              {/* Admin & Members */}
+              <div className="flex items-center justify-between text-[#6E7587] pt-2 border-t border-[#F4E3D8]/60">
+                <div>
+                  <span className="text-[11px] block">Group Admin:</span>
+                  <span className="font-extrabold text-[#17233C] text-xs">
+                    {confirmJoinGroup.admin?.name || 'Group Organizer'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] block">Confirmed Members:</span>
+                  <span className="font-extrabold text-[#17233C] text-xs">
+                    {confirmJoinGroup.confirmedMemberCount || confirmJoinGroup.members?.length || 1} / {confirmJoinGroup.targetCapacity || 4}
+                  </span>
+                </div>
+              </div>
+
+              {/* Available Spots */}
+              <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-[#6E7587]">Available Spots:</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-xs">
+                  {confirmJoinGroup.availableSpots ?? Math.max(0, (confirmJoinGroup.targetCapacity || 4) - (confirmJoinGroup.confirmedMemberCount || confirmJoinGroup.members?.length || 1))} spots left
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </ResponsiveShell>
   );
 }

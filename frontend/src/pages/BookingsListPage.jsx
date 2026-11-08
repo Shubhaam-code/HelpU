@@ -176,6 +176,7 @@ export default function BookingsListPage() {
     setActionLoadingId(bookingId);
     try {
       const res = await completeBooking(bookingId);
+      invalidateBookingQueries();
       const updated = res?.data?.data || res?.data;
       const updater = (list) => list.map(b => b._id === bookingId ? { ...b, ...(updated || {}), status: 'completed', completedAt: new Date().toISOString() } : b);
       setMyBookings(updater);
@@ -196,6 +197,7 @@ export default function BookingsListPage() {
     setActionLoadingId(bookingId);
     try {
       await respondBooking(bookingId, { action });
+      invalidateBookingQueries();
       await fetchAllBookings();
       if (selectedBooking && selectedBooking._id === bookingId) {
         setSelectedBooking(null);

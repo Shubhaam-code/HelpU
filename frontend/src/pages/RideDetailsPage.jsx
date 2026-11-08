@@ -329,6 +329,7 @@ export default function RideDetailsPage() {
 
       const res = await createBooking(bookingPayload);
       const created = res.data?.data || res.data;
+      invalidateBookingQueries();
 
       // Update state locally and notify user
       setMyBookings((prev) => [created, ...prev]);
@@ -381,6 +382,7 @@ export default function RideDetailsPage() {
 
     try {
       await confirmBooking(targetBookingId);
+      invalidateBookingQueries();
       setSuccessNotice('Booking confirmed! Seats have been reserved successfully.');
       loadData();
     } catch (err) {
@@ -390,6 +392,7 @@ export default function RideDetailsPage() {
         try {
           await respondBooking(targetBookingId, { action: 'accept' });
           await confirmBooking(targetBookingId);
+          invalidateBookingQueries();
           setSuccessNotice('Booking confirmed! Seats have been reserved successfully.');
           loadData();
           return;

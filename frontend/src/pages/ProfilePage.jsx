@@ -149,7 +149,17 @@ export default function ProfilePage() {
       }, 1000);
     } catch (err) {
       console.error('Save profile error:', err);
-      setSaveError(err.response?.data?.message || err.message || 'Failed to update profile.');
+      let msg = 'Failed to update profile.';
+      if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+        msg = 'Server took too long to respond. The server may be waking up, please try again in a moment.';
+      } else if (err.response) {
+        msg = err.response.data?.message || (err.response.status === 401 ? 'Session expired. Please sign in again.' : 'Failed to update profile.');
+      } else if (err.request || err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        msg = 'Unable to connect. Please check your internet connection and try again.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setSaveError(msg);
     } finally {
       setIsSaving(false);
     }

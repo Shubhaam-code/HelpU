@@ -50,6 +50,7 @@ export default function BookingDetailsPage() {
     setSuccessMsg('');
     try {
       await confirmBooking(id);
+      invalidateBookingQueries();
       setSuccessMsg('Booking confirmed! Seats have been reserved successfully.');
       loadBooking();
     } catch (err) {
@@ -59,6 +60,7 @@ export default function BookingDetailsPage() {
         try {
           await respondBooking(id, { action: 'accept' });
           await confirmBooking(id);
+          invalidateBookingQueries();
           setSuccessMsg('Booking confirmed! Seats have been reserved successfully.');
           loadBooking();
           return;

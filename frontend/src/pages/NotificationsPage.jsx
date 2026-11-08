@@ -12,7 +12,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { markRead, markAllRead, createGroupFromFindMatch } from '../lib/api';
 import { timeAgo, formatDateShort, formatMinutesToTime } from '../lib/utils';
 import { useNotificationsList, useUnreadNotificationsCount } from '../hooks/useAppData';
-import { QUERY_KEYS, invalidateNotificationQueries } from '../lib/queryClient';
+import { QUERY_KEYS, invalidateNotificationQueries, invalidateGroupQueries } from '../lib/queryClient';
 import { useUser } from '../context/FirebaseAuthContext';
 
 export default function NotificationsPage() {
@@ -52,6 +52,7 @@ export default function NotificationsPage() {
         return old.map((n) => ({ ...n, isRead: true }));
       });
       queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id), 0);
+      invalidateNotificationQueries();
       window.dispatchEvent(new CustomEvent('notifications-updated'));
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
@@ -124,6 +125,7 @@ export default function NotificationsPage() {
         originatingTravelId,
         candidateTravelId
       });
+      invalidateGroupQueries();
       const group = res.data?.data?.group || res.data?.group;
       if (group?._id) {
         if (!notification.isRead) {

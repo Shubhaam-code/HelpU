@@ -6,6 +6,7 @@ import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import { useUser } from '../context/FirebaseAuthContext';
 import { saveProfile, updateProfile } from '../lib/api';
 import { useAuthProfile } from '../context/AuthProfileContext';
+import { invalidateProfileQueries } from '../lib/queryClient';
 
 const COUNTRIES = [
   { code: 'IN', name: 'India', dial: '+91', flag: '🇮🇳' },
@@ -82,6 +83,7 @@ export default function WhatsAppOnboardingPage() {
 
       // Call saveProfile which POSTs to /api/students/profile (ensures both phone and whatsappNumber are saved)
       await saveProfile(payload);
+      invalidateProfileQueries();
 
       // Instantly update context profile state and refresh from MongoDB
       setWhatsAppNumber(normalizedNumber);
@@ -93,7 +95,33 @@ export default function WhatsAppOnboardingPage() {
       navigate('/home', { replace: true });
     } catch (err) {
       console.error('Error saving WhatsApp number:', err);
-      setError(err?.response?.data?.message || err?.message || 'Failed to save WhatsApp number. Please try again.');
+
+      let userFriendlyMessage = 'Failed to save WhatsApp number. Please try again.';
+
+      if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+        userFriendlyMessage = 'Server took too long to respond. The server may be waking up, please tap Save & Continue again.';
+      } else if (err.response) {
+        const status = err.response.status;
+        const serverMessage = err.response.data?.message;
+
+        if (status === 401) {
+          userFriendlyMessage = 'Your session has expired. Please sign in again to continue.';
+        } else if (status === 400) {
+          userFriendlyMessage = serverMessage || `Please enter a valid phone number for ${selectedCountry.name}.`;
+        } else if (status === 409) {
+          userFriendlyMessage = serverMessage || 'This phone number is already registered to another account.';
+        } else if (status >= 500) {
+          userFriendlyMessage = 'Server is currently experiencing issues. Please try again in a few moments.';
+        } else {
+          userFriendlyMessage = serverMessage || userFriendlyMessage;
+        }
+      } else if (err.request || err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        userFriendlyMessage = 'Unable to connect. Please check your internet connection and try again.';
+      } else if (err.message) {
+        userFriendlyMessage = err.message;
+      }
+
+      setError(userFriendlyMessage);
     } finally {
       setLoading(false);
     }

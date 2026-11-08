@@ -24,6 +24,7 @@ import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { Modal } from '../components/ui/Modal';
 import {
   useUserProfile,
   useSharedRideGroupDetails,
@@ -34,7 +35,8 @@ import {
 import {
   acceptStudentJoinRequest,
   rejectStudentJoinRequest,
-  inviteStudentToGroup
+  inviteStudentToGroup,
+  leaveSharedRideGroup
 } from '../lib/api';
 import { invalidateGroupQueries } from '../lib/queryClient';
 import { formatMinutesToTime } from '../lib/utils';
@@ -58,6 +60,8 @@ export default function GroupDetailsPage() {
 
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error' | 'info', text: string }
+  const [leaving, setLeaving] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   // 1. Fetch live group details
   const {
@@ -74,32 +78,36 @@ export default function GroupDetailsPage() {
 
   // 2. Fetch admin join requests & sent invites only if user is group admin
   const {
-    data: joinRequests = [],
+    data: rawJoinRequests,
     isLoading: requestsLoading,
     refetch: refetchRequests
   } = useGroupJoinRequests(groupId, isAdmin);
+  const joinRequests = Array.isArray(rawJoinRequests) ? rawJoinRequests : [];
 
   const {
-    data: sentInvites = [],
+    data: rawSentInvites,
     isLoading: invitesLoading,
     refetch: refetchInvites
   } = useGroupSentInvites(groupId, isAdmin);
+  const sentInvites = Array.isArray(rawSentInvites) ? rawSentInvites : [];
 
   // 3. Fetch candidate compatible travel matches for admin invite panel
   const originatingTravelId = group?.originatingTravelId?._id || group?.originatingTravelId;
   const {
-    data: travelMatches = [],
+    data: rawTravelMatches,
     isLoading: matchesLoading,
     refetch: refetchMatches
   } = useOriginatingTravelMatches(originatingTravelId, isAdmin);
+  const travelMatches = Array.isArray(rawTravelMatches) ? rawTravelMatches : [];
 
   // Separate confirmed members
-  const adminMember = (group?.members || []).find((m) => m.role === 'admin' || m.userId === group?.adminId);
-  const regularMembers = (group?.members || []).filter((m) => m.role !== 'admin' && m.userId !== group?.adminId);
+  const confirmedMembersList = Array.isArray(group?.members) ? group.members : [];
+  const adminMember = confirmedMembersList.find((m) => m.role === 'admin' || m.userId === group?.adminId);
+  const regularMembers = confirmedMembersList.filter((m) => m.role !== 'admin' && m.userId !== group?.adminId);
 
   // Pending join requests & invites
-  const pendingJoinRequests = (joinRequests || []).filter((r) => r.status === 'pending');
-  const pendingSentInvites = (sentInvites || []).filter((i) => i.status === 'pending');
+  const pendingJoinRequests = joinRequests.filter((r) => r.status === 'pending');
+  const pendingSentInvites = sentInvites.filter((i) => i.status === 'pending');
 
   const showFeedback = (type, text) => {
     setFeedback({ type, text });
@@ -154,6 +162,23 @@ export default function GroupDetailsPage() {
       showFeedback('error', err.response?.data?.message || 'Failed to send invitation.');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  // Leave group handler confirmed via Modal
+  const handleLeaveGroup = async () => {
+    setLeaving(true);
+    try {
+      await leaveSharedRideGroup(groupId);
+      invalidateGroupQueries();
+      showFeedback('info', 'You have left the group. Your active FIND post remains active.');
+      setShowLeaveModal(false);
+      setTimeout(() => {
+        navigate('/shared-rides');
+      }, 900);
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to leave group.');
+      setLeaving(false);
     }
   };
 
@@ -233,6 +258,21 @@ export default function GroupDetailsPage() {
               )}
             </AnimatePresence>
 
+            {/* Cancelled Group Alert Banner */}
+            {group.status === 'cancelled' && (
+              <div className="bg-rose-50 border border-rose-200 rounded-[22px] p-4 sm:p-5 flex items-start gap-3.5 text-rose-800 shadow-xs">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="font-black text-sm sm:text-base text-rose-900">
+                    This Shared Ride Group Has Been Cancelled
+                  </h4>
+                  <p className="text-xs sm:text-[13px] text-rose-700 leading-relaxed">
+                    All members have departed from this group. New student joins and member coordination are closed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* ========================================================================= */}
             {/* 2. GROUP HERO / ROUTE CARD                                                */}
             {/* ========================================================================= */}
@@ -259,7 +299,19 @@ export default function GroupDetailsPage() {
                   )}
                 </div>
 
-                <StatusBadge status={group.status} />
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={group.status} />
+                  {group.status !== 'cancelled' && (isAdmin || isConfirmedMember) && (
+                    <button
+                      type="button"
+                      disabled={leaving}
+                      onClick={() => setShowLeaveModal(true)}
+                      className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {leaving ? 'Leaving...' : 'Leave Group'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Route Display */}
@@ -323,7 +375,7 @@ export default function GroupDetailsPage() {
             {/* ========================================================================= */}
             {/* 3. WHATSAPP GROUP SECTION (CONFIRMED MEMBERS ONLY)                        */}
             {/* ========================================================================= */}
-            {(isAdmin || isConfirmedMember) && (
+            {group.status !== 'cancelled' && (isAdmin || isConfirmedMember) && (
               <div className="bg-white rounded-[22px] sm:rounded-[26px] border border-[#F4E3D8] shadow-xs p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -632,6 +684,67 @@ export default function GroupDetailsPage() {
         )}
 
       </div>
+
+      {/* Leave Group Confirmation Modal */}
+      <Modal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        title="Leave Shared Ride Group"
+        subtitle="Review trip details before leaving"
+        actions={
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => setShowLeaveModal(false)}
+              className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={leaving}
+              onClick={handleLeaveGroup}
+              className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {leaving ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Leaving...</span>
+                </>
+              ) : (
+                <span>Confirm & Leave</span>
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3.5">
+          {group && (
+            <div className="bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8] space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-black text-sm text-[#17233C]">
+                <span>{group.source}</span>
+                <span className="text-[#FF572E]">→</span>
+                <span>{group.destination}</span>
+              </div>
+              <div className="flex items-center gap-3 text-[#6E7587] text-[11px]">
+                <span>{formatTravelDate(group.travelDate)}</span>
+                <span>•</span>
+                <span>{formatMinutesToTime(group.departureTime)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+            <div className="font-bold flex items-center gap-1.5 text-amber-800">
+              <Info className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>Your FIND post remains intact</span>
+            </div>
+            <p className="text-[11.5px] leading-relaxed">
+              Leaving this shared group will not cancel or delete your active FIND request. You can still discover and receive vehicle offers and form new groups.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </ResponsiveShell>
   );
 }

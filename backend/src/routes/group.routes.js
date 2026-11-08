@@ -14,7 +14,9 @@ import {
   getSharedRideGroupById,
   getMyGroups,
   getGroupInvites,
-  getReceivedInvitations
+  getReceivedInvitations,
+  directJoinSharedRideGroup,
+  leaveSharedRideGroup
 } from '../controllers/group.controller.js';
 
 const router = express.Router();
@@ -57,5 +59,11 @@ router.get('/:id/invites', getGroupInvites);
 // 7. Student-initiated join requests for a group
 router.post('/:groupId/join-requests', createJoinRequest);
 router.get('/:groupId/join-requests', getGroupJoinRequests);
+
+// 8. Dynamic Direct Join & Leave
+router.post('/:groupId/join', directJoinSharedRideGroup);
+router.post('/:id/join', directJoinSharedRideGroup);
+router.post('/:groupId/leave', leaveSharedRideGroup);
+router.post('/:id/leave', leaveSharedRideGroup);
 
 export default router;

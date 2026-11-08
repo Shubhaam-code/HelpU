@@ -23,6 +23,10 @@ export const NOTIFICATION_JOB_TYPES = {
   GROUP_JOIN_REQUEST_RECEIVED: 'GROUP_JOIN_REQUEST_RECEIVED',
   GROUP_JOIN_REQUEST_ACCEPTED: 'GROUP_JOIN_REQUEST_ACCEPTED',
   GROUP_JOIN_REQUEST_REJECTED: 'GROUP_JOIN_REQUEST_REJECTED',
+  GROUP_MEMBER_JOINED: 'GROUP_MEMBER_JOINED',
+  GROUP_MEMBER_LEFT: 'GROUP_MEMBER_LEFT',
+  GROUP_ADMIN_PROMOTED: 'GROUP_ADMIN_PROMOTED',
+  GROUP_CLOSED: 'GROUP_CLOSED',
   COMPATIBLE_FIND_MATCH: 'COMPATIBLE_FIND_MATCH'
 };
 
@@ -197,6 +201,36 @@ export function formatNotificationContent(eventType, payload = {}) {
       return {
         title: 'Join Request Declined',
         message: `Your request to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was declined by the host.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_MEMBER_JOINED: {
+      const studentName = payload.memberName || payload.studentName || 'A student';
+      return {
+        title: 'New Student Joined Group',
+        message: `${studentName} joined your Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_MEMBER_LEFT: {
+      const studentName = payload.memberName || payload.studentName || 'A student';
+      return {
+        title: 'Member Left Group',
+        message: `${studentName} left your Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. A spot has opened up.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_ADMIN_PROMOTED: {
+      return {
+        title: 'You Are Now Group Admin',
+        message: `The previous organizer left the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. You have been promoted to Group Admin.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_CLOSED: {
+      return {
+        title: 'Shared Ride Group Closed',
+        message: `The Shared Ride Group for ${source} to ${destination} has been closed as all members have left.`
       };
     }
 

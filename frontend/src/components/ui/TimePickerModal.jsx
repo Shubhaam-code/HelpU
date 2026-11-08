@@ -43,10 +43,15 @@ export function TimePickerModal({
   isOpen,
   onClose,
   value = '08:00',
+  selectedTime,
   onChange,
+  onSelectTime,
   title = "Select Departure Time"
 }) {
-  const initial = useMemo(() => parseTimeString(value), [value]);
+  const actualValue = selectedTime || value || '08:00';
+  const actualOnChange = onChange || onSelectTime;
+
+  const initial = useMemo(() => parseTimeString(actualValue), [actualValue]);
 
   const [selectedHour, setSelectedHour] = useState(initial.hour12);
   const [selectedMinute, setSelectedMinute] = useState(initial.minute);
@@ -54,16 +59,18 @@ export function TimePickerModal({
 
   useEffect(() => {
     if (isOpen) {
-      const parsed = parseTimeString(value);
+      const parsed = parseTimeString(actualValue);
       setSelectedHour(parsed.hour12);
       setSelectedMinute(parsed.minute);
       setSelectedAmPm(parsed.ampm);
     }
-  }, [isOpen, value]);
+  }, [isOpen, actualValue]);
 
   const handleConfirm = () => {
     const formatted = to24HourString(selectedHour, selectedMinute, selectedAmPm);
-    onChange(formatted);
+    if (typeof actualOnChange === 'function') {
+      actualOnChange(formatted);
+    }
     onClose();
   };
 
@@ -72,7 +79,9 @@ export function TimePickerModal({
     setSelectedMinute(String(item.m).padStart(2, '0'));
     setSelectedAmPm(item.ampm);
     const formatted = to24HourString(item.h, item.m, item.ampm);
-    onChange(formatted);
+    if (typeof actualOnChange === 'function') {
+      actualOnChange(formatted);
+    }
     onClose();
   };
 

@@ -1726,6 +1726,25 @@ export async function acceptGroupInvitation(req, res) {
         throw err;
       }
 
+      // Step B2: Verify recipient is not already a confirmed member of another active group
+      const otherActiveGroup = session
+        ? await SharedRideGroup.findOne({
+            _id: { $ne: group._id },
+            status: { $in: ['open', 'full'] },
+            'members.userId': recipientId
+          }).session(session)
+        : await SharedRideGroup.findOne({
+            _id: { $ne: group._id },
+            status: { $in: ['open', 'full'] },
+            'members.userId': recipientId
+          });
+
+      if (otherActiveGroup) {
+        const activeErr = new Error('You are already a confirmed member of an active Shared Ride Group. You must leave that group before accepting another invitation.');
+        activeErr.statusCode = 409;
+        throw activeErr;
+      }
+
       // Step C: Atomically and conditionally add member to group only if members.length < targetCapacity
       const groupQuery = {
         _id: group._id,
@@ -2612,6 +2631,493 @@ export async function createGroupFromFindMatch(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to create group from compatible FIND match',
+      error: err.message
+    });
+  }
+}
+
+/**
+ * @route   POST /api/groups/:groupId/join
+ * @desc    Directly joins an open Shared Ride Group without requiring approval
+ * @access  Protected
+ */
+export async function directJoinSharedRideGroup(req, res) {
+  try {
+    const { groupId, id } = req.params;
+    const targetGroupId = groupId || id;
+    const studentId = req.userId;
+    const { travelId, requesterTravelId } = req.body;
+    const rawTravelId = travelId || requesterTravelId;
+
+    if (!studentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user ID'
+      });
+    }
+
+    if (!targetGroupId || !mongoose.Types.ObjectId.isValid(targetGroupId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group ID format'
+      });
+    }
+
+    if (!rawTravelId || !mongoose.Types.ObjectId.isValid(rawTravelId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'An active FIND travel post ID (travelId) is required to join a shared group'
+      });
+    }
+
+    // 1. Fetch group & travel outside session for quick initial validation
+    const group = await SharedRideGroup.findById(targetGroupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shared ride group not found'
+      });
+    }
+
+    const now = new Date();
+    if (group.status !== 'open') {
+      return res.status(400).json({
+        success: false,
+        message: group.status === 'full' ? 'Group is already full' : 'Group is not open for joining'
+      });
+    }
+
+    if (group.expiresAt && new Date(group.expiresAt) <= now) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot join an expired group'
+      });
+    }
+
+    if (group.adminId === studentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You are the admin of this group and cannot join it again'
+      });
+    }
+
+    if (Array.isArray(group.members) && group.members.some((m) => m.userId === studentId)) {
+      return res.status(409).json({
+        success: false,
+        message: 'You are already a confirmed member of this group'
+      });
+    }
+
+    // Check if student is already a confirmed member of ANY active group
+    const existingActiveGroup = await SharedRideGroup.findOne({
+      status: { $in: ['open', 'full'] },
+      'members.userId': studentId
+    });
+    if (existingActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: 'You are already a confirmed member of an active Shared Ride Group. You must leave that group before joining another.'
+      });
+    }
+
+    if (Array.isArray(group.members) && group.members.length >= group.targetCapacity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group has already reached its target capacity'
+      });
+    }
+
+    // 2. Fetch and validate candidate travel post
+    const travel = await Travel.findById(rawTravelId);
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate travel post not found'
+      });
+    }
+
+    if (travel.userId !== studentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only join with your own travel post'
+      });
+    }
+
+    if (travel.type !== 'request') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only FIND (request) posts are eligible to join a shared ride group'
+      });
+    }
+
+    if (travel.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot join with an inactive travel post'
+      });
+    }
+
+    if (travel.expiresAt && new Date(travel.expiresAt) <= now) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot join with an expired travel post'
+      });
+    }
+
+    // 2b. Fetch and validate original FIND post referenced by originatingTravelId
+    const originalFind = await Travel.findById(group.originatingTravelId);
+    if (!originalFind) {
+      return res.status(404).json({
+        success: false,
+        message: 'Original originating FIND post for this group not found'
+      });
+    }
+
+    if (originalFind.status === 'expired' || (originalFind.expiresAt && new Date(originalFind.expiresAt) <= now)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot join because the original originating FIND post for this group has expired'
+      });
+    }
+
+    // 3. Validate route and schedule compatibility strictly anchored to the original FIND post
+    if (!isSameDirection(originalFind.source, originalFind.destination, travel.source, travel.destination)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incompatible travel route or direction with original group proposal'
+      });
+    }
+
+    if (!isSameCalendarDay(originalFind.travelDate, travel.travelDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Travel dates must be on the same calendar day (Asia/Kolkata)'
+      });
+    }
+
+    if (!isDepartureTimeCompatible(originalFind.departureTime, travel.departureTime, 420)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Departure time exceeds the maximum 420-minute tolerance window from original FIND'
+      });
+    }
+
+    // 4. Fetch joining student profile for safe notification
+    const studentProfile = await Student.findOne(
+      { clerkId: studentId },
+      { name: 1, college: 1, imageUrl: 1, avatarId: 1, _id: 0 }
+    ).lean();
+
+    // 5. Execute atomic join inside transaction session
+    const updatedGroup = await runInTransaction(async (session) => {
+      const q = { _id: targetGroupId };
+      const currentGroup = session
+        ? await SharedRideGroup.findOne(q).session(session)
+        : await SharedRideGroup.findOne(q);
+
+      if (!currentGroup) {
+        const notFoundErr = new Error('Shared ride group not found');
+        notFoundErr.statusCode = 404;
+        throw notFoundErr;
+      }
+
+      if (currentGroup.status !== 'open') {
+        const statusErr = new Error(
+          currentGroup.status === 'full' ? 'Group is already full' : 'Group is not open for joining'
+        );
+        statusErr.statusCode = 400;
+        throw statusErr;
+      }
+
+      if (currentGroup.expiresAt && new Date(currentGroup.expiresAt) <= new Date()) {
+        const expErr = new Error('Cannot join an expired group');
+        expErr.statusCode = 400;
+        throw expErr;
+      }
+
+      if (currentGroup.adminId === studentId) {
+        const adminErr = new Error('You are the admin of this group and cannot join it again');
+        adminErr.statusCode = 400;
+        throw adminErr;
+      }
+
+      if (Array.isArray(currentGroup.members) && currentGroup.members.some((m) => m.userId === studentId)) {
+        const dupErr = new Error('You are already a confirmed member of this group');
+        dupErr.statusCode = 409;
+        throw dupErr;
+      }
+
+      // Inside transaction: verify student is not already a member of any other active group
+      const studentActiveGroupTx = session
+        ? await SharedRideGroup.findOne({
+            _id: { $ne: targetGroupId },
+            status: { $in: ['open', 'full'] },
+            'members.userId': studentId
+          }).session(session)
+        : await SharedRideGroup.findOne({
+            _id: { $ne: targetGroupId },
+            status: { $in: ['open', 'full'] },
+            'members.userId': studentId
+          });
+
+      if (studentActiveGroupTx) {
+        const activeGrpErr = new Error('You are already a confirmed member of an active Shared Ride Group. You must leave that group before joining another.');
+        activeGrpErr.statusCode = 409;
+        throw activeGrpErr;
+      }
+
+      // Inside transaction: verify original originating FIND post is still valid and unexpired
+      const txOriginalFind = session
+        ? await Travel.findById(currentGroup.originatingTravelId).session(session)
+        : await Travel.findById(currentGroup.originatingTravelId);
+
+      if (!txOriginalFind || txOriginalFind.status === 'expired' || (txOriginalFind.expiresAt && new Date(txOriginalFind.expiresAt) <= new Date())) {
+        const origExpErr = new Error('Cannot join because the original originating FIND post for this group has expired');
+        origExpErr.statusCode = 400;
+        throw origExpErr;
+      }
+
+      const currentCount = Array.isArray(currentGroup.members) ? currentGroup.members.length : 0;
+      if (currentCount >= currentGroup.targetCapacity) {
+        const fullErr = new Error('Group has already reached its target capacity');
+        fullErr.statusCode = 400;
+        throw fullErr;
+      }
+
+      // Add student to members
+      currentGroup.members.push({
+        userId: studentId,
+        travelId: travel._id,
+        role: 'member',
+        joinedAt: new Date()
+      });
+
+      // If capacity reached, transition status to 'full'
+      if (currentGroup.members.length >= currentGroup.targetCapacity) {
+        currentGroup.status = 'full';
+      }
+
+      await currentGroup.save(session ? { session } : {});
+
+      // Notify group admin of direct member arrival
+      try {
+        await createOutboxEvent({
+          eventType: NOTIFICATION_JOB_TYPES.GROUP_MEMBER_JOINED,
+          recipientId: currentGroup.adminId,
+          relatedTravelId: currentGroup.originatingTravelId,
+          payload: {
+            groupId: currentGroup._id,
+            source: currentGroup.source,
+            destination: currentGroup.destination,
+            travelDate: currentGroup.travelDate,
+            departureTime: currentGroup.departureTime,
+            memberName: studentProfile?.name || 'A fellow student',
+            targetCapacity: currentGroup.targetCapacity,
+            currentMembers: currentGroup.members.length,
+            route: `/groups/${currentGroup._id}`,
+            navigationUrl: `/groups/${currentGroup._id}`
+          }
+        }, session);
+      } catch (evtErr) {
+        console.warn('[DirectJoin] Outbox notification event creation warning:', evtErr.message);
+      }
+
+      return currentGroup;
+    });
+
+    try {
+      triggerOutboxSweep();
+    } catch {}
+
+    return res.status(200).json({
+      success: true,
+      message: 'Successfully joined shared ride group',
+      data: updatedGroup
+    });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({
+        success: false,
+        message: err.message
+      });
+    }
+    console.error('[SharedRideGroup] Error joining group directly:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to join shared ride group',
+      error: err.message
+    });
+  }
+}
+
+/**
+ * @route   POST /api/groups/:groupId/leave
+ * @desc    Leave a Shared Ride Group dynamically without affecting the FIND post
+ * @access  Protected
+ */
+export async function leaveSharedRideGroup(req, res) {
+  try {
+    const { groupId, id } = req.params;
+    const targetGroupId = groupId || id;
+    const studentId = req.userId;
+
+    if (!studentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user ID'
+      });
+    }
+
+    if (!targetGroupId || !mongoose.Types.ObjectId.isValid(targetGroupId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group ID format'
+      });
+    }
+
+    // 1. Initial check
+    const group = await SharedRideGroup.findById(targetGroupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shared ride group not found'
+      });
+    }
+
+    const isMember = Array.isArray(group.members) && group.members.some((m) => m.userId === studentId);
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a confirmed member of this shared ride group'
+      });
+    }
+
+    const leavingStudent = await Student.findOne(
+      { clerkId: studentId },
+      { name: 1, college: 1, _id: 0 }
+    ).lean();
+
+    // 2. Perform leave and admin transfer inside transaction
+    const updatedGroup = await runInTransaction(async (session) => {
+      const q = { _id: targetGroupId };
+      const currentGroup = session
+        ? await SharedRideGroup.findOne(q).session(session)
+        : await SharedRideGroup.findOne(q);
+
+      if (!currentGroup) {
+        const notFoundErr = new Error('Shared ride group not found');
+        notFoundErr.statusCode = 404;
+        throw notFoundErr;
+      }
+
+      const memberIdx = currentGroup.members.findIndex((m) => m.userId === studentId);
+      if (memberIdx === -1) {
+        const notMemberErr = new Error('You are not a confirmed member of this shared ride group');
+        notMemberErr.statusCode = 403;
+        throw notMemberErr;
+      }
+
+      const wasAdmin = currentGroup.adminId === studentId;
+
+      // Remove the member
+      currentGroup.members.splice(memberIdx, 1);
+
+      const remainingMembersCount = currentGroup.members.length;
+
+      if (wasAdmin) {
+        if (remainingMembersCount > 0) {
+          // Promote earliest joined member to admin
+          currentGroup.members.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+          const newAdmin = currentGroup.members[0];
+          newAdmin.role = 'admin';
+          currentGroup.adminId = newAdmin.userId;
+
+          // Reopen if group was full
+          const now = new Date();
+          if (currentGroup.members.length < currentGroup.targetCapacity && new Date(currentGroup.expiresAt) > now) {
+            currentGroup.status = 'open';
+          }
+
+          // Notify promoted admin
+          try {
+            await createOutboxEvent({
+              eventType: NOTIFICATION_JOB_TYPES.GROUP_ADMIN_PROMOTED,
+              recipientId: newAdmin.userId,
+              relatedTravelId: currentGroup.originatingTravelId,
+              payload: {
+                groupId: currentGroup._id,
+                source: currentGroup.source,
+                destination: currentGroup.destination,
+                travelDate: currentGroup.travelDate,
+                route: `/groups/${currentGroup._id}`,
+                navigationUrl: `/groups/${currentGroup._id}`
+              }
+            }, session);
+          } catch (promoteEvtErr) {
+            console.warn('[LeaveGroup] Promoted admin event warning:', promoteEvtErr.message);
+          }
+        } else {
+          // No members left: close group
+          currentGroup.status = 'cancelled';
+        }
+      } else {
+        // Non-admin member left
+        const now = new Date();
+        if (remainingMembersCount > 0) {
+          // If group was full, reopen it
+          if (currentGroup.members.length < currentGroup.targetCapacity && new Date(currentGroup.expiresAt) > now) {
+            currentGroup.status = 'open';
+          }
+
+          // Notify group admin that a member left
+          try {
+            await createOutboxEvent({
+              eventType: NOTIFICATION_JOB_TYPES.GROUP_MEMBER_LEFT,
+              recipientId: currentGroup.adminId,
+              relatedTravelId: currentGroup.originatingTravelId,
+              payload: {
+                groupId: currentGroup._id,
+                source: currentGroup.source,
+                destination: currentGroup.destination,
+                travelDate: currentGroup.travelDate,
+                memberName: leavingStudent?.name || 'A student',
+                route: `/groups/${currentGroup._id}`,
+                navigationUrl: `/groups/${currentGroup._id}`
+              }
+            }, session);
+          } catch (leftEvtErr) {
+            console.warn('[LeaveGroup] Member left event warning:', leftEvtErr.message);
+          }
+        } else {
+          // No members left
+          currentGroup.status = 'cancelled';
+        }
+      }
+
+      await currentGroup.save(session ? { session } : {});
+      return currentGroup;
+    });
+
+    try {
+      triggerOutboxSweep();
+    } catch {}
+
+    return res.status(200).json({
+      success: true,
+      message: 'You have left the group. You can still find normal ride offers.',
+      data: updatedGroup
+    });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({
+        success: false,
+        message: err.message
+      });
+    }
+    console.error('[SharedRideGroup] Error leaving group:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to leave shared ride group',
       error: err.message
     });
   }

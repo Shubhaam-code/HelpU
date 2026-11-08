@@ -37,19 +37,24 @@ export function DatePickerModal({
   isOpen,
   onClose,
   value,
+  selectedDate,
   onChange,
+  onSelectDate,
   title = "Select Travel Date"
 }) {
+  const actualValue = value || selectedDate;
+  const actualOnChange = onChange || onSelectDate;
+
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toDateStr(today), [today]);
 
   // Selected date state
-  const selectedDateStr = value || todayStr;
+  const selectedDateStr = actualValue || todayStr;
 
   // Currently viewed month/year in the calendar
   const [viewDate, setViewDate] = useState(() => {
-    if (value) {
-      const [y, m] = value.split('-').map(Number);
+    if (actualValue) {
+      const [y, m] = actualValue.split('-').map(Number);
       return new Date(y, m - 1, 1);
     }
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -135,7 +140,9 @@ export function DatePickerModal({
 
   const handleSelect = (dateStr) => {
     if (!dateStr || dateStr < todayStr) return;
-    onChange(dateStr);
+    if (typeof actualOnChange === 'function') {
+      actualOnChange(dateStr);
+    }
   };
 
   if (!isOpen) return null;

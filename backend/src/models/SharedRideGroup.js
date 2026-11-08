@@ -155,13 +155,13 @@ sharedRideGroupSchema.virtual('isFull').get(function () {
 
 // Pre-validate hook:
 // 1. Calculate expiresAt from travelDate if missing
-// 2. Ensure creator is automatically initialized as admin in members list if members array is empty
+// 2. Ensure creator is automatically initialized as admin in members list on creation if members array is empty
 sharedRideGroupSchema.pre('validate', function () {
   if (this.travelDate && !this.expiresAt) {
     this.expiresAt = calculateExpiresAt(this.travelDate);
   }
 
-  if (Array.isArray(this.members) && this.members.length === 0 && this.adminId && this.originatingTravelId) {
+  if (this.isNew && Array.isArray(this.members) && this.members.length === 0 && this.adminId && this.originatingTravelId) {
     this.members.push({
       userId: this.adminId,
       travelId: this.originatingTravelId,

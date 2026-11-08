@@ -4,6 +4,8 @@ import { requireAuth } from '../middlewares/auth.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
 import Student from '../models/Student.js';
 import Booking from '../models/Booking.js';
+import SharedRideGroup from '../models/SharedRideGroup.js';
+import GroupJoinRequest from '../models/GroupJoinRequest.js';
 import { createOutboxEvent, triggerOutboxSweep } from '../services/outbox.service.js';
 import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
 import { 
@@ -59,7 +61,101 @@ export async function expireOverdueRidesAndNotify(filterUserId = null) {
       console.warn('[Expiry] Outbox sweep warning:', sweepErr.message);
     }
   }
+
+  // Also expire any overdue shared ride groups
+  try {
+    await expireOverdueGroupsAndNotify();
+  } catch (groupExpErr) {
+    console.warn('[Expiry] Group expiry check warning:', groupExpErr.message);
+  }
+
   return overdue.length;
+}
+
+/**
+ * Automatically marks active groups past expiresAt (or whose original originating FIND post has expired)
+ * as expired, prevents further joins, excludes them from discovery, and creates idempotent Outbox notifications
+ * for all confirmed members.
+ */
+export async function expireOverdueGroupsAndNotify() {
+  const now = new Date();
+
+  // 1. Groups past their own expiresAt or past travelDate
+  const overdueGroups = await SharedRideGroup.find({
+    status: { $in: ['open', 'full'] },
+    $or: [
+      { expiresAt: { $lte: now } },
+      { travelDate: { $lt: now } }
+    ]
+  });
+
+  const overdueGroupIds = new Set(overdueGroups.map((g) => g._id.toString()));
+
+  // 2. Groups whose original originating FIND post is expired or past expiresAt
+  const remainingGroups = await SharedRideGroup.find({
+    _id: { $nin: Array.from(overdueGroupIds) },
+    status: { $in: ['open', 'full'] }
+  });
+
+  const originatingIds = remainingGroups.map((g) => g.originatingTravelId).filter(Boolean);
+  const expiredTravels = await Travel.find({
+    _id: { $in: originatingIds },
+    $or: [{ status: 'expired' }, { expiresAt: { $lte: now } }]
+  }).select('_id');
+  const expiredTravelIdSet = new Set(expiredTravels.map((t) => t._id.toString()));
+
+  const groupsToClose = [
+    ...overdueGroups,
+    ...remainingGroups.filter((g) => expiredTravelIdSet.has(g.originatingTravelId?.toString()))
+  ];
+
+  if (groupsToClose.length === 0) return 0;
+
+  for (const group of groupsToClose) {
+    group.status = 'expired';
+    await group.save();
+
+    // Expire any pending join requests or invitations for this group
+    await GroupJoinRequest.updateMany(
+      { groupId: group._id, status: 'pending' },
+      { $set: { status: 'expired' } }
+    ).catch(() => {});
+
+    // Notify all confirmed members idempotently using deterministic eventId
+    if (Array.isArray(group.members) && group.members.length > 0) {
+      for (const member of group.members) {
+        const eventId = `group_expired_${group._id}_${member.userId}`;
+        try {
+          await createOutboxEvent({
+            eventId,
+            eventType: NOTIFICATION_JOB_TYPES.GROUP_CLOSED,
+            recipientId: member.userId,
+            relatedTravelId: group.originatingTravelId,
+            payload: {
+              groupId: group._id,
+              title: 'Shared group expired',
+              message: `Your shared ride group (${group.source} → ${group.destination}) has expired.`,
+              reason: 'expired',
+              source: group.source,
+              destination: group.destination,
+              travelDate: group.travelDate,
+              route: `/groups/${group._id}`,
+              navigationUrl: `/groups/${group._id}`
+            }
+          });
+        } catch (evtErr) {
+          // Idempotent: ignore duplicate key errors if event was already emitted
+          console.warn(`[Group Expiry] Event warning for ${eventId}:`, evtErr.message);
+        }
+      }
+    }
+  }
+
+  try {
+    triggerOutboxSweep();
+  } catch {}
+
+  return groupsToClose.length;
 }
 
 const router = express.Router();
@@ -992,13 +1088,20 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
     // 4. Run matching engine
     const matches = await findMatchesForTravel(travel);
 
-    // 5. If this is a FIND post (type: 'request'), discover compatible Shared Ride Groups
+    // 5. If this is a FIND post (type: 'request'), discover compatible Shared Ride Groups AND compatible FIND peers
     let sharedRideGroups = [];
+    let compatibleFinds = [];
     if (travel.type === 'request') {
       try {
         sharedRideGroups = await findCompatibleGroupsForFindPost(travel, req.userId);
       } catch (groupMatchErr) {
         console.warn('[Travel Matches] Non-fatal shared group matching error:', groupMatchErr.message);
+      }
+
+      try {
+        compatibleFinds = await findCompatibleFindPosts(travel);
+      } catch (findMatchErr) {
+        console.warn('[Travel Matches] Non-fatal compatible find matching error:', findMatchErr.message);
       }
     }
 
@@ -1007,7 +1110,9 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
       count: matches.length,
       data: matches,
       sharedRideGroups,
-      sharedRideGroupsCount: sharedRideGroups.length
+      sharedRideGroupsCount: sharedRideGroups.length,
+      compatibleFinds,
+      compatibleFindsCount: compatibleFinds.length
     });
   } catch (error) {
     console.error('Error finding travel matches:', error);

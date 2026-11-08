@@ -2,8 +2,8 @@
 
 @theme {
   --color-navy: #17233C;
-  --color-coral: #FF5B37;
-  --color-cream: #FEF3EF;
+  --color-coral: #FF572E;
+  --color-cream: #FFF8F3;
   --color-mint: #C9F2DE;
   --color-sky: #BBDFFF;
   --color-peach: #FFE4D3;
@@ -24,15 +24,123 @@ html, body {
   color: var(--color-navy);
   -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
-/* Root styling - responsive full width with cream background */
+/* Root styling - responsive full width with warm cream background */
 #root {
   width: 100%;
   min-height: 100dvh;
   position: relative;
   background-color: var(--color-cream);
   overflow-x: hidden;
+}
+
+/* Helpu Design System Reusable Component Utility Classes */
+.helpu-card {
+  background-color: #FFFFFF;
+  border-radius: 1.5rem;
+  border: 1px solid #F4E3D8;
+  box-shadow: 0 1px 3px rgba(23, 35, 60, 0.04);
+  transition: all 0.2s ease;
+}
+
+.helpu-card-interactive {
+  background-color: #FFFFFF;
+  border-radius: 1.5rem;
+  border: 1px solid #F4E3D8;
+  box-shadow: 0 1px 3px rgba(23, 35, 60, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+.helpu-card-interactive:hover {
+  border-color: rgba(255, 87, 46, 0.35);
+  box-shadow: 0 4px 16px rgba(255, 87, 46, 0.06);
+}
+.helpu-card-interactive:active {
+  transform: scale(0.99);
+}
+
+.helpu-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 2.75rem;
+  border-radius: 0.875rem;
+  background-color: #FF572E;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  box-shadow: 0 2px 8px rgba(255, 87, 46, 0.25);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.helpu-btn-primary:hover:not(:disabled) {
+  background-color: #E64A22;
+  box-shadow: 0 4px 14px rgba(255, 87, 46, 0.35);
+}
+.helpu-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.helpu-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.helpu-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 2.75rem;
+  border-radius: 0.875rem;
+  background-color: #FFFFFF;
+  color: #17233C;
+  border: 1px solid #F4E3D8;
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  box-shadow: 0 1px 2px rgba(23, 35, 60, 0.03);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.helpu-btn-secondary:hover:not(:disabled) {
+  background-color: #FFF9F5;
+  border-color: rgba(255, 87, 46, 0.3);
+}
+.helpu-btn-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.helpu-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.helpu-input {
+  width: 100%;
+  border-radius: 0.875rem;
+  background-color: #FFFFFF;
+  border: 1px solid #F4E3D8;
+  padding: 0.7rem 1rem;
+  min-height: 2.85rem;
+  font-size: 0.875rem;
+  color: #17233C;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.helpu-input::placeholder {
+  color: #8C93A4;
+}
+.helpu-input:focus {
+  border-color: #FF572E;
+  box-shadow: 0 0 0 3px rgba(255, 87, 46, 0.15);
 }
 
 /* Mobile-only container clamp when viewing on mobile screen */

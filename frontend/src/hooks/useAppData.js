@@ -1,26 +1,56 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   getProfile, 
+  saveProfile,
+  updateProfile,
   getMyTravels, 
   getUserMatches, 
   getUnreadCount,
   getNotifications,
+  markRead,
+  markAllRead,
   getTravels,
   getTravelById,
+  createTravel,
+  updateTravel,
+  deleteTravel,
+  cancelTravel,
   getMyBookings,
   getReceivedBookings,
   getConfirmedBookings,
+  createBooking,
+  confirmBooking,
+  cancelBooking,
+  respondBooking,
+  completeBooking,
   getCommunityPosts,
   getMySharedRideGroups,
   discoverSharedRideGroups,
   getSharedRideGroupById,
+  createSharedRideGroup,
+  createGroupFromFindMatch,
+  directJoinSharedRideGroup,
+  leaveSharedRideGroup,
   getReceivedInvitations,
+  acceptGroupInvitation,
+  rejectGroupInvitation,
   getGroupJoinRequests,
+  acceptStudentJoinRequest,
+  rejectStudentJoinRequest,
   getGroupInvites,
+  inviteStudentToGroup,
   getTravelMatches,
   getCompatibleFinds
 } from '../lib/api';
-import { QUERY_KEYS } from '../lib/queryClient';
+import { 
+  QUERY_KEYS, 
+  CACHE_DURATIONS,
+  invalidateBookingQueries,
+  invalidateRideQueries,
+  invalidateGroupQueries,
+  invalidateProfileQueries,
+  invalidateNotificationQueries
+} from '../lib/queryClient';
 import { useUser } from '../context/FirebaseAuthContext';
 
 /**
@@ -35,7 +65,7 @@ export function useUserProfile() {
       return res.data?.data || null;
     },
     enabled: Boolean(user?.id),
-    staleTime: 60 * 1000 // 1 minute
+    ...CACHE_DURATIONS.PROFILE
   });
 }
 
@@ -52,7 +82,7 @@ export function useMyTravels() {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.MY_RIDES
   });
 }
 
@@ -84,8 +114,7 @@ export function useUserMatches() {
       return Array.isArray(data?.matches) ? data.matches : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 45 * 1000,
-    gcTime: 10 * 60 * 1000
+    ...CACHE_DURATIONS.HOME_MATCHES
   });
 }
 
@@ -113,8 +142,7 @@ export function useUserMatchesData() {
       };
     },
     enabled: Boolean(user?.id),
-    staleTime: 45 * 1000,
-    gcTime: 10 * 60 * 1000
+    ...CACHE_DURATIONS.HOME_MATCHES
   });
 }
 
@@ -131,7 +159,7 @@ export function useNotificationsList(params = {}) {
       return Array.isArray(items) ? items : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.NOTIFICATIONS
   });
 }
 
@@ -147,7 +175,7 @@ export function useUnreadNotificationsCount() {
       return res.data?.data?.count || 0;
     },
     enabled: Boolean(user?.id),
-    staleTime: 20 * 1000
+    ...CACHE_DURATIONS.UNREAD_COUNT
   });
 }
 
@@ -162,7 +190,7 @@ export function useTravels(params = {}) {
       const list = res.data?.data || res.data?.travels || res.data || [];
       return Array.isArray(list) ? list : [];
     },
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.MY_RIDES
   });
 }
 
@@ -178,7 +206,7 @@ export function useTravelDetails(id) {
       return res.data?.data || res.data?.travel || res.data || null;
     },
     enabled: Boolean(id),
-    staleTime: 45 * 1000
+    ...CACHE_DURATIONS.MY_RIDES
   });
 }
 
@@ -195,7 +223,7 @@ export function useMyBookings() {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.BOOKINGS
   });
 }
 
@@ -212,7 +240,7 @@ export function useReceivedBookings() {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.BOOKINGS
   });
 }
 
@@ -236,7 +264,7 @@ export function useConfirmedBookings() {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.BOOKINGS
   });
 }
 
@@ -253,7 +281,7 @@ export function useMySharedRideGroups() {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 15 * 1000
+    ...CACHE_DURATIONS.SHARED_GROUPS
   });
 }
 
@@ -271,7 +299,7 @@ export function useDiscoverSharedRideGroups(travelId) {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id && travelId),
-    staleTime: 15 * 1000
+    ...CACHE_DURATIONS.SHARED_GROUPS
   });
 }
 
@@ -289,7 +317,7 @@ export function useCompatibleFinds(travelId) {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id && travelId),
-    staleTime: 15 * 1000
+    ...CACHE_DURATIONS.SHARED_GROUPS
   });
 }
 
@@ -305,7 +333,7 @@ export function useSharedRideGroupDetails(groupId) {
       return res.data?.data || null;
     },
     enabled: Boolean(groupId),
-    staleTime: 15 * 1000
+    ...CACHE_DURATIONS.GROUP_DETAILS
   });
 }
 
@@ -322,7 +350,7 @@ export function useReceivedGroupInvitations() {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(user?.id),
-    staleTime: 15 * 1000
+    ...CACHE_DURATIONS.INVITATIONS
   });
 }
 
@@ -339,7 +367,7 @@ export function useGroupJoinRequests(groupId, enabled = true) {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(groupId && enabled),
-    staleTime: 10 * 1000
+    ...CACHE_DURATIONS.INVITATIONS
   });
 }
 
@@ -356,7 +384,7 @@ export function useGroupSentInvites(groupId, enabled = true) {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(groupId && enabled),
-    staleTime: 10 * 1000
+    ...CACHE_DURATIONS.INVITATIONS
   });
 }
 
@@ -373,7 +401,335 @@ export function useOriginatingTravelMatches(travelId, enabled = true) {
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(travelId && enabled),
-    staleTime: 30 * 1000
+    ...CACHE_DURATIONS.HOME_MATCHES
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MUTATION HOOKS WITH TARGETED CACHE INVALIDATION & DATA CONSISTENCY
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Hook to create a ride booking with automatic cache invalidation.
+ */
+export function useCreateBookingMutation(options = {}) {
+  return useMutation({
+    mutationFn: (payload) => createBooking(payload),
+    onSuccess: (data, variables, context) => {
+      invalidateBookingQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCreateBookingMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to cancel a booking with automatic cache invalidation and seat restoration.
+ */
+export function useCancelBookingMutation(options = {}) {
+  return useMutation({
+    mutationFn: (bookingId) => cancelBooking(bookingId),
+    onSuccess: (data, variables, context) => {
+      invalidateBookingQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCancelBookingMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to confirm a booking with automatic cache invalidation and atomic seat reservation.
+ */
+export function useConfirmBookingMutation(options = {}) {
+  return useMutation({
+    mutationFn: (bookingId) => confirmBooking(bookingId),
+    onSuccess: (data, variables, context) => {
+      invalidateBookingQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useConfirmBookingMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to respond to a booking (accept/reject) with automatic cache invalidation.
+ */
+export function useRespondBookingMutation(options = {}) {
+  return useMutation({
+    mutationFn: ({ bookingId, action }) => respondBooking(bookingId, { action }),
+    onSuccess: (data, variables, context) => {
+      invalidateBookingQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useRespondBookingMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to complete a booking with automatic cache invalidation.
+ */
+export function useCompleteBookingMutation(options = {}) {
+  return useMutation({
+    mutationFn: (bookingId) => completeBooking(bookingId),
+    onSuccess: (data, variables, context) => {
+      invalidateBookingQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCompleteBookingMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to create a travel post (OFFER or FIND) with automatic cache invalidation.
+ */
+export function useCreateTravelMutation(options = {}) {
+  return useMutation({
+    mutationFn: (payload) => createTravel(payload),
+    onSuccess: (data, variables, context) => {
+      invalidateRideQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCreateTravelMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to update a travel post with automatic cache invalidation.
+ */
+export function useUpdateTravelMutation(options = {}) {
+  return useMutation({
+    mutationFn: ({ travelId, payload }) => updateTravel(travelId, payload),
+    onSuccess: (data, variables, context) => {
+      invalidateRideQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useUpdateTravelMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to cancel a travel post with automatic cache invalidation.
+ */
+export function useCancelTravelMutation(options = {}) {
+  return useMutation({
+    mutationFn: (travelId) => cancelTravel(travelId),
+    onSuccess: (data, variables, context) => {
+      invalidateRideQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCancelTravelMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to delete a travel post with automatic cache invalidation.
+ */
+export function useDeleteTravelMutation(options = {}) {
+  return useMutation({
+    mutationFn: (travelId) => deleteTravel(travelId),
+    onSuccess: (data, variables, context) => {
+      invalidateRideQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useDeleteTravelMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to create a Shared Ride Group with automatic cache invalidation.
+ */
+export function useCreateSharedRideGroupMutation(options = {}) {
+  return useMutation({
+    mutationFn: (payload) => createSharedRideGroup(payload),
+    onSuccess: (data, variables, context) => {
+      invalidateGroupQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCreateSharedRideGroupMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to create a Shared Ride Group from a FIND match proposal with automatic cache invalidation.
+ */
+export function useCreateGroupFromMatchMutation(options = {}) {
+  return useMutation({
+    mutationFn: (payload) => createGroupFromFindMatch(payload),
+    onSuccess: (data, variables, context) => {
+      invalidateGroupQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useCreateGroupFromMatchMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to directly join a Shared Ride Group with automatic cache invalidation.
+ */
+export function useDirectJoinGroupMutation(options = {}) {
+  return useMutation({
+    mutationFn: ({ groupId, payload }) => directJoinSharedRideGroup(groupId, payload),
+    onSuccess: (data, variables, context) => {
+      invalidateGroupQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useDirectJoinGroupMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to leave a Shared Ride Group with automatic cache invalidation.
+ */
+export function useLeaveGroupMutation(options = {}) {
+  return useMutation({
+    mutationFn: (groupId) => leaveSharedRideGroup(groupId),
+    onSuccess: (data, variables, context) => {
+      invalidateGroupQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useLeaveGroupMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to accept a group invitation with automatic cache invalidation.
+ */
+export function useAcceptGroupInvitationMutation(options = {}) {
+  return useMutation({
+    mutationFn: (requestId) => acceptGroupInvitation(requestId),
+    onSuccess: (data, variables, context) => {
+      invalidateGroupQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useAcceptGroupInvitationMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to reject a group invitation with automatic cache invalidation.
+ */
+export function useRejectGroupInvitationMutation(options = {}) {
+  return useMutation({
+    mutationFn: (requestId) => rejectGroupInvitation(requestId),
+    onSuccess: (data, variables, context) => {
+      invalidateGroupQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useRejectGroupInvitationMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to save or update student profile with automatic cache invalidation.
+ */
+export function useSaveProfileMutation(options = {}) {
+  return useMutation({
+    mutationFn: (payload) => saveProfile(payload),
+    onSuccess: (data, variables, context) => {
+      invalidateProfileQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useSaveProfileMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to mark a notification as read with automatic cache invalidation.
+ */
+export function useMarkNotificationReadMutation(options = {}) {
+  return useMutation({
+    mutationFn: (notifId) => markRead(notifId),
+    onSuccess: (data, variables, context) => {
+      invalidateNotificationQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useMarkNotificationReadMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
+  });
+}
+
+/**
+ * Hook to mark all notifications as read with automatic cache invalidation.
+ */
+export function useMarkAllNotificationsReadMutation(options = {}) {
+  return useMutation({
+    mutationFn: () => markAllRead(),
+    onSuccess: (data, variables, context) => {
+      invalidateNotificationQueries();
+      options.onSuccess?.(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      console.error('[useMarkAllNotificationsReadMutation] Error:', error);
+      options.onError?.(error, variables, context);
+    },
+    ...options
   });
 }
 
@@ -396,6 +752,25 @@ export default {
   useReceivedGroupInvitations,
   useGroupJoinRequests,
   useGroupSentInvites,
-  useOriginatingTravelMatches
+  useOriginatingTravelMatches,
+  // Mutations
+  useCreateBookingMutation,
+  useCancelBookingMutation,
+  useConfirmBookingMutation,
+  useRespondBookingMutation,
+  useCompleteBookingMutation,
+  useCreateTravelMutation,
+  useUpdateTravelMutation,
+  useCancelTravelMutation,
+  useDeleteTravelMutation,
+  useCreateSharedRideGroupMutation,
+  useCreateGroupFromMatchMutation,
+  useDirectJoinGroupMutation,
+  useLeaveGroupMutation,
+  useAcceptGroupInvitationMutation,
+  useRejectGroupInvitationMutation,
+  useSaveProfileMutation,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation
 };
 

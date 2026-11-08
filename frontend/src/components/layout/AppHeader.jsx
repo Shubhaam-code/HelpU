@@ -3,7 +3,24 @@ import { Bell, ArrowLeft } from 'lucide-react';
 import { useUser } from '../../context/FirebaseAuthContext';
 import { Avatar } from '../ui/Avatar';
 
-export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 0, showLogo = false }) {
+/**
+ * Helpu Mobile Application Header
+ * 
+ * Features:
+ * - Home header: Logo + Notification bell with unread badge + Direct profile access
+ * - Sub-page header: Back button with accessible touch target + Title + Optional right actions
+ * - Smooth backdrop blur & consistent border styling
+ */
+export function AppHeader({ 
+  title, 
+  backTo, 
+  avatarId, 
+  src, 
+  onBell, 
+  unreadCount = 0, 
+  showLogo = false,
+  rightAction = null 
+}) {
   const navigate = useNavigate();
   const { user } = useUser();
 
@@ -12,28 +29,40 @@ export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 
   // Sub-page header (with back button)
   if (title) {
     return (
-      <header className="flex items-center px-4 sm:px-5 py-2 sm:py-2.5 bg-cream/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]/50">
-        {backTo && (
-          <button
-            onClick={() => (backTo === -1 ? navigate(-1) : navigate(backTo))}
-            className="mr-2.5 p-1 -ml-1 text-navy hover:bg-white rounded-xl transition cursor-pointer"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-5 h-5 text-navy" />
-          </button>
+      <header className="flex items-center justify-between px-4 sm:px-5 py-2.5 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {backTo !== undefined && (
+            <button
+              type="button"
+              onClick={() => (backTo === -1 ? navigate(-1) : navigate(backTo))}
+              className="p-1.5 -ml-1.5 text-[#17233C] hover:bg-white rounded-xl border border-transparent hover:border-[#F4E3D8] transition-colors cursor-pointer shrink-0"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-5 h-5 text-[#17233C]" />
+            </button>
+          )}
+          <h1 className="font-extrabold text-[#17233C] text-base sm:text-lg truncate">
+            {title}
+          </h1>
+        </div>
+
+        {rightAction && (
+          <div className="shrink-0 ml-2">
+            {rightAction}
+          </div>
         )}
-        <h1 className="font-extrabold text-navy text-lg sm:text-xl flex-1 truncate">{title}</h1>
       </header>
     );
   }
 
-  // Main home header
+  // Main Home header
   return (
-    <header className="flex items-center justify-between px-4 sm:px-5 py-1.5 sm:py-2 bg-cream/90 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]/40">
-      {/* HelpU Logo from public folder (No plain text) */}
+    <header className="flex items-center justify-between px-4 sm:px-5 py-2 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
+      {/* HelpU Brand Logo */}
       <button 
+        type="button"
         onClick={() => navigate('/home')}
-        className="flex items-center shrink-0 focus:outline-none cursor-pointer transition-transform duration-200 active:scale-95 py-0.5"
+        className="flex items-center shrink-0 focus:outline-none cursor-pointer transition-transform duration-150 active:scale-95 py-0.5"
         aria-label="HelpU Home"
       >
         <img 
@@ -44,28 +73,32 @@ export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 
         />
       </button>
 
-      {/* Right actions */}
+      {/* Right actions: Notifications Bell + Header Profile Avatar */}
       <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
         {onBell && (
           <button
+            type="button"
             onClick={onBell}
-            className="relative p-1.5 text-navy hover:bg-white rounded-full transition-all duration-200 border border-[#F4E3D8]/80 bg-white/70 active:scale-95 focus:outline-none flex items-center justify-center cursor-pointer shadow-2xs"
+            className="relative p-2 text-[#17233C] bg-white hover:bg-[#FFF9F5] rounded-full transition-all duration-150 border border-[#F4E3D8] shadow-2xs active:scale-95 focus:outline-none flex items-center justify-center cursor-pointer"
             aria-label="Notifications"
           >
-            <Bell className="w-4.5 h-4.5 text-navy" />
+            <Bell className="w-4.5 h-4.5 text-[#17233C]" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-coral text-white text-[9px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-xs">
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#FF572E] text-white text-[9px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-xs">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
         )}
+
+        {/* Profile Avatar: One tap to /profile */}
         <button 
+          type="button"
           onClick={() => navigate('/profile')}
-          className="relative flex items-center p-0.5 rounded-full transition-all duration-200 hover:ring-2 hover:ring-coral/40 focus:outline-none cursor-pointer"
-          aria-label="User profile"
+          className="relative flex items-center p-0.5 rounded-full transition-all duration-150 hover:ring-2 hover:ring-[#FF572E]/40 focus:outline-none cursor-pointer active:scale-95"
+          aria-label="User Profile"
         >
-          <div className="relative rounded-full p-[1.5px] bg-gradient-to-tr from-coral/40 via-transparent to-coral/20">
+          <div className="relative rounded-full p-[1.5px] bg-gradient-to-tr from-[#FF572E]/40 via-transparent to-[#FF572E]/20">
             <Avatar 
               src={resolvedSrc} 
               name={user?.fullName || 'Student'} 
@@ -81,4 +114,3 @@ export function AppHeader({ title, backTo, avatarId, src, onBell, unreadCount = 
 }
 
 export default AppHeader;
-

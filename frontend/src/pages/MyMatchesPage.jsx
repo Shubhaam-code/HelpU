@@ -362,6 +362,39 @@ export default function MyMatchesPage() {
           )}
         </AnimatePresence>
 
+        {/* Smart FIND Matching & Shared Groups Callout Banner */}
+        {myTravels.some((t) => t.type === 'request') && (
+          <div className="bg-gradient-to-r from-white via-[#FFFBF8] to-[#FFF5EE] rounded-[22px] sm:rounded-[26px] p-4 sm:p-5 border border-[#FDE0D0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-[#FFE8DC] text-[#FF572E] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                <Sparkles className="w-5 h-5 text-[#FF572E]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    FIND Requests Active
+                  </span>
+                  <span className="text-[11px] font-bold text-[#17233C]">
+                    Offers, Shared Groups &amp; Compatible Students
+                  </span>
+                </div>
+                <p className="text-xs text-[#6E7587] leading-relaxed">
+                  Discover direct ride offers, join open cab groups, or team up with compatible peers heading your way.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/match/explore')}
+              className="shrink-0 px-4 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95 flex items-center gap-1.5"
+            >
+              <span>Explore by Post</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* ACTIVE TRAVELS CONTEXT & FILTER BAR                                       */}
         {/* ========================================================================= */}
@@ -448,7 +481,7 @@ export default function MyMatchesPage() {
               <p className="text-xs text-red-600 mt-1 max-w-sm mx-auto leading-relaxed">{error}</p>
             </div>
             <button
-              onClick={fetchMatches}
+              onClick={() => refetchMatches()}
               className="px-6 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <style>
+    html, body {
+      width: 390px !important;
+      max-width: 390px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+  </style>
+</head>
+<body style="background: yellow;">
+  <div style="width: 390px; height: 100vh; background: lightblue; border: 4px solid red; box-sizing: border-box;">
+    <h1 id="out" style="margin:0; font-size: 20px;"></h1>
+  </div>
+  <script>
+    document.getElementById('out').textContent = 'body.clientWidth: ' + document.body.clientWidth;
+  </script>
+</body>
+</html>
