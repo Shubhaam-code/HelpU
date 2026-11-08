@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LayoutGrid, Calendar, Car, Users, Heart, MessageSquare, Info, FileText 
+  LayoutGrid, Calendar, Car, Users, Heart, MessageSquare, Info, FileText, CarTaxiFront 
 } from 'lucide-react';
 
 // Illustration for sidebar promo widget matching desktop screenshot
@@ -46,6 +46,7 @@ export function DesktopSidebar({ onCloseMobile }) {
   const menuItems = [
     { label: 'Dashboard', path: '/home', icon: LayoutGrid },
     { label: 'Offers & Requests', path: '/rides/offer', icon: Car },
+    { label: 'Shared Rides', path: '/shared-rides', icon: CarTaxiFront },
     { label: 'Matches', path: '/match', icon: Users },
     { label: 'Saved Rides', path: '/saved', icon: Heart },
     { label: 'WhatsApp Connect', path: '/chat', icon: MessageSquare },

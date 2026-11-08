@@ -3,7 +3,30 @@ import { auth } from './firebase';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Determine API Base URL
+// When developing on localhost/127.0.0.1, prioritize local backend on port 5000 so new local APIs work out of the box
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.localStorage?.getItem('VITE_API_URL')) {
+    return window.localStorage.getItem('VITE_API_URL');
+  }
+
+  const envUrl = import.meta.env.VITE_API_URL;
+
+  // If running in browser on localhost or 127.0.0.1
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    if (envUrl && !envUrl.includes('onrender.com')) {
+      return envUrl;
+    }
+    return 'http://localhost:5000';
+  }
+
+  return envUrl || 'http://localhost:5000';
+};
+
+const BASE_URL = getBaseUrl();
 
 // Create an axios instance
 const apiClient = axios.create({
@@ -229,6 +252,33 @@ export const getHelpRequests = (params) => apiClient.get('/api/help/requests', {
 export const createHelpRequest = (data) => apiClient.post('/api/help/requests', data);
 export const getMyHelpRequests = () => apiClient.get('/api/help/requests/my');
 export const updateHelpStatus = (id, status) => apiClient.patch(`/api/help/requests/${id}/status`, { status });
+
+// ── Shared Ride Groups ────────────────────────────────────────────────────────
+export const createSharedRideGroup = (data) => apiClient.post('/api/groups', data);
+export const createGroupFromFindMatch = (data) => apiClient.post('/api/groups/from-match', data);
+export const getCompatibleFinds = (travelId) => apiClient.get(`/api/travels/${travelId}/compatible-finds`);
+export const getMySharedRideGroups = () => apiClient.get('/api/groups/my');
+export const getSharedRideGroupById = (id) => apiClient.get(`/api/groups/${id}`);
+export const discoverSharedRideGroups = (travelId) =>
+  apiClient.get('/api/groups/discover', { params: { travelId } });
+export const createGroupJoinRequest = (groupId, data) =>
+  apiClient.post(`/api/groups/${groupId}/join-requests`, data);
+export const getGroupJoinRequests = (groupId) =>
+  apiClient.get(`/api/groups/${groupId}/join-requests`);
+export const acceptStudentJoinRequest = (requestId) =>
+  apiClient.post(`/api/groups/join-requests/${requestId}/accept`);
+export const rejectStudentJoinRequest = (requestId) =>
+  apiClient.post(`/api/groups/join-requests/${requestId}/reject`);
+export const inviteStudentToGroup = (groupId, data) =>
+  apiClient.post(`/api/groups/${groupId}/invites`, data);
+export const getGroupInvites = (groupId) =>
+  apiClient.get(`/api/groups/${groupId}/invites`);
+export const getReceivedInvitations = () =>
+  apiClient.get('/api/groups/invitations/received');
+export const acceptGroupInvitation = (requestId) =>
+  apiClient.post(`/api/groups/invitations/${requestId}/accept`);
+export const rejectGroupInvitation = (requestId) =>
+  apiClient.post(`/api/groups/invitations/${requestId}/reject`);
 
 export default apiClient;
 

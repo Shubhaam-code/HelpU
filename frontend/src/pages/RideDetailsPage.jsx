@@ -129,6 +129,13 @@ export default function RideDetailsPage() {
   // 3. Computed calculations
   const isOffer = travel?.type === 'offer';
 
+  const isFulfilled = useMemo(() => {
+    if (isOffer || !travel) return false;
+    const hasConfirmedInReceived = postReceivedBookings?.some(b => ['accepted', 'confirmed', 'completed'].includes(b.status));
+    const hasConfirmedInMy = myBookings?.some(b => ['accepted', 'confirmed', 'completed'].includes(b.status) && (b.travelId?._id === travel._id || b.travelId === travel._id));
+    return Boolean(travel.isFulfilled || (travel.bookedSeats || 0) >= 1 || travel.status === 'completed' || hasConfirmedInReceived || hasConfirmedInMy);
+  }, [isOffer, travel, postReceivedBookings, myBookings]);
+
   const pricePerSeat = useMemo(() => {
     return typeof travel?.pricePerSeat === 'number' && travel.pricePerSeat >= 0
       ? travel.pricePerSeat
@@ -514,7 +521,9 @@ export default function RideDetailsPage() {
                 <p className="text-xs sm:text-sm text-[#6E7587] mt-1 font-medium">
                   {isOffer 
                     ? 'Review ride details, select seats, and coordinate directly with the student.'
-                    : 'Connect with this verified student looking for a travel buddy on this route.'}
+                    : (isFulfilled
+                        ? 'This student has found a ride! Ride booking is confirmed.'
+                        : 'Connect with this verified student looking for a travel buddy on this route.')}
                 </p>
               </div>
 
@@ -538,13 +547,21 @@ export default function RideDetailsPage() {
                     }`}>
                       {isOffer ? '🚗 Ride Offer' : '🙋 Find Ride'}
                     </span>
-                    {isOffer && (
+                    {isOffer ? (
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
                         maxAvailableSeats > 0 
                           ? 'bg-[#EAF8F0] border-[#BCECD4] text-[#16A34A]'
                           : 'bg-red-50 border-red-200 text-red-600'
                       }`}>
                         {maxAvailableSeats > 0 ? `${maxAvailableSeats} seats left` : 'FULL'}
+                      </span>
+                    ) : (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
+                        isFulfilled
+                          ? 'bg-[#EAF8F0] border-[#BCECD4] text-[#16A34A]'
+                          : 'bg-[#FFF4ED] border-[#FDE0D0] text-[#FF572E]'
+                      }`}>
+                        {isFulfilled ? '1 seat found' : '1 seat needed'}
                       </span>
                     )}
                   </div>
@@ -601,11 +618,11 @@ export default function RideDetailsPage() {
 
                   <div className="bg-[#FFFBF8] rounded-xl p-3 border border-[#F4E3D8]/70 col-span-2 sm:col-span-1">
                     <span className="text-[10px] font-bold text-[#6E7587] uppercase block">
-                      {isOffer ? 'Available Seats' : 'Seats Needed'}
+                      {isOffer ? 'Available Seats' : 'Seat Status'}
                     </span>
                     <span className="font-black text-xs sm:text-sm text-[#17233C] mt-0.5 flex items-center gap-1.5 truncate">
                       <Users className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                      <span>{isOffer ? `${maxAvailableSeats} available` : `${travel.seats || 1} requested`}</span>
+                      <span>{isOffer ? `${maxAvailableSeats} available` : (isFulfilled ? '1 seat found' : '1 seat needed')}</span>
                     </span>
                   </div>
                 </div>

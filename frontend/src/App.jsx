@@ -23,6 +23,8 @@ import MatchDetailsPage from './pages/MatchDetailsPage';
 import MatchSuccessPage from './pages/MatchSuccessPage';
 import ChatConversationPage from './pages/ChatConversationPage';
 import ProfilePage from './pages/ProfilePage';
+import SharedRidesPage from './pages/SharedRidesPage';
+import GroupDetailsPage from './pages/GroupDetailsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import CreatePage from './pages/CreatePage';
 import MyPostsPage from './pages/MyPostsPage';
@@ -219,6 +221,9 @@ export default function App() {
           <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
           <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/shared-rides" element={<ProtectedRoute><SharedRidesPage /></ProtectedRoute>} />
+          <Route path="/groups" element={<ProtectedRoute><Navigate to="/shared-rides" replace /></ProtectedRoute>} />
+          <Route path="/groups/:groupId" element={<ProtectedRoute><GroupDetailsPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
 

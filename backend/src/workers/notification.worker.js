@@ -55,7 +55,14 @@ export async function processNotificationJob(job) {
     case NOTIFICATION_JOB_TYPES.RIDE_UPDATED:
     case NOTIFICATION_JOB_TYPES.RIDE_CANCELLED:
     case NOTIFICATION_JOB_TYPES.RIDE_EXPIRED:
-    case NOTIFICATION_JOB_TYPES.NEW_MATCH_FOUND: {
+    case NOTIFICATION_JOB_TYPES.NEW_MATCH_FOUND:
+    case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_RECEIVED:
+    case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_ACCEPTED:
+    case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_REJECTED:
+    case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_RECEIVED:
+    case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_ACCEPTED:
+    case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_REJECTED:
+    case NOTIFICATION_JOB_TYPES.COMPATIBLE_FIND_MATCH: {
       const { eventId, recipientId, relatedBookingId, relatedTravelId, payload } = data;
 
       if (!recipientId || !eventId) {
@@ -89,12 +96,21 @@ export async function processNotificationJob(job) {
         try {
           const outboxDoc = await Outbox.findOne({ eventId });
           if (outboxDoc && !outboxDoc.pushSentAt) {
+            const isGroupEvent = typeof name === 'string' && name.startsWith('GROUP_');
+            const groupId = payload?.groupId ? String(payload.groupId) : '';
+            const groupRoute = groupId ? `/groups/${groupId}` : '/notifications';
+
             const pushData = {
               type: name,
               eventId,
               bookingId: relatedBookingId ? String(relatedBookingId) : '',
               travelId: relatedTravelId ? String(relatedTravelId) : '',
-              route: relatedBookingId ? `/bookings/${relatedBookingId}` : (relatedTravelId ? `/rides/${relatedTravelId}` : '/notifications')
+              groupId,
+              route: payload?.navigationUrl
+                ? String(payload.navigationUrl)
+                : (isGroupEvent
+                  ? groupRoute
+                  : (relatedBookingId ? `/bookings/${relatedBookingId}` : (relatedTravelId ? `/rides/${relatedTravelId}` : '/notifications')))
             };
             const pushRes = await sendPushToUser(recipientId, { title, body: message }, pushData);
             if (pushRes && pushRes.sent > 0) {

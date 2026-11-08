@@ -263,6 +263,10 @@ export async function initPushNotifications({
         targetRoute = data.route;
       } else if (data.url) {
         targetRoute = data.url;
+      } else if (data.navigationUrl) {
+        targetRoute = data.navigationUrl;
+      } else if (data.groupId) {
+        targetRoute = `/groups/${data.groupId}`;
       } else if (notifType.includes('MATCH')) {
         targetRoute = data.travelId || data.postId ? `/rides/${data.travelId || data.postId}` : '/match';
       } else if (data.bookingId) {

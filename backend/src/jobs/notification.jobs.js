@@ -16,7 +16,14 @@ export const NOTIFICATION_JOB_TYPES = {
   RIDE_EXPIRED: 'RIDE_EXPIRED',
   TRAVEL_REMINDER_24H: 'TRAVEL_REMINDER_24H',
   TRAVEL_REMINDER_1H: 'TRAVEL_REMINDER_1H',
-  NEW_MATCH_FOUND: 'NEW_MATCH_FOUND'
+  NEW_MATCH_FOUND: 'NEW_MATCH_FOUND',
+  GROUP_INVITATION_RECEIVED: 'GROUP_INVITATION_RECEIVED',
+  GROUP_INVITATION_ACCEPTED: 'GROUP_INVITATION_ACCEPTED',
+  GROUP_INVITATION_REJECTED: 'GROUP_INVITATION_REJECTED',
+  GROUP_JOIN_REQUEST_RECEIVED: 'GROUP_JOIN_REQUEST_RECEIVED',
+  GROUP_JOIN_REQUEST_ACCEPTED: 'GROUP_JOIN_REQUEST_ACCEPTED',
+  GROUP_JOIN_REQUEST_REJECTED: 'GROUP_JOIN_REQUEST_REJECTED',
+  COMPATIBLE_FIND_MATCH: 'COMPATIBLE_FIND_MATCH'
 };
 
 /**
@@ -131,6 +138,80 @@ export function formatNotificationContent(eventType, payload = {}) {
       return {
         title: 'New Ride Match',
         message: `A compatible ride has been found for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Open Helpu to view the match.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_RECEIVED: {
+      if (payload.customTitle || payload.customMessage) {
+        return {
+          title: payload.customTitle || 'You have a Shared Group invitation!',
+          message: payload.customMessage || 'A student wants to create a Shared Group with you for your trip. Review and accept the invitation to join.'
+        };
+      }
+      if (payload.fromMatchProposal) {
+        return {
+          title: 'You have a Shared Group invitation!',
+          message: 'A student wants to create a Shared Group with you for your trip. Review and accept the invitation to join.'
+        };
+      }
+      const adminName = payload.adminName || payload.senderName || 'A campus peer';
+      return {
+        title: 'Shared Ride Group Invitation',
+        message: `${adminName} invited you to join a Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Open Helpu to review and join.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_ACCEPTED: {
+      const studentName = payload.memberName || 'A student';
+      return {
+        title: 'Group Invitation Accepted',
+        message: `${studentName} accepted your invitation to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_REJECTED: {
+      const studentName = payload.memberName || payload.studentName || 'A student';
+      return {
+        title: 'Group Invitation Declined',
+        message: `${studentName} declined your invitation to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_RECEIVED: {
+      const requesterName = payload.requesterName || payload.senderName || 'A student';
+      return {
+        title: 'New Join Request',
+        message: `${requesterName} requested to join your Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Open Helpu to review and accept.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_ACCEPTED: {
+      const adminName = payload.adminName || 'The group admin';
+      return {
+        title: 'Join Request Accepted',
+        message: `Your request to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was accepted by ${adminName}.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_REJECTED: {
+      return {
+        title: 'Join Request Declined',
+        message: `Your request to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was declined by the host.`
+      };
+    }
+
+    case NOTIFICATION_JOB_TYPES.COMPATIBLE_FIND_MATCH: {
+      const isExisting = Boolean(payload.isExistingPostOwner);
+      const defaultTitle = isExisting
+        ? 'Another student wants to travel on your route!'
+        : 'A compatible student was found!';
+      const defaultMessage = isExisting
+        ? 'A compatible student has been found for your trip. You can create a Shared Group together.'
+        : 'Another student wants to travel on the same route and date. You can create a Shared Group together.';
+
+      return {
+        title: payload.title || defaultTitle,
+        message: payload.message || defaultMessage
       };
     }
 

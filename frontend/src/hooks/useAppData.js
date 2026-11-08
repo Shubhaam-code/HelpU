@@ -10,7 +10,15 @@ import {
   getMyBookings,
   getReceivedBookings,
   getConfirmedBookings,
-  getCommunityPosts
+  getCommunityPosts,
+  getMySharedRideGroups,
+  discoverSharedRideGroups,
+  getSharedRideGroupById,
+  getReceivedInvitations,
+  getGroupJoinRequests,
+  getGroupInvites,
+  getTravelMatches,
+  getCompatibleFinds
 } from '../lib/api';
 import { QUERY_KEYS } from '../lib/queryClient';
 import { useUser } from '../context/FirebaseAuthContext';
@@ -232,6 +240,143 @@ export function useConfirmedBookings() {
   });
 }
 
+/**
+ * Hook to get Shared Ride Groups the student has joined.
+ */
+export function useMySharedRideGroups() {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.myGroups(user?.id),
+    queryFn: async () => {
+      const res = await getMySharedRideGroups();
+      const list = res.data?.data || res.data?.groups || res.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 15 * 1000
+  });
+}
+
+/**
+ * Hook to discover compatible Shared Ride Groups for an active FIND post.
+ */
+export function useDiscoverSharedRideGroups(travelId) {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.discoverGroups(travelId),
+    queryFn: async () => {
+      if (!travelId) return [];
+      const res = await discoverSharedRideGroups(travelId);
+      const list = res.data?.data || res.data?.groups || res.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(user?.id && travelId),
+    staleTime: 15 * 1000
+  });
+}
+
+/**
+ * Hook to discover compatible FIND posts for smart group formation suggestions.
+ */
+export function useCompatibleFinds(travelId) {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.compatibleFinds ? QUERY_KEYS.compatibleFinds(travelId) : ['travels', 'compatible-finds', travelId || 'none'],
+    queryFn: async () => {
+      if (!travelId) return [];
+      const res = await getCompatibleFinds(travelId);
+      const list = res.data?.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(user?.id && travelId),
+    staleTime: 15 * 1000
+  });
+}
+
+/**
+ * Hook to get Shared Ride Group details by ID.
+ */
+export function useSharedRideGroupDetails(groupId) {
+  return useQuery({
+    queryKey: QUERY_KEYS.groupDetails(groupId),
+    queryFn: async () => {
+      if (!groupId) return null;
+      const res = await getSharedRideGroupById(groupId);
+      return res.data?.data || null;
+    },
+    enabled: Boolean(groupId),
+    staleTime: 15 * 1000
+  });
+}
+
+/**
+ * Hook to get pending received group invitations for the current student.
+ */
+export function useReceivedGroupInvitations() {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.receivedInvitations(user?.id),
+    queryFn: async () => {
+      const res = await getReceivedInvitations();
+      const list = res.data?.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 15 * 1000
+  });
+}
+
+/**
+ * Hook to get student join requests for a group (Group Admin only).
+ */
+export function useGroupJoinRequests(groupId, enabled = true) {
+  return useQuery({
+    queryKey: QUERY_KEYS.groupJoinRequests(groupId),
+    queryFn: async () => {
+      if (!groupId) return [];
+      const res = await getGroupJoinRequests(groupId);
+      const list = res.data?.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(groupId && enabled),
+    staleTime: 10 * 1000
+  });
+}
+
+/**
+ * Hook to get sent invitations for a group (Group Admin only).
+ */
+export function useGroupSentInvites(groupId, enabled = true) {
+  return useQuery({
+    queryKey: QUERY_KEYS.groupInvites(groupId),
+    queryFn: async () => {
+      if (!groupId) return [];
+      const res = await getGroupInvites(groupId);
+      const list = res.data?.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(groupId && enabled),
+    staleTime: 10 * 1000
+  });
+}
+
+/**
+ * Hook to get compatible travel matches for an originating travel post.
+ */
+export function useOriginatingTravelMatches(travelId, enabled = true) {
+  return useQuery({
+    queryKey: ['travels', 'matches', travelId],
+    queryFn: async () => {
+      if (!travelId) return [];
+      const res = await getTravelMatches(travelId);
+      const list = res.data?.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(travelId && enabled),
+    staleTime: 30 * 1000
+  });
+}
+
 export default {
   useUserProfile,
   useMyTravels,
@@ -243,6 +388,14 @@ export default {
   useTravelDetails,
   useMyBookings,
   useReceivedBookings,
-  useConfirmedBookings
+  useConfirmedBookings,
+  useMySharedRideGroups,
+  useDiscoverSharedRideGroups,
+  useCompatibleFinds,
+  useSharedRideGroupDetails,
+  useReceivedGroupInvitations,
+  useGroupJoinRequests,
+  useGroupSentInvites,
+  useOriginatingTravelMatches
 };
 

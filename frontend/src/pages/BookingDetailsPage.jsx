@@ -621,15 +621,28 @@ export default function BookingDetailsPage() {
                 <div className="space-y-2.5">
                   {/* Owner View: Show Confirm Booking */}
                   {isOwner ? (
-                    <button
-                      type="button"
-                      onClick={handleConfirm}
-                      disabled={confirming}
-                      className="w-full py-3.5 px-6 rounded-full font-black text-sm bg-[#17233C] hover:bg-[#233252] active:scale-[0.99] text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                      <span>{confirming ? 'Confirming Reservation...' : 'Confirm Booking'}</span>
-                    </button>
+                    <>
+                      {/* Reminder Before Confirming */}
+                      <div className="p-3 rounded-2xl bg-[#FFF8F3] border border-[#FEE6D8] flex items-center gap-2.5 text-xs text-[#9C381E] font-medium leading-snug shadow-2xs">
+                        <img
+                          src="/whatsapp.png"
+                          alt="WhatsApp"
+                          className="w-4 h-4 object-contain shrink-0"
+                          onError={(e) => { e.currentTarget.src = '/whatsapp.svg'; }}
+                        />
+                        <span>Before confirming, please chat on WhatsApp and confirm the ride details with each other.</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={confirming}
+                        className="w-full py-3.5 px-6 rounded-full font-black text-sm bg-[#17233C] hover:bg-[#233252] active:scale-[0.99] text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                        <span>{confirming ? 'Confirming Reservation...' : 'Confirm Booking'}</span>
+                      </button>
+                    </>
                   ) : (
                     /* Requester View: Show Request Pending indicator (NO Confirm Booking!) */
                     <div className="w-full py-3 px-6 rounded-full font-black text-sm bg-amber-500 text-white opacity-95 flex items-center justify-center gap-2 shadow-xs cursor-default">

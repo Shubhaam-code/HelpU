@@ -1,5 +1,9 @@
 import Travel from '../models/Travel.js';
 import Student from '../models/Student.js';
+import SharedRideGroup from '../models/SharedRideGroup.js';
+import GroupJoinRequest from '../models/GroupJoinRequest.js';
+import { createOutboxEvent, triggerOutboxSweep } from './outbox.service.js';
+import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
 
 /**
  * Normalizes location strings to standard canonical names
@@ -137,6 +141,19 @@ export function isSameCalendarDay(date1, date2) {
 }
 
 /**
+ * Checks if two departure times (in minutes from midnight, 0-1439)
+ * fall within the maximum allowed departure window (default 420 minutes / 7 hours).
+ * Returns false if either time is undefined, null, or not a number.
+ */
+export function isDepartureTimeCompatible(timeA, timeB, maxWindowMinutes = 420) {
+  if (typeof timeA !== 'number' || typeof timeB !== 'number' || isNaN(timeA) || isNaN(timeB)) {
+    return false;
+  }
+  const diff = Math.abs(timeA - timeB);
+  return diff <= maxWindowMinutes;
+}
+
+/**
  * Rule-based Smart Matching Engine for Helpu.
  * 
  * Strict Matching Rules:
@@ -206,8 +223,7 @@ export async function findMatchesForTravel(travelPost) {
     }
 
     // Rule C: Departure time compatibility (maximum 7 hours / 420 minutes)
-    const timeDiff = Math.abs((travelPost.departureTime || 0) - (candidate.departureTime || 0));
-    if (timeDiff > 420) {
+    if (!isDepartureTimeCompatible(travelPost.departureTime, candidate.departureTime, 420)) {
       continue;
     }
 
@@ -326,4 +342,409 @@ export async function findMatchesForUser(userId) {
     myTravels,
     matches: Array.from(matchedMap.values())
   };
+}
+
+/**
+ * Checks if two FIND posts (type: 'request') are compatible for Shared Group formation.
+ * 
+ * Rules:
+ * 1. Both posts must exist and belong to different students (postA.userId !== postB.userId).
+ * 2. Both posts must have type 'request' (FIND posts).
+ * 3. Both posts must be active and unexpired (status: 'active', expiresAt > now).
+ * 4. Same origin (normalized location).
+ * 5. Same destination and travel direction (NEVER reverse direction).
+ * 6. Same calendar day in Asia/Kolkata timezone.
+ * 7. Departure time difference within 420 minutes tolerance.
+ * 8. Neither student is already a confirmed member of the same active/relevant group.
+ * 
+ * @param {Object} postA - First FIND post (Travel document or object)
+ * @param {Object} postB - Second FIND post (Travel document or object)
+ * @param {Object} [options]
+ * @param {boolean} [options.skipGroupCheck=false] - Skip group lookup if already verified
+ * @returns {Promise<boolean>}
+ */
+export async function areFindPostsCompatible(postA, postB, { skipGroupCheck = false } = {}) {
+  if (!postA || !postB) return false;
+
+  const idA = postA._id ? postA._id.toString() : null;
+  const idB = postB._id ? postB._id.toString() : null;
+  if (idA && idB && idA === idB) return false;
+
+  if (!postA.userId || !postB.userId || postA.userId === postB.userId) return false;
+
+  if (postA.type !== 'request' || postB.type !== 'request') return false;
+
+  if (postA.status !== 'active' || postB.status !== 'active') return false;
+
+  const now = new Date();
+  if (postA.expiresAt && new Date(postA.expiresAt) <= now) return false;
+  if (postB.expiresAt && new Date(postB.expiresAt) <= now) return false;
+
+  if (!isSameDirection(postA.source, postA.destination, postB.source, postB.destination)) {
+    return false;
+  }
+
+  if (!isSameCalendarDay(postA.travelDate, postB.travelDate)) {
+    return false;
+  }
+
+  if (!isDepartureTimeCompatible(postA.departureTime, postB.departureTime, 420)) {
+    return false;
+  }
+
+  if (!skipGroupCheck) {
+    try {
+      const commonGroup = await SharedRideGroup.findOne({
+        status: { $in: ['open', 'full'] },
+        expiresAt: { $gt: now },
+        'members.userId': { $all: [postA.userId, postB.userId] }
+      }).select('_id');
+      if (commonGroup) return false;
+    } catch {
+      // Safe fallback if SharedRideGroup lookup fails
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Discovers existing active compatible FIND posts for a given FIND post.
+ * Strictly used for Shared Ride Group suggestions.
+ * NEVER creates normal bookings or decrements seats.
+ * 
+ * @param {Object} targetFindPost - The source FIND post
+ * @returns {Promise<Array>} List of compatible FIND posts with safe public profiles
+ */
+export async function findCompatibleFindPosts(targetFindPost) {
+  if (!targetFindPost || targetFindPost.type !== 'request' || targetFindPost.status !== 'active') {
+    return [];
+  }
+
+  const now = new Date();
+  if (targetFindPost.expiresAt && new Date(targetFindPost.expiresAt) <= now) {
+    return [];
+  }
+
+  const candidates = await Travel.find({
+    _id: { $ne: targetFindPost._id },
+    userId: { $ne: targetFindPost.userId },
+    type: 'request',
+    status: 'active',
+    expiresAt: { $gt: now }
+  }).sort({ createdAt: -1 }).lean();
+
+  const compatiblePosts = [];
+  for (const cand of candidates) {
+    const isCompat = await areFindPostsCompatible(targetFindPost, cand);
+    if (isCompat) {
+      compatiblePosts.push(cand);
+    }
+  }
+
+  if (compatiblePosts.length === 0) return [];
+
+  // Enrich with safe public student details (omitting private phone numbers, emails, clerkId, firebaseUid)
+  const userIds = [...new Set(compatiblePosts.map((p) => p.userId))];
+  const students = await Student.find(
+    { clerkId: { $in: userIds } },
+    { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
+  ).lean();
+
+  const studentMap = new Map();
+  students.forEach((s) => studentMap.set(s.clerkId, s));
+
+  return compatiblePosts.map((post) => {
+    const student = studentMap.get(post.userId);
+    const safeStudent = {
+      name: student?.name || post.authorName || 'Campus Student',
+      imageUrl: student?.imageUrl || post.authorImage || null,
+      avatarId: student?.avatarId || 'm1',
+      college: student?.college || 'VIT, Bhopal',
+      isVerified: Boolean(student?.isVerified)
+    };
+
+    return {
+      _id: post._id,
+      userId: post.userId,
+      type: post.type,
+      source: post.source,
+      destination: post.destination,
+      travelDate: post.travelDate,
+      departureTime: post.departureTime,
+      timeFlexibility: post.timeFlexibility,
+      status: post.status,
+      expiresAt: post.expiresAt,
+      student: safeStudent,
+      matchedWithTravelId: targetFindPost._id
+    };
+  });
+}
+
+/**
+ * Detects compatible existing FIND posts when a new FIND post is created,
+ * and triggers idempotent notifications for both students via the Outbox.
+ * 
+ * Notification text per specification:
+ * - Student A (Existing Post Owner):
+ *   Title: "Another student wants to travel on your route!"
+ *   Message: "A compatible student has been found for your trip. You can create a Shared Group together."
+ * 
+ * - Student B (New Post Creator):
+ *   Title: "A compatible student was found!"
+ *   Message: "Another student wants to travel on the same route and date. You can create a Shared Group together."
+ * 
+ * @param {Object} newFindPost - The newly created FIND post
+ * @returns {Promise<Array>} Array of created notification events / pairs
+ */
+export async function detectAndNotifyCompatibleFindPosts(newFindPost) {
+  if (!newFindPost || newFindPost.type !== 'request' || newFindPost.status !== 'active') {
+    return [];
+  }
+
+  const now = new Date();
+  if (newFindPost.expiresAt && new Date(newFindPost.expiresAt) <= now) {
+    return [];
+  }
+
+  const compatiblePosts = await findCompatibleFindPosts(newFindPost);
+  if (!compatiblePosts || compatiblePosts.length === 0) {
+    return [];
+  }
+
+  const createdEvents = [];
+
+  for (const existingPost of compatiblePosts) {
+    // Canonical pair key (sorted travel post IDs) guarantees determinism regardless of creation order
+    const [id1, id2] = [newFindPost._id.toString(), existingPost._id.toString()].sort();
+    const pairKey = `${id1}_${id2}`;
+
+    // Event 1: Student A (existing post owner)
+    const eventIdA = `find_pair_${pairKey}_${existingPost.userId}`;
+    try {
+      const evtA = await createOutboxEvent({
+        eventId: eventIdA,
+        eventType: NOTIFICATION_JOB_TYPES.COMPATIBLE_FIND_MATCH,
+        recipientId: existingPost.userId,
+        relatedTravelId: existingPost._id,
+        payload: {
+          title: 'Another student wants to travel on your route!',
+          message: 'A compatible student has been found for your trip. You can create a Shared Group together.',
+          isExistingPostOwner: true,
+          source: existingPost.source,
+          destination: existingPost.destination,
+          travelDate: existingPost.travelDate,
+          departureTime: existingPost.departureTime,
+          matchedTravelId: newFindPost._id,
+          pairKey,
+          navigationUrl: '/shared-rides'
+        }
+      });
+      if (evtA) createdEvents.push(evtA);
+    } catch (err) {
+      // Code 11000 = duplicate eventId -> idempotent skip
+      if (err.code !== 11000 && !err.message?.includes('E11000')) {
+        console.warn(`[FindMatch] Outbox event creation error for student A (${existingPost.userId}):`, err.message);
+      }
+    }
+
+    // Event 2: Student B (new post creator)
+    const eventIdB = `find_pair_${pairKey}_${newFindPost.userId}`;
+    try {
+      const evtB = await createOutboxEvent({
+        eventId: eventIdB,
+        eventType: NOTIFICATION_JOB_TYPES.COMPATIBLE_FIND_MATCH,
+        recipientId: newFindPost.userId,
+        relatedTravelId: newFindPost._id,
+        payload: {
+          title: 'A compatible student was found!',
+          message: 'Another student wants to travel on the same route and date. You can create a Shared Group together.',
+          isExistingPostOwner: false,
+          source: newFindPost.source,
+          destination: newFindPost.destination,
+          travelDate: newFindPost.travelDate,
+          departureTime: newFindPost.departureTime,
+          matchedTravelId: existingPost._id,
+          pairKey,
+          navigationUrl: '/shared-rides'
+        }
+      });
+      if (evtB) createdEvents.push(evtB);
+    } catch (err) {
+      // Code 11000 = duplicate eventId -> idempotent skip
+      if (err.code !== 11000 && !err.message?.includes('E11000')) {
+        console.warn(`[FindMatch] Outbox event creation error for student B (${newFindPost.userId}):`, err.message);
+      }
+    }
+  }
+
+  if (createdEvents.length > 0) {
+    try {
+      triggerOutboxSweep();
+    } catch (sweepErr) {
+      console.warn('[FindMatch] Outbox sweep trigger warning:', sweepErr.message);
+    }
+  }
+
+  return createdEvents;
+}
+
+/**
+ * Discovers compatible, active, open Shared Ride Groups for an active FIND post.
+ * Excludes:
+ * - Inactive or expired groups
+ * - Full groups (members.length >= targetCapacity)
+ * - Groups where the student is admin or confirmed member
+ * - Groups originating from the same travel post
+ * - Groups for which the student already has an active pending join request/invitation
+ * Validates:
+ * - Same normalized origin & destination (isSameDirection)
+ * - Same calendar travel date in Asia/Kolkata (isSameCalendarDay)
+ * - Departure time within 420 minutes tolerance (isDepartureTimeCompatible)
+ * - Safe admin and member preview without sensitive private data
+ */
+export async function findCompatibleGroupsForFindPost(findPost, studentId) {
+  const now = new Date();
+
+  if (!findPost || findPost.type !== 'request' || findPost.status !== 'active' || (findPost.expiresAt && findPost.expiresAt <= now)) {
+    return [];
+  }
+
+  // 1. Fetch active pending join requests or invitations for this student to exclude groups
+  const pendingRequests = await GroupJoinRequest.find(
+    {
+      requesterId: studentId,
+      status: 'pending'
+    },
+    { groupId: 1, expiresAt: 1 }
+  ).populate({ path: 'groupId', select: 'expiresAt status' }).lean();
+
+  const activePendingGroupIds = [];
+  const expiredRequestIds = [];
+
+  for (const r of pendingRequests) {
+    const expiry = r.expiresAt || r.groupId?.expiresAt;
+    if (expiry && new Date(expiry) <= now) {
+      expiredRequestIds.push(r._id);
+    } else if (r.groupId && r.groupId.status === 'open') {
+      activePendingGroupIds.push(r.groupId._id || r.groupId);
+    }
+  }
+
+  // Lazy cleanup expired pending requests
+  if (expiredRequestIds.length > 0) {
+    GroupJoinRequest.updateMany(
+      { _id: { $in: expiredRequestIds }, status: 'pending' },
+      { $set: { status: 'expired' } }
+    ).catch(() => {});
+  }
+
+  // 2. Query candidates
+  const candidateQuery = {
+    status: 'open',
+    expiresAt: { $gt: now },
+    adminId: { $ne: studentId },
+    'members.userId': { $ne: studentId },
+    originatingTravelId: { $ne: findPost._id }
+  };
+
+  if (activePendingGroupIds.length > 0) {
+    candidateQuery._id = { $nin: activePendingGroupIds };
+  }
+
+  const candidateGroups = await SharedRideGroup.find(candidateQuery).sort({ createdAt: -1 }).lean();
+
+  // 3. Filter using compatibility rules
+  const matchingGroups = [];
+  for (const group of candidateGroups) {
+    // Check capacity
+    const memberCount = Array.isArray(group.members) ? group.members.length : 0;
+    if (memberCount >= group.targetCapacity) {
+      continue;
+    }
+
+    // Check same route and direction
+    if (!isSameDirection(group.source, group.destination, findPost.source, findPost.destination)) {
+      continue;
+    }
+
+    // Check same calendar day in Asia/Kolkata
+    if (!isSameCalendarDay(group.travelDate, findPost.travelDate)) {
+      continue;
+    }
+
+    // Check departure time within 420 minutes tolerance
+    if (!isDepartureTimeCompatible(group.departureTime, findPost.departureTime, 420)) {
+      continue;
+    }
+
+    matchingGroups.push(group);
+  }
+
+  if (matchingGroups.length === 0) {
+    return [];
+  }
+
+  // 4. Attach safe admin profile & safe member preview (no phone, no email, no clerkId, no firebaseUid)
+  const allUserIds = [
+    ...new Set([
+      ...matchingGroups.map((g) => g.adminId),
+      ...matchingGroups.flatMap((g) => (g.members || []).map((m) => m.userId))
+    ].filter(Boolean))
+  ];
+
+  const studentProfiles = await Student.find(
+    { clerkId: { $in: allUserIds } },
+    { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
+  ).lean();
+
+  const studentMap = new Map();
+  for (const s of studentProfiles) {
+    studentMap.set(s.clerkId, {
+      name: s.name || 'Campus Student',
+      college: s.college || null,
+      isVerified: Boolean(s.isVerified),
+      imageUrl: s.imageUrl || null,
+      avatarId: s.avatarId || null
+    });
+  }
+
+  return matchingGroups.map((g) => {
+    const adminProfile = studentMap.get(g.adminId) || {
+      name: 'Campus Student',
+      college: null,
+      isVerified: false,
+      imageUrl: null,
+      avatarId: null
+    };
+
+    const membersList = (g.members || []).map((m) => {
+      const p = studentMap.get(m.userId);
+      return {
+        name: p?.name || 'Member',
+        imageUrl: p?.imageUrl || null,
+        avatarId: p?.avatarId || null,
+        role: m.role || 'member'
+      };
+    });
+
+    const memberCount = Array.isArray(g.members) ? g.members.length : 0;
+    const availableSpots = Math.max(0, g.targetCapacity - memberCount);
+
+    return {
+      _id: g._id,
+      groupId: g._id,
+      source: g.source,
+      destination: g.destination,
+      travelDate: g.travelDate,
+      departureTime: g.departureTime,
+      admin: adminProfile,
+      confirmedMemberCount: memberCount,
+      targetCapacity: g.targetCapacity,
+      availableSpots,
+      status: g.status,
+      members: membersList,
+      membersPreview: membersList.slice(0, 4)
+    };
+  });
 }

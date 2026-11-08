@@ -9,6 +9,7 @@ import bookingRoutes from './routes/booking.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import communityRoutes from './routes/community.routes.js';
 import helpRoutes from './routes/help.routes.js';
+import groupRoutes from './routes/group.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,5 +40,6 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/groups', groupRoutes);
 
 export default app;

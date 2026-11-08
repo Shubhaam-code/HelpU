@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, FileText, Calendar, Download
+  Home, Car, Users, Info, Search, Bell, Menu, X, LogOut, User, FileText, Calendar, Download, CarTaxiFront
 } from 'lucide-react';
 import { useUser, useFirebaseAuth } from '../../context/FirebaseAuthContext';
 import { Avatar } from '../ui/Avatar';
@@ -72,6 +72,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const isActive = (path) => {
     if (path === '/home') return location.pathname === '/home' || location.pathname === '/';
     if (path === '/rides/offer') return location.pathname.startsWith('/rides');
+    if (path === '/shared-rides') return location.pathname.startsWith('/shared-rides') || location.pathname.startsWith('/groups');
     if (path === '/matches') return location.pathname.startsWith('/match');
     if (path === '/posts') return location.pathname.startsWith('/posts');
     return location.pathname.startsWith(path);
@@ -80,6 +81,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const navLinks = [
     { label: 'Home', path: '/home', icon: Home },
     { label: 'Ride', path: '/rides/offer', icon: Car },
+    { label: 'Shared Rides', path: '/shared-rides', icon: CarTaxiFront },
     { label: 'My Posts', path: '/posts', icon: FileText },
     { label: 'My Matches', path: '/matches', icon: Users },
     { label: 'About', path: '/about', icon: Info },

@@ -52,9 +52,15 @@ export function RideCard({ travel, onPress }) {
   const student = travel.student || travel.creator || {};
   const studentName = travel.studentName || student.name || travel.authorName || 'Campus Student';
   const isVerified = Boolean(student.isVerified || travel.isVerified);
+  const isFulfilled = !isOffer && Boolean(
+    travel.isFulfilled ||
+    (travel.bookedSeats || 0) >= 1 ||
+    travel.status === 'completed' ||
+    (travel.confirmedBookingsCount || 0) > 0
+  );
 
-  const availableSeats = typeof travel.seats === 'number' 
-    ? Math.max(0, travel.seats - (travel.bookedSeats || 0)) 
+  const availableSeats = typeof travel.seats === 'number'
+    ? Math.max(0, travel.seats - (travel.bookedSeats || 0))
     : (travel.availableSeats || 1);
 
   const fromCity = travel.source || travel.from || 'Campus Gate';
@@ -120,8 +126,12 @@ export function RideCard({ travel, onPress }) {
             )
           ) : (
             <div className="bg-[#EFF6FF] rounded-2xl px-3.5 py-2 text-center border border-[#DBEAFE]">
-              <div className="text-sm font-black text-[#2563EB] leading-none">Seeking</div>
-              <div className="text-[10px] font-bold text-[#6E7587] mt-1">Find Ride</div>
+              <div className="text-sm font-black text-[#2563EB] leading-none">
+                {isFulfilled ? 'Found' : 'Seeking'}
+              </div>
+              <div className="text-[10px] font-bold text-[#6E7587] mt-1">
+                {isFulfilled ? 'Ride Found' : 'Find Ride'}
+              </div>
             </div>
           )}
         </div>
@@ -173,7 +183,11 @@ export function RideCard({ travel, onPress }) {
         <span className="text-gray-300 font-light select-none">|</span>
 
         {/* Seat count in green pill */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] shrink-0">
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border shrink-0 ${
+          isFulfilled || isOffer
+            ? 'bg-[#EDFAF3] text-[#16A34A] border-[#BCECD4]'
+            : 'bg-[#FFF4ED] text-[#FF572E] border-[#FDE0D0]'
+        }`}>
           <svg className="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3" />
             <path d="M3 11v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0z" />
@@ -181,7 +195,9 @@ export function RideCard({ travel, onPress }) {
             <path d="M19 18v2" />
           </svg>
           <span>
-            {availableSeats} {isOffer ? (availableSeats === 1 ? 'seat left' : 'seats left') : (availableSeats === 1 ? 'seat needed' : 'seats needed')}
+            {isOffer
+              ? `${availableSeats} ${availableSeats === 1 ? 'seat left' : 'seats left'}`
+              : (isFulfilled ? '1 seat found' : '1 seat needed')}
           </span>
         </div>
       </div>

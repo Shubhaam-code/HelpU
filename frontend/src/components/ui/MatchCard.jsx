@@ -57,6 +57,12 @@ export function MatchCard({ match, onPress, bookingStatus }) {
   const bStatus = typeof bookingStatus === 'object' ? bookingStatus?.status : bookingStatus;
   const isIncoming = bDirection === 'incoming';
   const isOutgoing = bDirection === 'outgoing' || (bStatus && !bDirection);
+  const isFulfilled = !isOffer && Boolean(
+    match.isFulfilled ||
+    (match.bookedSeats || 0) >= 1 ||
+    match.status === 'completed' ||
+    (bStatus && ['confirmed', 'accepted', 'completed'].includes(bStatus))
+  );
   
   const fromCity = match.source || match.from || 'Campus Gate';
   const toCity = match.destination || match.to || 'City Destination';
@@ -137,8 +143,12 @@ export function MatchCard({ match, onPress, bookingStatus }) {
             )
           ) : (
             <div className="bg-[#EFF6FF] rounded-2xl px-3.5 py-2 text-center border border-[#DBEAFE]">
-              <div className="text-sm font-black text-[#2563EB] leading-none">Seeking</div>
-              <div className="text-[10px] font-bold text-[#6E7587] mt-1">Ride Request</div>
+              <div className="text-sm font-black text-[#2563EB] leading-none">
+                {isFulfilled ? 'Found' : 'Seeking'}
+              </div>
+              <div className="text-[10px] font-bold text-[#6E7587] mt-1">
+                {isFulfilled ? 'Ride Found' : 'Ride Request'}
+              </div>
             </div>
           )}
         </div>
@@ -190,7 +200,11 @@ export function MatchCard({ match, onPress, bookingStatus }) {
         <span className="text-gray-300 font-light select-none">|</span>
 
         {/* Seat count in green pill */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] shrink-0">
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border shrink-0 ${
+          isFulfilled || isOffer
+            ? 'bg-[#EDFAF3] text-[#16A34A] border-[#BCECD4]'
+            : 'bg-[#FFF4ED] text-[#FF572E] border-[#FDE0D0]'
+        }`}>
           <svg className="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3" />
             <path d="M3 11v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H7v-2a2 2 0 0 0-4 0z" />
@@ -198,7 +212,9 @@ export function MatchCard({ match, onPress, bookingStatus }) {
             <path d="M19 18v2" />
           </svg>
           <span>
-            {seats} {isOffer ? (seats === 1 ? 'seat left' : 'seats left') : (seats === 1 ? 'seat needed' : 'seats needed')}
+            {isOffer
+              ? `${seats} ${seats === 1 ? 'seat left' : 'seats left'}`
+              : (isFulfilled ? '1 seat found' : '1 seat needed')}
           </span>
         </div>
       </div>

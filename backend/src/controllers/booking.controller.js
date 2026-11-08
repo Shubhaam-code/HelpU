@@ -533,9 +533,23 @@ export async function respondToBookingRequest(req, res) {
       // 7. If booking belongs to a Request post, identify the actual Offer post providing seats.
       // Never decrement seats from a Request post.
       let targetOffer = null;
+      let targetRequest = null;
       if (travel.type === 'offer') {
         targetOffer = travel;
+        if (booking.matchedTravelId) {
+          targetRequest = await Travel.findOne({ _id: booking.matchedTravelId, type: 'request' }).session(session);
+        } else {
+          targetRequest = await Travel.findOne({
+            userId: booking.passengerId,
+            type: 'request',
+            status: 'active',
+            source: travel.source,
+            destination: travel.destination,
+            travelDate: travel.travelDate
+          }).session(session);
+        }
       } else if (travel.type === 'request') {
+        targetRequest = travel;
         if (booking.offerTravelId) {
           targetOffer = await Travel.findById(booking.offerTravelId).session(session);
         } else if (booking.offerId) {
@@ -594,6 +608,15 @@ export async function respondToBookingRequest(req, res) {
               message: 'Failed to reserve seats: insufficient seats available'
             });
           }
+        }
+
+        // Dynamically mark associated FIND post as fulfilled
+        if (targetRequest) {
+          await Travel.updateOne(
+            { _id: targetRequest._id },
+            { $set: { bookedSeats: 1 } },
+            { session }
+          );
         }
 
         // Atomically update booking status from 'pending' to 'confirmed' with approvedAt timestamp
@@ -941,9 +964,23 @@ export async function confirmBooking(req, res) {
 
       // 7. If booking belongs to a Request post, identify the actual Offer post providing seats
       let targetOffer = null;
+      let targetRequest = null;
       if (travel.type === 'offer') {
         targetOffer = travel;
+        if (booking.matchedTravelId) {
+          targetRequest = await Travel.findOne({ _id: booking.matchedTravelId, type: 'request' }).session(session);
+        } else {
+          targetRequest = await Travel.findOne({
+            userId: booking.passengerId,
+            type: 'request',
+            status: 'active',
+            source: travel.source,
+            destination: travel.destination,
+            travelDate: travel.travelDate
+          }).session(session);
+        }
       } else if (travel.type === 'request') {
+        targetRequest = travel;
         if (booking.offerTravelId) {
           targetOffer = await Travel.findById(booking.offerTravelId).session(session);
         } else if (booking.offerId) {
@@ -1000,6 +1037,15 @@ export async function confirmBooking(req, res) {
             message: 'Failed to reserve seats: insufficient seats or travel post has expired/become inactive'
           });
         }
+      }
+
+      // Dynamically mark associated FIND post as fulfilled
+      if (targetRequest) {
+        await Travel.updateOne(
+          { _id: targetRequest._id },
+          { $set: { bookedSeats: 1 } },
+          { session }
+        );
       }
 
       // 9. Atomically update booking status to 'confirmed' within the transaction
@@ -1255,9 +1301,22 @@ export async function cancelBooking(req, res) {
       // 7. If booking belongs to a Request post, identify the actual Offer post providing seats.
       // Never decrement or restore seats on a Request post.
       let targetOfferTravel = null;
+      let targetRequestTravel = null;
       if (travel.type === 'offer') {
         targetOfferTravel = travel;
+        if (booking.matchedTravelId) {
+          targetRequestTravel = await Travel.findOne({ _id: booking.matchedTravelId, type: 'request' }).session(session);
+        } else {
+          targetRequestTravel = await Travel.findOne({
+            userId: booking.passengerId,
+            type: 'request',
+            source: travel.source,
+            destination: travel.destination,
+            travelDate: travel.travelDate
+          }).session(session);
+        }
       } else if (travel.type === 'request') {
+        targetRequestTravel = travel;
         if (booking.offerTravelId) {
           targetOfferTravel = await Travel.findById(booking.offerTravelId).session(session);
         } else if (booking.offerId) {
@@ -1294,6 +1353,15 @@ export async function cancelBooking(req, res) {
             { returnDocument: 'after', session }
           );
         }
+      }
+
+      if (targetRequestTravel) {
+        // Dynamically revert FIND post seat status to 1 seat needed (bookedSeats = 0)
+        await Travel.updateOne(
+          { _id: targetRequestTravel._id },
+          { $set: { bookedSeats: 0 } },
+          { session }
+        );
       }
 
       // 8. Create Outbox event for cancellation inside transaction

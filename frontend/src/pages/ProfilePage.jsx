@@ -169,7 +169,7 @@ export default function ProfilePage() {
       customMobileHeader={
         <AppHeader 
           title="Student Profile" 
-          backTo={false} 
+          backTo={-1} 
           src={profile?.imageUrl || user?.imageUrl}
         />
       }

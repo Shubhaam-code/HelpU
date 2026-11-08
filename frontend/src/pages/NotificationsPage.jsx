@@ -9,8 +9,8 @@ import {
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
-import { markRead, markAllRead } from '../lib/api';
-import { timeAgo } from '../lib/utils';
+import { markRead, markAllRead, createGroupFromFindMatch } from '../lib/api';
+import { timeAgo, formatDateShort, formatMinutesToTime } from '../lib/utils';
 import { useNotificationsList, useUnreadNotificationsCount } from '../hooks/useAppData';
 import { QUERY_KEYS, invalidateNotificationQueries } from '../lib/queryClient';
 import { useUser } from '../context/FirebaseAuthContext';
@@ -22,6 +22,8 @@ export default function NotificationsPage() {
 
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'read'
   const [markingAll, setMarkingAll] = useState(false);
+  const [creatingGroupId, setCreatingGroupId] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   // Cached notifications list and unread count via TanStack Query (no repeated full-page loading)
   const { 
@@ -80,6 +82,13 @@ export default function NotificationsPage() {
 
     const bookingId = notification.relatedBookingId;
     const travelId = notification.relatedTravelId;
+    const groupId = notification.payload?.groupId;
+
+    // Direct routing to group details if notification belongs to a Shared Ride Group
+    if (groupId) {
+      navigate(`/groups/${groupId}`);
+      return;
+    }
 
     // Direct routing to the exact booking details whenever a related booking exists
     if (bookingId) {
@@ -95,6 +104,41 @@ export default function NotificationsPage() {
 
     // Fallback: My Posts page
     navigate('/posts');
+  };
+
+  // Direct action: Create Shared Ride Group from a compatible FIND match notification
+  const handleCreateGroupFromMatch = async (notification, e) => {
+    if (e) e.stopPropagation();
+    const originatingTravelId = notification.relatedTravelId;
+    const candidateTravelId = notification.payload?.candidateTravelId || notification.payload?.initiatorTravelId;
+
+    if (!originatingTravelId || !candidateTravelId) {
+      navigate('/shared-rides');
+      return;
+    }
+
+    setCreatingGroupId(notification._id);
+    setActionError(null);
+    try {
+      const res = await createGroupFromFindMatch({
+        originatingTravelId,
+        candidateTravelId
+      });
+      const group = res.data?.data?.group || res.data?.group;
+      if (group?._id) {
+        if (!notification.isRead) {
+          markRead(notification._id).catch(() => {});
+        }
+        navigate(`/groups/${group._id}`);
+      } else {
+        navigate('/shared-rides');
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to create group';
+      setActionError({ notifId: notification._id, message: msg });
+    } finally {
+      setCreatingGroupId(null);
+    }
   };
 
   // Filter tab counts
@@ -176,6 +220,30 @@ export default function NotificationsPage() {
         badgeColor: 'text-[#D97706]',
         badgeText: t.includes('1H') ? 'Departing in 1 Hour' : 'Ride Tomorrow (24h)',
         actionLabel: 'View Departure',
+      };
+    }
+
+    if (t === 'COMPATIBLE_FIND_MATCH') {
+      return {
+        icon: Users,
+        iconBg: 'bg-[#FFF4ED]',
+        iconColor: 'text-[#FF572E]',
+        badgeBg: 'bg-[#FFF4ED]',
+        badgeColor: 'text-[#FF572E]',
+        badgeText: 'Compatible FIND Match',
+        actionLabel: 'Create Group',
+      };
+    }
+
+    if (t === 'GROUP_INVITATION_RECEIVED') {
+      return {
+        icon: Car,
+        iconBg: 'bg-[#FFF4ED]',
+        iconColor: 'text-[#FF572E]',
+        badgeBg: 'bg-[#FFF4ED]',
+        badgeColor: 'text-[#FF572E]',
+        badgeText: 'Group Invitation',
+        actionLabel: 'View Group',
       };
     }
 
@@ -504,22 +572,91 @@ export default function NotificationsPage() {
                       <p className="text-xs text-[#555E70] leading-relaxed line-clamp-2">
                         {n.message}
                       </p>
+
+                      {/* Rich details for Compatible FIND match */}
+                      {n.type === 'COMPATIBLE_FIND_MATCH' && n.payload && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-[#FFF9F5] border border-[#FDE0D0] text-xs space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-[#FFEAE0] text-[#FF572E] font-black flex items-center justify-center text-[10px] shrink-0 uppercase">
+                                {(n.payload.candidateName || n.payload.initiatorName || 'S').charAt(0)}
+                              </div>
+                              <span className="font-extrabold text-[#17233C]">
+                                {n.payload.candidateName || n.payload.initiatorName || 'Campus Student'}
+                              </span>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-white border border-[#FDE0D0] text-[10px] font-bold text-[#FF572E]">
+                              Active Match
+                            </span>
+                          </div>
+
+                          {(n.payload.source || n.payload.destination) && (
+                            <div className="text-[11px] font-bold text-[#475569] flex items-center gap-1.5 flex-wrap">
+                              <span>{n.payload.source}</span>
+                              <span>→</span>
+                              <span>{n.payload.destination}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-3 text-[11px] text-[#64748B] flex-wrap">
+                            {n.payload.travelDate && (
+                              <span className="inline-flex items-center gap-1 font-medium">
+                                <Calendar className="w-3 h-3 text-[#FF572E]" />
+                                {formatDateShort(n.payload.travelDate)}
+                              </span>
+                            )}
+                            {typeof n.payload.departureTime === 'number' && (
+                              <span className="inline-flex items-center gap-1 font-medium">
+                                <Clock className="w-3 h-3 text-[#FF572E]" />
+                                {formatMinutesToTime(n.payload.departureTime)}
+                              </span>
+                            )}
+                          </div>
+
+                          {actionError?.notifId === n._id && (
+                            <div className="text-[11px] text-red-600 font-semibold bg-red-50 p-1.5 rounded-lg border border-red-100">
+                              {actionError.message}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Right: Clean Action button without any checkmark or tick */}
+                  {/* Right: Clean Action button */}
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pl-13 sm:pl-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNotificationClick(n);
-                      }}
-                      className="px-3.5 py-1.5 bg-[#FFF4ED] hover:bg-[#FFE8DC] text-[#FF572E] text-xs font-bold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 active:scale-95 shadow-2xs"
-                    >
-                      <span>{visuals.actionLabel}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    {n.type === 'COMPATIBLE_FIND_MATCH' ? (
+                      <button
+                        type="button"
+                        disabled={creatingGroupId === n._id}
+                        onClick={(e) => handleCreateGroupFromMatch(n, e)}
+                        className="px-3.5 py-1.5 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 active:scale-95 shadow-2xs disabled:opacity-50"
+                      >
+                        {creatingGroupId === n._id ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Creating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Create Group</span>
+                            <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNotificationClick(n);
+                        }}
+                        className="px-3.5 py-1.5 bg-[#FFF4ED] hover:bg-[#FFE8DC] text-[#FF572E] text-xs font-bold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 active:scale-95 shadow-2xs"
+                      >
+                        <span>{visuals.actionLabel}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               );

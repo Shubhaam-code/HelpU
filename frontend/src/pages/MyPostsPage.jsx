@@ -330,6 +330,14 @@ export default function MyPostsPage() {
   const renderRideStatusBadge = (travel) => {
     const now = new Date();
     const isExpired = travel.status === 'expired' || (travel.status === 'active' && new Date(travel.expiresAt) <= now);
+    const isOffer = travel.type === 'offer';
+    const isFulfilled = !isOffer && Boolean(
+      travel.isFulfilled ||
+      (travel.bookedSeats || 0) >= 1 ||
+      travel.status === 'completed' ||
+      (travel.confirmedBookingsCount || 0) > 0 ||
+      (travel.acceptedRequestsCount || 0) > 0
+    );
 
     if (travel.status === 'cancelled') {
       return (
@@ -352,6 +360,14 @@ export default function MyPostsPage() {
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
           <Clock className="w-3 h-3" />
           Expired
+        </span>
+      );
+    }
+    if (isFulfilled) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          Ride Found
         </span>
       );
     }
@@ -542,6 +558,13 @@ export default function MyPostsPage() {
               const isOffer = travel.type === 'offer';
               const booked = travel.bookedSeats || 0;
               const availableSeats = Math.max(0, (travel.seats || 1) - booked);
+              const isFulfilled = !isOffer && Boolean(
+                travel.isFulfilled ||
+                booked >= 1 ||
+                travel.status === 'completed' ||
+                (travel.confirmedBookingsCount || 0) > 0 ||
+                (travel.acceptedRequestsCount || 0) > 0
+              );
               const now = new Date();
               const isExpired = travel.status === 'expired' || (travel.status === 'active' && new Date(travel.expiresAt) <= now);
               const isActive = travel.status === 'active' && !isExpired;
@@ -691,8 +714,10 @@ export default function MyPostsPage() {
                           </span>
                         </div>
 
-                        <div className={`font-bold shrink-0 text-xs ${isOffer ? 'text-[#16A34A]' : 'text-[#FF572E]'}`}>
-                          {isOffer ? `${availableSeats} seat(s) left` : `${travel.seats || 1} seat(s) needed`}
+                        <div className={`font-bold shrink-0 text-xs ${isOffer ? 'text-[#16A34A]' : (isFulfilled ? 'text-[#16A34A]' : 'text-[#FF572E]')}`}>
+                          {isOffer
+                            ? `${availableSeats} seat(s) left`
+                            : (isFulfilled ? '1 seat found' : '1 seat needed')}
                         </div>
                       </div>
                     </div>

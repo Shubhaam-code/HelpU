@@ -13,7 +13,10 @@ import {
   isSameCalendarDay, 
   getCanonicalCalendarDate,
   areLocationsMatching, 
-  normalizeLocation 
+  normalizeLocation,
+  findCompatibleFindPosts,
+  detectAndNotifyCompatibleFindPosts,
+  findCompatibleGroupsForFindPost
 } from '../services/matching.service.js';
 
 /**
@@ -217,6 +220,15 @@ router.post('/', requireAuth, async (req, res) => {
         }
       } catch (matchErr) {
         console.warn('[Travel] Non-fatal match notification error:', matchErr.message);
+      }
+
+      // If newly created post is a FIND post (type: 'request'), detect and notify compatible FIND peers for Shared Group formation
+      if (travel.type === 'request') {
+        try {
+          await detectAndNotifyCompatibleFindPosts(travel);
+        } catch (findErr) {
+          console.warn('[Travel] Non-fatal FIND compatibility notification error:', findErr.message);
+        }
       }
     });
 
@@ -443,8 +455,11 @@ router.get('/', requireAuth, async (req, res) => {
     const enriched = matchedList.map(t => {
       const s = studentMap.get(t.userId);
       const peerPhone = s?.phone || t.authorPhone || '';
+      const isOffer = t.type === 'offer';
+      const isFulfilled = !isOffer && Boolean((t.bookedSeats || 0) >= 1 || t.isFulfilled || t.status === 'completed');
       return {
         ...t,
+        isFulfilled,
         phone: peerPhone,
         isMine: false,
         student: {
@@ -529,7 +544,14 @@ router.get('/my', requireAuth, async (req, res) => {
     const travels = await Travel.find(filter).sort({ createdAt: -1 }).lean();
 
     const travelIds = travels.map(t => t._id);
-    const bookings = await Booking.find({ travelId: { $in: travelIds } }).lean();
+    const [bookings, matchedBookings, passengerBookings] = await Promise.all([
+      Booking.find({ travelId: { $in: travelIds } }).lean(),
+      Booking.find({ matchedTravelId: { $in: travelIds } }).lean(),
+      Booking.find({
+        passengerId: req.userId,
+        status: { $in: ['accepted', 'confirmed', 'completed'] }
+      }).populate('travelId').lean()
+    ]);
 
     const bookingsByTravel = new Map();
     for (const b of bookings) {
@@ -538,17 +560,51 @@ router.get('/my', requireAuth, async (req, res) => {
       bookingsByTravel.get(tid).push(b);
     }
 
+    const matchedBookingsByTravel = new Map();
+    for (const b of matchedBookings) {
+      if (b.matchedTravelId) {
+        const mid = b.matchedTravelId.toString();
+        if (!matchedBookingsByTravel.has(mid)) matchedBookingsByTravel.set(mid, []);
+        matchedBookingsByTravel.get(mid).push(b);
+      }
+    }
+
     const enriched = travels.map(t => {
+      const isOffer = t.type === 'offer';
       const reqs = bookingsByTravel.get(t._id.toString()) || [];
+      const mReqs = matchedBookingsByTravel.get(t._id.toString()) || [];
       const isExpired = t.status === 'expired' || (t.status === 'active' && new Date(t.expiresAt) <= now);
       const effectiveStatus = isExpired ? 'expired' : t.status;
+
+      let isFulfilled = false;
+      let confirmedCount = reqs.filter(r => ['accepted', 'confirmed', 'completed'].includes(r.status)).length;
+
+      if (!isOffer) {
+        // For FIND post: check if fulfilled by confirmed/accepted booking
+        const hasDirectConfirmed = reqs.some(r => ['accepted', 'confirmed', 'completed'].includes(r.status));
+        const hasMatchedConfirmed = mReqs.some(r => ['accepted', 'confirmed', 'completed'].includes(r.status));
+        const hasPassengerConfirmed = passengerBookings.some(pb => {
+          if (!pb.travelId) return false;
+          return isSameCalendarDay(pb.travelId.travelDate, t.travelDate) &&
+                 isSameDirection(pb.travelId.source, pb.travelId.destination, t.source, t.destination);
+        });
+
+        if (hasDirectConfirmed || hasMatchedConfirmed || hasPassengerConfirmed || (t.bookedSeats || 0) >= 1) {
+          isFulfilled = true;
+          confirmedCount = Math.max(confirmedCount, 1);
+        }
+      }
+
       return {
         ...t,
         status: effectiveStatus,
+        isFulfilled,
+        bookedSeats: isFulfilled ? 1 : (isOffer ? (t.bookedSeats || 0) : 0),
+        availableSeats: isOffer ? Math.max(0, (t.seats || 1) - (t.bookedSeats || 0)) : (isFulfilled ? 0 : 1),
         requestsCount: reqs.length,
         pendingRequestsCount: reqs.filter(r => r.status === 'pending').length,
-        acceptedRequestsCount: reqs.filter(r => ['accepted', 'confirmed'].includes(r.status)).length,
-        confirmedBookingsCount: reqs.filter(r => ['accepted', 'confirmed'].includes(r.status)).length,
+        acceptedRequestsCount: confirmedCount,
+        confirmedBookingsCount: confirmedCount,
         cancelledBookingsCount: reqs.filter(r => r.status === 'cancelled').length
       };
     });
@@ -632,12 +688,48 @@ router.get('/:id', requireAuth, async (req, res) => {
     const student = await Student.findOne({ clerkId: travel.userId }).lean();
 
     // Compute real-time confirmed and available seats
-    const confirmedBookings = await Booking.find({
-      travelId: travel._id,
-      status: 'confirmed'
-    });
-    const confirmedSeats = confirmedBookings.reduce((sum, b) => sum + (b.requestedSeats || 0), 0);
-    const bookedSeats = Math.max(confirmedSeats, travel.bookedSeats || 0);
+    let isFulfilled = false;
+    let bookedSeats = travel.bookedSeats || 0;
+
+    if (travel.type === 'request') {
+      const confirmedBooking = await Booking.findOne({
+        $or: [
+          { travelId: travel._id },
+          { matchedTravelId: travel._id }
+        ],
+        status: { $in: ['accepted', 'confirmed', 'completed'] }
+      });
+
+      let passengerConfirmed = null;
+      if (!confirmedBooking) {
+        const ownerBookings = await Booking.find({
+          passengerId: travel.userId,
+          status: { $in: ['accepted', 'confirmed', 'completed'] }
+        }).populate('travelId').lean();
+
+        passengerConfirmed = ownerBookings.find(b => {
+          if (!b.travelId) return false;
+          return isSameCalendarDay(b.travelId.travelDate, travel.travelDate) &&
+                 isSameDirection(b.travelId.source, b.travelId.destination, travel.source, travel.destination);
+        });
+      }
+
+      if (confirmedBooking || passengerConfirmed || (travel.bookedSeats || 0) >= 1) {
+        isFulfilled = true;
+        bookedSeats = 1;
+      } else {
+        isFulfilled = false;
+        bookedSeats = 0;
+      }
+    } else {
+      const confirmedBookings = await Booking.find({
+        travelId: travel._id,
+        status: 'confirmed'
+      });
+      const confirmedSeats = confirmedBookings.reduce((sum, b) => sum + (b.requestedSeats || 0), 0);
+      bookedSeats = Math.max(confirmedSeats, travel.bookedSeats || 0);
+    }
+
     const availableSeats = Math.max(0, (travel.seats || 1) - bookedSeats);
 
     return res.status(200).json({
@@ -645,6 +737,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       data: {
         ...travel,
         status: effectiveStatus,
+        isFulfilled,
         bookedSeats,
         availableSeats,
         pricePerSeat: travel.pricePerSeat || 350,
@@ -899,10 +992,22 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
     // 4. Run matching engine
     const matches = await findMatchesForTravel(travel);
 
+    // 5. If this is a FIND post (type: 'request'), discover compatible Shared Ride Groups
+    let sharedRideGroups = [];
+    if (travel.type === 'request') {
+      try {
+        sharedRideGroups = await findCompatibleGroupsForFindPost(travel, req.userId);
+      } catch (groupMatchErr) {
+        console.warn('[Travel Matches] Non-fatal shared group matching error:', groupMatchErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       count: matches.length,
-      data: matches
+      data: matches,
+      sharedRideGroups,
+      sharedRideGroupsCount: sharedRideGroups.length
     });
   } catch (error) {
     console.error('Error finding travel matches:', error);
@@ -910,6 +1015,60 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
       success: false,
       message: 'Internal server error while finding travel matches',
       error: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/travels/:id/compatible-finds
+ * @desc    Find compatible FIND posts for a given active FIND post (for Shared Group suggestions)
+ * @access  Protected
+ */
+router.get('/:id/compatible-finds', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid travel ID format'
+      });
+    }
+
+    const travel = await Travel.findById(id);
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Travel post not found'
+      });
+    }
+
+    if (travel.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You are not authorized to query compatible finds for this post'
+      });
+    }
+
+    if (travel.type !== 'request') {
+      return res.status(400).json({
+        success: false,
+        message: 'Compatible FIND discovery is only supported for FIND (request) posts'
+      });
+    }
+
+    const compatiblePosts = await findCompatibleFindPosts(travel);
+
+    return res.status(200).json({
+      success: true,
+      count: compatiblePosts.length,
+      data: compatiblePosts
+    });
+  } catch (err) {
+    console.error('Error finding compatible FIND posts:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while finding compatible FIND posts',
+      error: err.message
     });
   }
 });

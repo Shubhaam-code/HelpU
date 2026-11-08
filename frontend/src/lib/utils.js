@@ -30,6 +30,18 @@ export const formatTime = (dateStr) => {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
+/**
+ * Format departure minutes from midnight (0..1439) into 12-hour AM/PM format (e.g. 08:30 AM)
+ */
+export function formatMinutesToTime(minutes) {
+  if (typeof minutes !== 'number' || isNaN(minutes)) return '08:00 AM';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 export const timeAgo = (dateStr) => {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();

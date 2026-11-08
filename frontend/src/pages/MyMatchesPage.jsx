@@ -304,6 +304,14 @@ export default function MyMatchesPage() {
                 </button>
 
                 <button
+                  onClick={() => navigate('/match/explore')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-[#FFF7F2] active:scale-[0.98] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] text-xs font-bold rounded-full shadow-2xs transition-all cursor-pointer"
+                >
+                  <Compass className="w-3.5 h-3.5 text-[#FF572E]" />
+                  <span>By Post</span>
+                </button>
+
+                <button
                   onClick={() => navigate('/rides/offer')}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white text-xs font-black rounded-full shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
                 >

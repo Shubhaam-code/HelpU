@@ -147,25 +147,34 @@ self.addEventListener('fetch', (event) => {
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
           // Fetch update in background for next time
-          fetch(request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(STATIC_CACHE).then((cache) => {
-                cache.put(request, networkResponse);
-              });
-            }
-          }).catch(() => {});
+          fetch(request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                const clone = networkResponse.clone();
+                caches.open(STATIC_CACHE).then((cache) => {
+                  cache.put(request, clone);
+                });
+              }
+            })
+            .catch(() => {});
           return cachedResponse;
         }
 
-        return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(STATIC_CACHE).then((cache) => {
-              cache.put(request, clone);
-            });
-          }
-          return networkResponse;
-        });
+        return fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const clone = networkResponse.clone();
+              caches.open(STATIC_CACHE).then((cache) => {
+                cache.put(request, clone);
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => {
+            return caches.match(request);
+          });
+      }).catch(() => {
+        return fetch(request).catch(() => caches.match(request));
       })
     );
     return;

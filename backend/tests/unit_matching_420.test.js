@@ -3,7 +3,8 @@ import {
   isSameDirection, 
   isSameCalendarDay, 
   areLocationsMatching, 
-  normalizeLocation 
+  normalizeLocation,
+  isDepartureTimeCompatible
 } from '../src/services/matching.service.js';
 
 console.log('================================================================');
@@ -138,7 +139,33 @@ const mockStudent = {
 assert.strictEqual('phone' in mockStudent, false, 'Student profile must not include phone property');
 console.log('  ✔ Private phone number completely excluded from match result: PASS\n');
 
+// 9. Shared isDepartureTimeCompatible Helper Regression
+console.log('TEST 9: Shared isDepartureTimeCompatible Helper Regression');
+// Exactly 420 minutes
+assert.strictEqual(isDepartureTimeCompatible(600, 1020, 420), true, 'Exact 420 mins must be true');
+assert.strictEqual(isDepartureTimeCompatible(1020, 600, 420), true, 'Exact 420 mins reversed must be true');
+console.log('  ✔ Exactly 420 minutes: PASS');
+
+// Less than 420 minutes
+assert.strictEqual(isDepartureTimeCompatible(600, 720, 420), true, '120 mins diff must be true');
+assert.strictEqual(isDepartureTimeCompatible(600, 600, 420), true, '0 min diff must be true');
+console.log('  ✔ Less than 420 minutes: PASS');
+
+// More than 420 minutes
+assert.strictEqual(isDepartureTimeCompatible(600, 1021, 420), false, '421 mins diff must be false');
+assert.strictEqual(isDepartureTimeCompatible(1021, 600, 420), false, '421 mins diff reversed must be false');
+assert.strictEqual(isDepartureTimeCompatible(100, 900, 420), false, '800 mins diff must be false');
+console.log('  ✔ More than 420 minutes: PASS');
+
+// Missing or invalid time values
+assert.strictEqual(isDepartureTimeCompatible(null, 600), false, 'null timeA must be false');
+assert.strictEqual(isDepartureTimeCompatible(600, undefined), false, 'undefined timeB must be false');
+assert.strictEqual(isDepartureTimeCompatible('600', 600), false, 'string timeA must be false');
+assert.strictEqual(isDepartureTimeCompatible(NaN, 600), false, 'NaN timeA must be false');
+assert.strictEqual(isDepartureTimeCompatible(null, null), false, 'null values must be false');
+console.log('  ✔ Missing or invalid time values: PASS\n');
+
 console.log('================================================================');
-console.log('ALL 8 TEST SUITES PASSED (100% SUCCESS)');
+console.log('ALL 9 TEST SUITES PASSED (100% SUCCESS)');
 console.log('================================================================');
 

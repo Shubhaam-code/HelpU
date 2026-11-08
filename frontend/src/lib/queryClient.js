@@ -32,12 +32,22 @@ export const QUERY_KEYS = {
   bookingDetail: (id) => ['bookings', 'detail', id],
   unreadCount: (userId) => ['notifications', 'unread-count', userId || 'current'],
   notifications: (params, userId) => ['notifications', 'list', params || {}, userId || 'current'],
-  communityPosts: (params) => ['community', 'posts', params || {}]
+  communityPosts: (params) => ['community', 'posts', params || {}],
+  myGroups: (userId) => ['groups', 'my', userId || 'current'],
+  discoverGroups: (travelId) => ['groups', 'discover', travelId || 'none'],
+  compatibleFinds: (travelId) => ['travels', 'compatible-finds', travelId || 'none'],
+  groupDetails: (groupId) => ['groups', 'detail', groupId],
+  groupJoinRequests: (groupId) => ['groups', 'joinRequests', groupId],
+  groupInvites: (groupId) => ['groups', 'sentInvites', groupId],
+  receivedInvitations: (userId) => ['groups', 'receivedInvites', userId || 'current']
 };
 
 /**
  * Targeted Cache Invalidation Helpers
  */
+export function invalidateGroupQueries() {
+  queryClient.invalidateQueries({ queryKey: ['groups'] });
+}
 export function invalidateRideQueries() {
   queryClient.invalidateQueries({ queryKey: ['travels'] });
 }
