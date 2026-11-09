@@ -1,30 +1,20 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import { 
-  Car, Users, ShieldCheck, Coins, ArrowRight, Play, Award, Star
+  ArrowRight, Play, Zap, ShieldCheck, Users, Sprout, 
+  User, LayoutGrid, Plus, X, Car, GraduationCap, CheckCircle2, Sparkles
 } from 'lucide-react';
-
-// 3 decorative accent sparks \ | / matching reference image
-function AccentSparks({ className = '' }) {
-  return (
-    <svg width="28" height="24" viewBox="0 0 28 24" fill="none" className={`inline-block ${className}`}>
-      <line x1="4" y1="20" x2="2" y2="8" stroke="#FF5B37" strokeWidth="3" strokeLinecap="round" />
-      <line x1="14" y1="18" x2="15" y2="4" stroke="#FF5B37" strokeWidth="3" strokeLinecap="round" />
-      <line x1="24" y1="20" x2="28" y2="8" stroke="#FF5B37" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 
 export default function OnboardingPage() {
   const { isSignedIn, isLoaded } = useUser();
   const navigate = useNavigate();
 
+  // If already logged in, redirect straight to home
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      navigate('/home', { replace: true });
+      navigate('/slotmate', { replace: true });
     }
   }, [isLoaded, isSignedIn, navigate]);
 
@@ -32,363 +22,342 @@ export default function OnboardingPage() {
     navigate(`/auth?mode=${mode}`);
   };
 
-  const scrollToSection = (id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   return (
-    // Exact background color sampled from the reference image: #FEF3EF
-    <div className="min-h-screen bg-[#FEF3EF] text-[#17233C] font-sans relative overflow-x-hidden selection:bg-[#FF5B37]/20 selection:text-[#FF5B37]">
+    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] font-sans relative overflow-x-hidden selection:bg-[#F59E0B]/20 selection:text-[#D97706]">
       
       {/* ========================================================================= */}
-      {/* 1. TOP NAVBAR                                                             */}
+      {/* 0. TOP-RIGHT WARM GLOW & SPARKS (MATCHES REFERENCE DESIGN)                */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-40 bg-[#FEF3EF]/95 backdrop-blur-md px-4 sm:px-8 lg:px-12 py-3.5 border-b border-[#F5E5DC] transition-all">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          
-          {/* Brand Logo - Using user's logo.png */}
+      <div 
+        aria-hidden="true" 
+        className="absolute top-0 right-0 w-64 sm:w-80 h-64 sm:h-80 bg-gradient-to-bl from-[#FDE68A]/60 via-[#FDE047]/20 to-transparent pointer-events-none rounded-bl-full blur-2xl" 
+      />
+
+      {/* Decorative top-right flame swoosh & sparkles */}
+      <div className="absolute top-1 right-2 sm:right-6 pointer-events-none select-none opacity-90">
+        <svg width="120" height="90" viewBox="0 0 120 90" fill="none" className="text-[#FBBF24]">
+          <path 
+            d="M120 0C90 10 70 30 65 60C80 40 100 25 120 15V0Z" 
+            fill="url(#yellowGlow)" 
+            opacity="0.85" 
+          />
+          {/* Floating confetti shapes */}
+          <rect x="75" y="60" width="8" height="4" rx="2" transform="rotate(25 75 60)" fill="#F59E0B" />
+          <rect x="95" y="45" width="9" height="4.5" rx="2" transform="rotate(-30 95 45)" fill="#FBBF24" />
+          <circle cx="50" cy="50" r="2.5" fill="#F59E0B" />
+          <circle cx="85" cy="20" r="3" fill="#FBBF24" />
+          <defs>
+            <linearGradient id="yellowGlow" x1="120" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#FDE68A" />
+              <stop offset="1" stopColor="#F59E0B" stopOpacity="0.3" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MAIN CONTAINER: STRICTLY MOBILE-FIRST (MAX-W-MD)                          */}
+      {/* ========================================================================= */}
+      <div className="max-w-md sm:max-w-lg md:max-w-xl mx-auto px-4 sm:px-6 pt-3 pb-0 space-y-6 sm:space-y-7 relative z-10">
+
+        {/* ======================================================================= */}
+        {/* A. HEADER (MINIMAL & CLEAN: HELPU LOGO + LOG IN)                       */}
+        {/* ======================================================================= */}
+        <header className="flex items-center justify-between py-1">
           <div 
-            className="flex items-center gap-2 cursor-pointer group" 
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center cursor-pointer select-none"
           >
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105"
+              className="h-8 sm:h-9 w-auto object-contain"
             />
           </div>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8">
-            <button 
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="text-sm font-bold text-[#17233C] relative py-1 cursor-pointer"
-            >
-              Home
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FF5B37] rounded-full" />
-            </button>
-            <button 
-              onClick={() => scrollToSection('features')}
-              className="text-sm font-semibold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer"
-            >
-              Features
-            </button>
-            <button 
-              onClick={() => scrollToSection('how-it-works')}
-              className="text-sm font-semibold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer"
-            >
-              How it Works
-            </button>
-            <button 
-              onClick={() => scrollToSection('about')}
-              className="text-sm font-semibold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer"
-            >
-              About
-            </button>
-          </nav>
+          {/* Clean minimal Log In pill */}
+          <button
+            type="button"
+            onClick={() => openAuth('signIn')}
+            className="px-4 py-1.5 rounded-full text-xs font-black text-[#17233C] bg-white border border-[#F4E3D8] hover:bg-[#FFF8F3] hover:border-[#F59E0B]/50 shadow-2xs active:scale-95 transition-all cursor-pointer"
+          >
+            Log In
+          </button>
+        </header>
 
-          {/* Right Action Button: Log In only */}
-          <div className="flex items-center">
+        {/* ======================================================================= */}
+        {/* B. HERO SECTION                                                         */}
+        {/* ======================================================================= */}
+        <section className="space-y-3 pt-1">
+          {/* Main Heading matching reference screenshot exactly */}
+          <h1 className="text-[30px] min-[375px]:text-[34px] sm:text-[40px] font-black text-[#17233C] tracking-tight leading-[1.12]">
+            Ride Together.<br />
+            Study Together.<br />
+            Grow Together on{' '}
+            <span className="relative inline-block text-[#FF572E]">
+              Helpu.
+              {/* Decorative yellow sunburst rays */}
+              <span className="absolute -top-1.5 -right-4 min-[375px]:-right-5 text-[#F59E0B]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <line x1="4" y1="18" x2="2" y2="6" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" />
+                  <line x1="12" y1="20" x2="15" y2="4" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" />
+                  <line x1="20" y1="18" x2="24" y2="8" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              </span>
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-xs min-[375px]:text-[13px] sm:text-sm text-[#5A6275] font-medium leading-relaxed max-w-sm pt-0.5">
+            Find rides, match your classes, and stay connected with your college peers — all in one student-only platform. 🚀
+          </p>
+
+          {/* CTA Button */}
+          <div className="flex items-center pt-2">
+            {/* Get Started Without Login Button */}
             <button
-              onClick={() => openAuth('signIn')}
-              className="px-6 py-2.5 rounded-full text-xs sm:text-sm font-bold text-[#17233C] bg-white border border-[#E8D8CD] hover:bg-[#FFF9F6] hover:border-[#D9C4B7] shadow-2xs hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              type="button"
+              onClick={() => navigate('/slotmate')}
+              className="inline-flex items-center justify-center gap-1.5 px-6 py-3 rounded-full bg-gradient-to-r from-[#FF6B35] to-[#FF451A] hover:from-[#FF572E] hover:to-[#E63E15] text-white font-black text-xs sm:text-sm shadow-md shadow-[#FF572E]/25 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
-              Log In
+              <span>Get Started Without Login</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.8]" />
             </button>
           </div>
 
-        </div>
-      </header>
-
-
-      {/* ========================================================================= */}
-      {/* 2. HERO SECTION — TWO-COLUMN RESPONSIVE LAYOUT                             */}
-      {/* ========================================================================= */}
-      <section className="relative pt-6 sm:pt-8 lg:pt-12 pb-6 sm:pb-8 px-4 sm:px-8 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[0.88fr_1.12fr] items-center gap-8 lg:gap-8 relative">
-          
-          {/*
-            =====================================================================
-            LEFT COLUMN — 45% width
-            - For Campus Students badge
-            - Controlled 2-line Heading with sparks
-            - Description
-            - Get Started + Watch How It Works buttons
-            - Student avatars & Campus trust badge
-            =====================================================================
-          */}
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex flex-col justify-center space-y-5 sm:space-y-6 z-10"
-          >
-            {/* For Campus Students Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FFE3CF] border border-[#FFD1B5] text-[#FF5B37] text-xs sm:text-sm font-extrabold shadow-2xs w-fit">
-              <span className="text-sm">🎓</span>
-              <span className="tracking-wide">For Campus Students</span>
-            </div>
-
-            {/* Heading with Controlled Line Breaks & Sparks */}
-            <h1 className="font-black text-[#17233C] text-3xl sm:text-4xl md:text-5xl lg:text-[44px] xl:text-[52px] leading-[1.12] tracking-tight">
-              <span className="block whitespace-nowrap">
-                Ride, Share, Get Help —
-              </span>
-              <span className="block mt-1 sm:mt-1.5 whitespace-nowrap">
-                <span>Within </span>
-                <span className="text-[#FF5B37] relative inline-block">
-                  Your Campus
-                  <AccentSparks className="ml-2 sm:ml-2.5 -mt-2 sm:-mt-3" />
-                </span>
-              </span>
-            </h1>
-
-            {/* Supporting Description */}
-            <p className="text-[#596277] text-sm sm:text-base lg:text-[17px] font-medium leading-relaxed max-w-lg">
-              A student-only platform to <strong className="font-bold text-[#17233C]">find rides</strong>, <strong className="font-bold text-[#17233C]">share seats</strong>, and <strong className="font-bold text-[#17233C]">get or offer help</strong> across your campus.
-            </p>
-
-            {/* Action Buttons: Get Started + Watch How It Works */}
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
-              <button
-                onClick={() => openAuth('signUp')}
-                className="flex items-center gap-2 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-black text-white bg-[#FF5B37] hover:bg-[#F04F2B] text-sm sm:text-base shadow-lg shadow-[#FF5B37]/35 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-              >
-                <span>Get Started</span>
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.8} />
-              </button>
-
-              <button
-                onClick={() => scrollToSection('how-it-works')}
-                className="flex items-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 rounded-full font-extrabold text-[#17233C] bg-white border border-[#E8D8CD] hover:bg-[#FFF9F6] hover:border-[#D9C4B7] text-sm sm:text-base shadow-2xs hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-              >
-                <div className="w-6 h-6 rounded-full bg-[#FFE4D3] text-[#FF5B37] flex items-center justify-center shrink-0">
-                  <Play className="w-3 h-3 fill-[#FF5B37] ml-0.5" />
-                </div>
-                <span>How It Works</span>
-              </button>
-            </div>
-
-
-          </motion.div>
-
-          {/*
-            =====================================================================
-            RIGHT COLUMN — 55% width
-            - Transparent student illustration
-            - Contained entirely within the right column (max-w-[720px])
-            - Zero white box, zero overlap with heading/buttons
-            =====================================================================
-          */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="relative w-full max-w-[720px] ml-auto overflow-visible flex justify-center lg:justify-end items-end"
-          >
-            <img 
-              src="/image.png" 
-              alt="HelpU Campus Students" 
-              className="w-full h-auto object-contain object-bottom block select-none pointer-events-none"
+          {/* Boy and Girl Student Illustration */}
+          <div className="relative w-full pt-1 overflow-hidden select-none">
+            <img
+              src="/landing-hero-students.png"
+              alt="Helpu Students with Yellow Car and Campus"
+              className="w-full h-auto max-h-[290px] sm:max-h-[350px] object-contain mx-auto"
+              loading="eager"
             />
-          </motion.div>
-
-        </div>
-      </section>
-
-
-      {/* ========================================================================= */}
-      {/* 3. FOUR FEATURE FLOATING PILL CARDS                                       */}
-      {/* ========================================================================= */}
-      <section id="features" className="px-4 sm:px-8 lg:px-12 py-4 relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-white/95 rounded-[32px] sm:rounded-full p-3 sm:p-4 shadow-sm border border-[#F4E3D8] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 divide-y sm:divide-y-0 lg:divide-x divide-[#F7EBE2]">
-            
-            {/* 1. Find & Share Rides */}
-            <div className="flex items-center gap-3.5 px-3 py-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#FFE4D3] text-[#FF5B37] flex items-center justify-center shrink-0">
-                <Car className="w-6 h-6 text-[#FF5B37]" />
-              </div>
-              <div>
-                <h3 className="font-black text-[#17233C] text-sm leading-snug">
-                  Find & Share Rides
-                </h3>
-                <p className="text-[#6E7587] text-[11px] font-medium mt-0.5">
-                  Travel with verified students
-                </p>
-              </div>
-            </div>
-
-            {/* 2. Get Campus Help */}
-            <div className="flex items-center gap-3.5 px-3 py-2 pt-3 sm:pt-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#DDF1FF] text-[#2563EB] flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6 text-[#2563EB]" />
-              </div>
-              <div>
-                <h3 className="font-black text-[#17233C] text-sm leading-snug">
-                  Get Campus Help
-                </h3>
-                <p className="text-[#6E7587] text-[11px] font-medium mt-0.5">
-                  Ask or offer help to peers
-                </p>
-              </div>
-            </div>
-
-            {/* 3. Travel Safely */}
-            <div className="flex items-center gap-3.5 px-3 py-2 pt-3 sm:pt-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#D7F5E3] text-[#16A34A] flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-6 h-6 text-[#16A34A]" />
-              </div>
-              <div>
-                <h3 className="font-black text-[#17233C] text-sm leading-snug">
-                  Travel Safely
-                </h3>
-                <p className="text-[#6E7587] text-[11px] font-medium mt-0.5">
-                  Campus-verified & trusted
-                </p>
-              </div>
-            </div>
-
-            {/* 4. Save Time & Money */}
-            <div className="flex items-center gap-3.5 px-3 py-2 pt-3 sm:pt-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#EFE7FF] text-[#7C3AED] flex items-center justify-center shrink-0">
-                <Coins className="w-6 h-6 text-[#7C3AED]" />
-              </div>
-              <div>
-                <h3 className="font-black text-[#17233C] text-sm leading-snug">
-                  Save Time & Money
-                </h3>
-                <p className="text-[#6E7587] text-[11px] font-medium mt-0.5">
-                  Share costs and ride together
-                </p>
-              </div>
-            </div>
-
           </div>
-        </div>
-      </section>
+        </section>
 
+        {/* ======================================================================= */}
+        {/* C. MAIN FEATURES (TWO ATTRACTIVE 2-COL CARDS) - STATIC PRESENTATION      */}
+        {/* ======================================================================= */}
+        <section className="grid grid-cols-2 gap-3 sm:gap-3.5 w-full select-none">
+          {/* Card 1: PoolMate */}
+          <div 
+            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FFF5ED] via-[#FFF9F5] to-white border border-[#FFE4D6] p-3 sm:p-4 flex flex-col justify-between shadow-2xs"
+          >
+            {/* Top Car Illustration */}
+            <div className="w-full flex items-center justify-center py-1 sm:py-2">
+              <img
+                src="/landing-car.png"
+                alt="PoolMate Yellow Car"
+                className="h-14 sm:h-18 w-auto object-contain"
+              />
+            </div>
 
-      {/* ========================================================================= */}
-      {/* 4. HOW HELPU WORKS? SECTION                                               */}
-      {/* ========================================================================= */}
-      <section id="how-it-works" className="px-4 sm:px-8 lg:px-12 py-12 lg:py-16 relative">
-        <div className="max-w-7xl mx-auto">
-          
-          {/* Section Header */}
-          <div className="text-center mb-10">
-            <h2 className="font-black text-3xl sm:text-4xl lg:text-5xl tracking-tight inline-flex items-center">
-              <span className="text-[#17233C]">How </span>
-              <span className="text-[#FF5B37] ml-2">HelpU </span>
-              <span className="text-[#17233C] ml-2">Works?</span>
-              <AccentSparks className="ml-2.5 -mt-2 sm:-mt-3" />
+            <div className="space-y-1 mt-1">
+              {/* Title & Arrow */}
+              <div className="flex items-center justify-between gap-1">
+                <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
+                  PoolMate
+                </h3>
+                <div className="w-5.5 h-5.5 rounded-full bg-[#FF572E] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.8]" />
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-[10px] min-[360px]:text-[11px] text-[#6E7587] font-medium leading-tight">
+                Find & share rides with trusted students.
+              </p>
+
+              {/* 3 Pills: Carpool | Save Cost | Safer */}
+              <div className="flex flex-wrap items-center gap-1 pt-1.5">
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FFEFE6] text-[#D9532A] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FFD9C7]">
+                  Carpool
+                </span>
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FFEFE6] text-[#D9532A] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FFD9C7]">
+                  Save Cost
+                </span>
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FFEFE6] text-[#D9532A] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FFD9C7]">
+                  Safer
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: SlotMate */}
+          <div 
+            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FEFCE8] via-[#FFFDF5] to-white border border-[#FEF08A] p-3 sm:p-4 flex flex-col justify-between shadow-2xs"
+          >
+            {/* Top Books & Graduation Cap Illustration */}
+            <div className="w-full flex items-center justify-center py-1 sm:py-2">
+              <img
+                src="/landing-cap-books.png"
+                alt="SlotMate Books & Cap"
+                className="h-14 sm:h-18 w-auto object-contain"
+              />
+            </div>
+
+            <div className="space-y-1 mt-1">
+              {/* Title & Arrow */}
+              <div className="flex items-center justify-between gap-1">
+                <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
+                  SlotMate
+                </h3>
+                <div className="w-5.5 h-5.5 rounded-full bg-[#F59E0B] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.8]" />
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-[10px] min-[360px]:text-[11px] text-[#6E7587] font-medium leading-tight">
+                Find classmates in your course & slot.
+              </p>
+
+              {/* 3 Pills: Match | Collaborate | Study */}
+              <div className="flex flex-wrap items-center gap-1 pt-1.5">
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FDE68A]">
+                  Match
+                </span>
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FDE68A]">
+                  Collaborate
+                </span>
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FDE68A]">
+                  Study
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ======================================================================= */}
+        {/* D. WHY STUDENTS LOVE HELPU? ❤️                                           */}
+        {/* ======================================================================= */}
+        <section className="space-y-2.5 w-full">
+          <h2 className="font-black text-sm min-[360px]:text-base sm:text-lg text-[#17233C] flex items-center gap-1.5 tracking-tight">
+            <span>Why Students Love</span>
+            <span className="text-[#FF572E]">Helpu?</span>
+            <span>❤️</span>
+          </h2>
+
+          <div className="grid grid-cols-4 gap-1.5 min-[360px]:gap-2 sm:gap-2.5 w-full">
+            {/* 1. Save Time */}
+            <div className="rounded-[18px] sm:rounded-[20px] bg-[#FFFBEB] border border-[#FEF3C7] p-2 min-[360px]:p-2.5 flex flex-col items-center text-center shadow-2xs">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-1 shadow-2xs">
+                <Zap className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 fill-[#F59E0B] stroke-[#D97706]" />
+              </div>
+              <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-black text-[#17233C] leading-tight">
+                Save<br />Time
+              </span>
+            </div>
+
+            {/* 2. Campus Verified */}
+            <div className="rounded-[18px] sm:rounded-[20px] bg-[#F0FDF4] border border-[#DCFCE7] p-2 min-[360px]:p-2.5 flex flex-col items-center text-center shadow-2xs">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center mb-1 shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 stroke-[2.4]" />
+              </div>
+              <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-black text-[#17233C] leading-tight">
+                Campus<br />Verified
+              </span>
+            </div>
+
+            {/* 3. Make Connections */}
+            <div className="rounded-[18px] sm:rounded-[20px] bg-[#FFF7ED] border border-[#FFEDD5] p-2 min-[360px]:p-2.5 flex flex-col items-center text-center shadow-2xs">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFEDD5] text-[#EA580C] flex items-center justify-center mb-1 shadow-2xs">
+                <Users className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 stroke-[2.4]" />
+              </div>
+              <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-black text-[#17233C] leading-tight">
+                Make<br />Connections
+              </span>
+            </div>
+
+            {/* 4. Support Each Other */}
+            <div className="rounded-[18px] sm:rounded-[20px] bg-[#FAF5FF] border border-[#F3E8FF] p-2 min-[360px]:p-2.5 flex flex-col items-center text-center shadow-2xs">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#F3E8FF] text-[#9333EA] flex items-center justify-center mb-1 shadow-2xs">
+                <Sprout className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 stroke-[2.4]" />
+              </div>
+              <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-black text-[#17233C] leading-tight">
+                Support<br />Each Other
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* ======================================================================= */}
+        {/* E. HOW IT WORKS? ✨                                                     */}
+        {/* ======================================================================= */}
+        <section className="space-y-2.5 w-full">
+          <div>
+            <h2 className="font-black text-sm min-[360px]:text-base sm:text-lg text-[#17233C] flex items-center gap-1.5 tracking-tight">
+              <span>How It Works?</span>
+              <span className="text-[#F59E0B]">✨</span>
             </h2>
-            <p className="text-[#6E7587] text-sm sm:text-base font-medium mt-2">
-              Get started in just 3 simple steps.
+            <p className="text-[10.5px] min-[360px]:text-[11.5px] sm:text-xs text-[#6E7587] font-medium">
+              Get started in just 4 simple steps.
             </p>
           </div>
 
-          {/* 3 Steps in a Row with Arrows */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 lg:gap-6 relative">
-            
+          <div className="flex items-center justify-between gap-1 sm:gap-2 w-full pt-1">
             {/* Step 1 */}
-            <div className="flex-1 w-full bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F4E3D8] flex items-center gap-4 relative">
-              <div className="w-13 h-13 rounded-2xl bg-[#FFE4D3] text-[#FF5B37] flex items-center justify-center shrink-0">
-                <span className="text-2xl">👤</span>
+            <div className="flex-1 flex flex-col items-center text-center">
+              <div className="w-8 h-8 min-[360px]:w-9 min-[360px]:h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-1 shadow-2xs">
+                <User className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.4]" />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="w-5 h-5 rounded-full bg-[#FF5B37] text-white text-[11px] font-black flex items-center justify-center mb-1">
-                  1
-                </div>
-                <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base leading-snug">
-                  Create an Account
-                </h3>
-                <p className="text-[#6E7587] text-xs mt-1 font-medium leading-relaxed">
-                  Sign up with your campus email
-                </p>
-              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-black text-[#17233C] leading-tight">
+                Create<br />Your Account
+              </span>
             </div>
 
-            {/* Arrow 1 */}
-            <div className="hidden md:flex text-[#FF5B37] shrink-0 font-black text-xl">
-              →
-            </div>
+            <span className="text-[#D97706]/50 text-xs font-black shrink-0 -mt-3">→</span>
 
             {/* Step 2 */}
-            <div className="flex-1 w-full bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F4E3D8] flex items-center gap-4 relative">
-              <div className="w-13 h-13 rounded-2xl bg-[#FFE4D3] text-[#FF5B37] flex items-center justify-center shrink-0">
-                <Car className="w-6 h-6 text-[#FF5B37]" />
+            <div className="flex-1 flex flex-col items-center text-center">
+              <div className="w-8 h-8 min-[360px]:w-9 min-[360px]:h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-1 shadow-2xs">
+                <LayoutGrid className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.4]" />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="w-5 h-5 rounded-full bg-[#FF5B37] text-white text-[11px] font-black flex items-center justify-center mb-1">
-                  2
-                </div>
-                <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base leading-snug">
-                  Request or Offer a Ride
-                </h3>
-                <p className="text-[#6E7587] text-xs mt-1 font-medium leading-relaxed">
-                  Post a ride or find a match
-                </p>
-              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-black text-[#17233C] leading-tight">
+                Choose<br />PoolMate or<br />SlotMate
+              </span>
             </div>
 
-            {/* Arrow 2 */}
-            <div className="hidden md:flex text-[#FF5B37] shrink-0 font-black text-xl">
-              →
-            </div>
+            <span className="text-[#D97706]/50 text-xs font-black shrink-0 -mt-3">→</span>
 
             {/* Step 3 */}
-            <div className="flex-1 w-full bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F4E3D8] flex items-center gap-4 relative">
-              <div className="w-13 h-13 rounded-2xl bg-[#FFE4D3] text-[#FF5B37] flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6 text-[#FF5B37]" />
+            <div className="flex-1 flex flex-col items-center text-center">
+              <div className="w-8 h-8 min-[360px]:w-9 min-[360px]:h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-1 shadow-2xs">
+                <Plus className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[3]" />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="w-5 h-5 rounded-full bg-[#FF5B37] text-white text-[11px] font-black flex items-center justify-center mb-1">
-                  3
-                </div>
-                <h3 className="font-extrabold text-[#17233C] text-sm sm:text-base leading-snug">
-                  Connect & Travel
-                </h3>
-                <p className="text-[#6E7587] text-xs mt-1 font-medium leading-relaxed">
-                  Coordinate and ride together safely
-                </p>
-              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-black text-[#17233C] leading-tight">
+                Post Your<br />Ride or<br />Course
+              </span>
             </div>
 
+            <span className="text-[#D97706]/50 text-xs font-black shrink-0 -mt-3">→</span>
+
+            {/* Step 4 */}
+            <div className="flex-1 flex flex-col items-center text-center">
+              <div className="w-8 h-8 min-[360px]:w-9 min-[360px]:h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-1 shadow-2xs">
+                <Users className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.4]" />
+              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-black text-[#17233C] leading-tight">
+                Discover<br />Matches &<br />Connect
+              </span>
+            </div>
           </div>
+        </section>
 
-        </div>
+        {/* ======================================================================= */}
+        {/* F. BOTTOM CAMPUS DECORATIVE ILLUSTRATION                                 */}
+        {/* ======================================================================= */}
+        <section className="relative -mx-4 sm:-mx-6 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] pt-2 pb-0 overflow-hidden select-none -mb-px">
+          <img
+            src="/landing-campus-footer.png"
+            alt="Helpu Campus Road Car Landscape"
+            className="w-full h-auto object-cover mx-auto block pointer-events-none"
+            loading="lazy"
+          />
+        </section>
 
-
-      </section>
-
-
-      {/* ========================================================================= */}
-      {/* 5. FOOTER (MATCHING REFERENCE PALETTE)                                    */}
-      {/* ========================================================================= */}
-      <footer id="about" className="border-t border-[#F2E3D8] bg-[#FEF3EF]/90 py-8 px-4 sm:px-8 text-center relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo.png" 
-              alt="HelpU" 
-              className="h-7 w-auto object-contain"
-            />
-            <span className="text-xs text-[#6E7587] ml-2">© {new Date().getFullYear()} Campus Ride & Assistance Network.</span>
-          </div>
-
-          <div className="flex items-center gap-6 text-xs text-[#6E7587] font-semibold">
-            <button onClick={() => scrollToSection('features')} className="hover:text-[#17233C] cursor-pointer">Features</button>
-            <button onClick={() => scrollToSection('how-it-works')} className="hover:text-[#17233C] cursor-pointer">How It Works</button>
-            <button onClick={() => openAuth('signIn')} className="hover:text-[#FF5B37] font-bold cursor-pointer">Sign In</button>
-          </div>
-        </div>
-      </footer>
-
+      </div>
     </div>
   );
 }

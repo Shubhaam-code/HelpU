@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
+import { useAuthProfile } from '../context/AuthProfileContext';
 import { 
   Car, MapPin, Calendar, Clock, Users, ShieldCheck, 
   ArrowRight, ArrowLeft, Minus, Plus, Phone, Mail, 
@@ -13,6 +14,7 @@ import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { CancelBookingModal } from '../components/ui/CancelBookingModal';
+import { GuestAuthPromptModal } from '../components/auth/GuestAuthPromptModal';
 import { invalidateBookingQueries } from '../lib/queryClient';
 import { 
   getTravelById, 
@@ -26,11 +28,19 @@ import {
   respondBooking 
 } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
+import {
+  saveBookingDraft,
+  getBookingDraft,
+  clearBookingDraft,
+  generateIdempotencyKey,
+} from '../utils/guestDraft';
 
 export default function RideDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useUser();
+  const { isSignedIn } = useUser();
+  const { hasWhatsApp } = useAuthProfile();
 
   // Data states
   const [travel, setTravel] = useState(null);
@@ -58,6 +68,11 @@ export default function RideDetailsPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelModalError, setCancelModalError] = useState('');
   const [pendingCancelId, setPendingCancelId] = useState(null);
+
+  // Guest booking draft state
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isBookingDraftRestored, setIsBookingDraftRestored] = useState(false);
+  const idempotencyKeyRef = useRef(null);
 
   // 1. Fetch live ride details, passenger profile, and bookings on mount
   const loadData = useCallback(async () => {
@@ -125,6 +140,22 @@ export default function RideDetailsPage() {
       setPhone(savedPhone);
     }
   }, [profile, user]);
+
+  // 2b. Restore booking draft if present (guest returning after authentication)
+  //     Drafts override auto-fill to preserve whatever the guest typed.
+  useEffect(() => {
+    const draft = getBookingDraft();
+    if (!draft || !draft.data) return;
+    // Only restore if the draft is for this ride
+    if (draft.data.travelId && draft.data.travelId !== id) return;
+    const d = draft.data;
+    if (d.fullName) setFullName(d.fullName);
+    if (d.email)    setEmail(d.email);
+    if (d.phone)    setPhone(d.phone);
+    if (d.notes)    setNotes(d.notes);
+    if (d.seats)    setSeats(Number(d.seats));
+    setIsBookingDraftRestored(true);
+  }, [id]);
 
   // 3. Computed calculations
   const isOffer = travel?.type === 'offer';
@@ -284,6 +315,26 @@ export default function RideDetailsPage() {
     setSubmitError('');
     setSuccessNotice('');
 
+    // ── GUEST INTERCEPTION ──────────────────────────────────────────────────
+    // If the user is not signed in, save passenger form data + ride ID and
+    // prompt Google authentication. Never call the API for unauthenticated users.
+    if (!isSignedIn) {
+      saveBookingDraft(
+        travel?._id || id,
+        {
+          fullName: fullName.trim(),
+          email:    email.trim(),
+          phone:    phone.trim(),
+          notes:    notes.trim(),
+          seats,
+        },
+        `/rides/${id}`
+      );
+      setShowAuthModal(true);
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     if (isOwnRide) {
       setSubmitError('You cannot book your own ride post.');
       return;
@@ -313,6 +364,11 @@ export default function RideDetailsPage() {
 
     setIsSubmitting(true);
 
+    // Generate or reuse idempotency key for this booking attempt
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateIdempotencyKey();
+    }
+
     try {
       const targetTravelId = travel?._id || id;
       const bookingPayload = {
@@ -327,8 +383,17 @@ export default function RideDetailsPage() {
         totalPrice: totalAmount
       };
 
-      const res = await createBooking(bookingPayload);
+      const options = {
+        headers: { 'Idempotency-Key': idempotencyKeyRef.current }
+      };
+
+      const res = await createBooking(bookingPayload, options);
       const created = res.data?.data || res.data;
+
+      // Success: clear idempotency key and booking draft
+      idempotencyKeyRef.current = null;
+      clearBookingDraft();
+      setIsBookingDraftRestored(false);
       invalidateBookingQueries();
 
       // Update state locally and notify user
@@ -339,9 +404,11 @@ export default function RideDetailsPage() {
       console.error('Booking request failed:', err);
       const msg = err.response?.data?.message || err.message || 'Failed to submit booking request. Please try again.';
       setSubmitError(msg);
-      if (err.status === 409 || err.code === 'DUPLICATE_BOOKING_REQUEST') {
+      if (err.response?.status === 409 || err.code === 'DUPLICATE_BOOKING_REQUEST') {
+        // 409 from idempotency or duplicate: do NOT clear key; allow safe retry
         loadData();
       }
+      // For any other failure, keep idempotencyKeyRef so the user can retry safely
     } finally {
       setIsSubmitting(false);
     }
@@ -744,6 +811,31 @@ export default function RideDetailsPage() {
                 ) : (
                   <form onSubmit={handleBookSeat} className="space-y-4">
                     
+                    {/* Booking Draft Restored Banner */}
+                    {isBookingDraftRestored && (
+                      <div className="bg-[#FFFBEB] border border-[#FEF3C7] rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs text-[#92400E]">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#EA580C] shrink-0" />
+                          <span><strong>Draft restored:</strong> Please review your passenger details before clicking 'Book Seat'.</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            clearBookingDraft();
+                            setIsBookingDraftRestored(false);
+                            setFullName('');
+                            setEmail('');
+                            setPhone('');
+                            setNotes('');
+                            setSeats(1);
+                          }}
+                          className="text-[#B45309] font-bold underline hover:no-underline text-[11px] shrink-0 cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
                     {/* Full Name Input */}
                     <div>
                       <label className="block text-xs font-bold text-[#17233C] mb-1.5">
@@ -1272,6 +1364,14 @@ export default function RideDetailsPage() {
         onConfirm={handleConfirmCancelModal}
         isCancelling={isCancelling}
         error={cancelModalError}
+      />
+
+      {/* Guest Authentication Prompt Modal – Booking Flow */}
+      <GuestAuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        moduleName="PoolMate"
+        returnPath={`/rides/${id}`}
       />
     </ResponsiveShell>
   );

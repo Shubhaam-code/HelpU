@@ -11,6 +11,16 @@ import { registerServiceWorker } from './pwa/registerServiceWorker';
 // Register PWA service worker
 registerServiceWorker();
 
+// Suppress accidental long-press Android context menu & selection popups on non-input UI elements
+if (typeof window !== 'undefined') {
+  window.addEventListener('contextmenu', (e) => {
+    const tag = e.target?.tagName?.toUpperCase();
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !e.target?.isContentEditable) {
+      e.preventDefault();
+    }
+  });
+}
+
 console.log('[HelpuPush] 0. Web app mounted inside Capacitor WebView.');
 
 createRoot(document.getElementById('root')).render(

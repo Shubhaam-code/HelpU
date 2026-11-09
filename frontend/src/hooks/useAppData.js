@@ -7,6 +7,8 @@ import {
   getUserMatches, 
   getUnreadCount,
   getNotifications,
+  getSlotMateNotifications,
+  getSlotMateUnreadCount,
   markRead,
   markAllRead,
   getTravels,
@@ -165,17 +167,40 @@ export function useNotificationsList(params = {}) {
 
 /**
  * Hook to get unread notification count with caching.
+ * Supports module isolation: { module: 'slotmate' } or { module: 'poolmate' }.
  */
-export function useUnreadNotificationsCount() {
+export function useUnreadNotificationsCount(params = {}) {
   const { user } = useUser();
+  const moduleParam = params?.module;
   return useQuery({
-    queryKey: QUERY_KEYS.unreadCount(user?.id),
+    queryKey: moduleParam
+      ? ['notifications', 'unread-count', user?.id, moduleParam]
+      : QUERY_KEYS.unreadCount(user?.id),
     queryFn: async () => {
-      const res = await getUnreadCount();
-      return res.data?.data?.count || 0;
+      const res = moduleParam === 'slotmate' 
+        ? await getSlotMateUnreadCount() 
+        : await getUnreadCount(params);
+      return res.data?.unreadCount || res.data?.data?.unreadCount || res.data?.data?.count || 0;
     },
     enabled: Boolean(user?.id),
     ...CACHE_DURATIONS.UNREAD_COUNT
+  });
+}
+
+/**
+ * Hook to get SlotMate notifications list with TanStack Query caching.
+ */
+export function useSlotMateNotificationsList(params = {}) {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: ['notifications', 'slotmate', params, user?.id],
+    queryFn: async () => {
+      const res = await getSlotMateNotifications(params);
+      const items = res.data?.data || [];
+      return Array.isArray(items) ? items : [];
+    },
+    enabled: Boolean(user?.id),
+    ...CACHE_DURATIONS.NOTIFICATIONS
   });
 }
 
@@ -739,6 +764,7 @@ export default {
   useUserMatches,
   useUserMatchesData,
   useNotificationsList,
+  useSlotMateNotificationsList,
   useUnreadNotificationsCount,
   useTravels,
   useTravelDetails,

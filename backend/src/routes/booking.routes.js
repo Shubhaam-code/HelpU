@@ -1,5 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middlewares/auth.js';
+import { requireIdempotency } from '../middlewares/idempotency.js';
 import {
   createBookingRequest,
   getReceivedBookings,
@@ -19,8 +20,9 @@ const router = express.Router();
  * @route   POST /api/bookings
  * @desc    Create a booking request for an active, unexpired offer post
  * @access  Protected
+ * @idempotency  Required — prevents duplicate booking on retries / double-clicks
  */
-router.post('/', requireAuth, createBookingRequest);
+router.post('/', requireAuth, requireIdempotency(), createBookingRequest);
 
 /**
  * @route   GET /api/bookings/received

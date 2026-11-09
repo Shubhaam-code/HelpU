@@ -25,6 +25,17 @@ html, body {
   -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
   overflow-x: hidden;
+  /* Prevent accidental long-press text selection popup on mobile */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Allow text selection only in actual editable inputs */
+input, textarea, [contenteditable="true"], .selectable-text {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 /* Root styling - responsive full width with warm cream background */

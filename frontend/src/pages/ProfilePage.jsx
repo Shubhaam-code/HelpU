@@ -5,8 +5,8 @@ import { useUser, useFirebaseAuth } from '../context/FirebaseAuthContext';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import {
   Calendar, Car, Heart, HelpCircle, ChevronRight, LogOut,
-  ShieldCheck, Mail, Phone, GraduationCap, BookOpen, Edit3, CheckCircle2,
-  ArrowRight, Sparkles, X, User as UserIcon, Download, MessageCircle, ChevronDown
+  ShieldCheck, ShieldAlert, Mail, Phone, GraduationCap, BookOpen, Edit3, CheckCircle2,
+  ArrowRight, Sparkles, X, User as UserIcon, Download, MessageCircle, ChevronDown, Crown
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -16,6 +16,7 @@ import { saveProfile } from '../lib/api';
 import { useAuthProfile } from '../context/AuthProfileContext';
 import { useUserProfile, useMyTravels, useMyBookings } from '../hooks/useAppData';
 import { queryClient, QUERY_KEYS, invalidateProfileQueries } from '../lib/queryClient';
+import { getProfileDraft } from '../utils/guestDraft';
 
 const COUNTRIES = [
   { code: 'IN', name: 'India', dial: '+91', flag: '🇮🇳' },
@@ -33,6 +34,8 @@ export default function ProfilePage() {
   const { signOut } = useFirebaseAuth();
   const { setWhatsAppNumber: setContextWhatsAppNumber } = useAuthProfile();
 
+  const isGuest = !user;
+
   // TanStack Query cached data flow (Instant navigation, zero full-page spinners on return visits)
   const { data: cachedProfile, isLoading: profileLoading } = useUserProfile();
   const { data: myTravels = [], isLoading: travelsLoading } = useMyTravels();
@@ -40,9 +43,39 @@ export default function ProfilePage() {
 
   // Profile data & counts derived from cache
   const profile = cachedProfile || null;
-  const ridesCount = Array.isArray(myTravels) ? myTravels.length : 0;
-  const bookingsCount = Array.isArray(myBookings) ? myBookings.length : 0;
-  const loading = profileLoading && !cachedProfile;
+  const ridesCount = isGuest ? 0 : (Array.isArray(myTravels) ? myTravels.length : 0);
+  const bookingsCount = isGuest ? 0 : (Array.isArray(myBookings) ? myBookings.length : 0);
+  const loading = !isGuest && profileLoading && !cachedProfile;
+
+  const displayName = isGuest 
+    ? 'Guest Mode' 
+    : (profile?.name || user?.fullName || 'Campus Student');
+
+  const displayStatus = isGuest ? 'Unverified' : 'Verified Student';
+
+  const displayReg = isGuest
+    ? 'Unverified'
+    : (profile?.registrationNumber || 'Not set');
+
+  const displayBranch = isGuest
+    ? 'Unverified'
+    : (profile?.course || 'B.Tech - Computer Science & Engineering');
+
+  const displayYear = isGuest
+    ? 'Unverified'
+    : (profile?.year || '2nd Year');
+
+  const displayPhone = isGuest
+    ? 'Unverified'
+    : (profile?.whatsappNumber || profile?.phone || 'Not added yet');
+
+  const displayEmail = isGuest
+    ? 'Sign in to link email'
+    : (user?.primaryEmailAddress?.emailAddress || profile?.email || 'student@vitbhopal.ac.in');
+
+  const displayCollege = isGuest
+    ? 'Unverified'
+    : (profile?.college || 'VIT, Bhopal');
 
   // Edit profile modal state
   const [isEditing, setIsEditing] = useState(false);
@@ -196,80 +229,114 @@ export default function ProfilePage() {
           className="bg-white rounded-[22px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden"
         >
           {/* Campus Illustration Background Header */}
-          <div className="h-28 sm:h-36 lg:h-44 relative overflow-hidden bg-gradient-to-br from-[#FFF7F0] via-[#FFE8D6] to-[#FFF5ED]">
-            <div 
-              className="absolute inset-0 opacity-60"
-              style={{
-                backgroundImage: 'url(/assets/footer-campus.png)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center center',
-                backgroundRepeat: 'no-repeat'
-              }}
+          <div className="h-28 sm:h-36 lg:h-44 relative overflow-hidden bg-[#FEF9C3]">
+            <img 
+              src="/profile-campus-footer.png"
+              alt="Campus Life"
+              className="w-full h-full object-cover object-top select-none pointer-events-none"
             />
-            {/* Soft gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/40 pointer-events-none" />
+            {/* Subtle soft gradient fade into the white profile card */}
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/95 via-white/40 to-transparent pointer-events-none" />
           </div>
 
           {/* Profile Content */}
           <div className="px-4 sm:px-6 pb-4 sm:pb-5 -mt-8 sm:-mt-12 lg:-mt-14 relative z-10">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
+            <div className="flex flex-col gap-3">
               
-              {/* Avatar + Name Details */}
-              <div className="flex items-center sm:items-end gap-3 sm:gap-4 min-w-0">
-                {/* Avatar with Orange Ring & Verified Checkmark Badge */}
-                <div className="relative shrink-0">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-[3px] border-[#FF572E] bg-[#FF572E]/10 p-0 shadow-md flex items-center justify-center overflow-hidden">
-                    <Avatar 
-                      src={user?.imageUrl || profile?.imageUrl}
-                      name={profile?.name || user?.fullName}
-                      email={profile?.email || user?.primaryEmailAddress?.emailAddress}
-                      size="full"
-                      className="w-full h-full aspect-square object-cover"
-                    />
+              {/* Avatar + Name Details Row */}
+              <div className="flex items-start sm:items-end justify-between gap-3 sm:gap-4">
+                <div className="flex items-start sm:items-end gap-3 sm:gap-4 min-w-0">
+                  {/* Avatar with Golden Ring (Guest) or Orange Ring (Verified) + Crown on Bottom-Left */}
+                  <div className="relative shrink-0">
+                    <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full border-[3.5px] ${isGuest ? 'border-[#F59E0B] bg-[#FFFBEB]' : 'border-[#FF572E] bg-[#FF572E]/10'} p-0 shadow-md flex items-center justify-center overflow-hidden`}>
+                      {isGuest ? (
+                        <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-[#9CA3AF] stroke-[1.8]" />
+                      ) : (
+                        <Avatar 
+                          src={user?.imageUrl || profile?.imageUrl}
+                          name={displayName}
+                          email={displayEmail}
+                          size="full"
+                          className="w-full h-full aspect-square object-cover"
+                        />
+                      )}
+                    </div>
+                    {isGuest ? (
+                      /* Crown icon at bottom-left of avatar */
+                      <div className="absolute -bottom-1.5 -left-1 text-[#F59E0B] pointer-events-none select-none drop-shadow-xs">
+                        <Crown className="w-5 h-5 fill-[#FBBF24] stroke-[#D97706] -rotate-12" />
+                      </div>
+                    ) : (
+                      <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-md z-10 pointer-events-none">
+                        <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white stroke-[2.8]" />
+                      </div>
+                    )}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-md z-10 pointer-events-none">
-                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white stroke-[2.8]" />
+
+                  {/* Name, Badge, College, Email */}
+                  <div className="min-w-0 text-left pt-1 sm:pt-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h1 className="font-black text-[#17233C] text-base sm:text-xl lg:text-2xl tracking-tight truncate">
+                        {displayName}
+                      </h1>
+                      {isGuest ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#EA580C] bg-[#FFF7ED] border border-[#FED7AA] px-2.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                          <ShieldAlert className="w-3.5 h-3.5 text-[#EA580C]" />
+                          <span>Unverified</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-black text-white bg-[#16A34A] px-2.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                          <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[2.5]" />
+                          <span>Verified Student</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-0.5 text-xs text-[#6E7587]">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <GraduationCap className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+                        <span className="font-bold text-[#17233C] text-[11px] sm:text-xs truncate">
+                          {isGuest ? 'Student • Unverified' : displayCollege}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <Mail className="w-3.5 h-3.5 text-[#8C93A4] shrink-0" />
+                        <span className="font-medium text-[10.5px] sm:text-xs truncate max-w-[220px] sm:max-w-xs md:max-w-md">
+                          {isGuest ? 'College Email • Unverified' : displayEmail}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Name, Badge, College, Email */}
-                <div className="min-w-0 text-left">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h1 className="font-black text-[#17233C] text-base sm:text-xl lg:text-2xl tracking-tight truncate">
-                      {profile?.name || user?.fullName || 'Campus Student'}
-                    </h1>
-                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-black text-white bg-[#16A34A] px-2.5 py-0.5 rounded-full shadow-2xs shrink-0">
-                      <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[2.5]" />
-                      <span>Verified Student</span>
-                    </span>
+                {/* Edit Profile button for verified user */}
+                {!isGuest && (
+                  <div className="shrink-0 flex justify-end pt-1 sm:pt-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2 bg-[#FF572E] hover:bg-[#E64A22] active:scale-95 text-white rounded-full text-xs font-black shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Edit Profile</span>
+                    </button>
                   </div>
+                )}
+              </div>
 
-                  <div className="space-y-0.5 text-xs text-[#6E7587]">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <GraduationCap className="w-3.5 h-3.5 text-[#FF572E] shrink-0" />
-                      <span className="font-bold text-[#17233C] text-[11px] sm:text-xs truncate">{profile?.college || 'VIT, Bhopal'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Mail className="w-3.5 h-3.5 text-[#8C93A4] shrink-0" />
-                      <span className="font-medium text-[10.5px] sm:text-xs truncate max-w-[220px] sm:max-w-xs md:max-w-md">
-                        {user?.primaryEmailAddress?.emailAddress || profile?.email}
-                      </span>
-                    </div>
-                  </div>
+              {/* Guest Mode: Full Width "Sign In to Complete Your Profile" Pill Button */}
+              {isGuest && (
+                <div className="w-full pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/auth?returnTo=/profile')}
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 sm:py-3.5 px-6 rounded-full bg-gradient-to-r from-[#FF6B35] to-[#FF451A] hover:from-[#FF572E] hover:to-[#E63E15] active:scale-98 text-white font-black text-xs sm:text-sm shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
+                  >
+                    <span>Sign In to Complete Your Profile</span>
+                    <ArrowRight className="w-4 h-4 stroke-[2.8]" />
+                  </button>
                 </div>
-              </div>
-
-              {/* Edit Profile Button */}
-              <div className="shrink-0 flex justify-end pt-1 sm:pt-0">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2 bg-[#FF572E] hover:bg-[#E64A22] active:scale-95 text-white rounded-full text-xs font-black shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Edit Profile</span>
-                </button>
-              </div>
+              )}
 
             </div>
           </div>
@@ -321,19 +388,19 @@ export default function ProfilePage() {
             </div>
           </motion.div>
 
-          {/* Card 3: Student Verification (Active) */}
+          {/* Card 3: Student Verification */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: 0.15 }}
             className="bg-white rounded-[18px] sm:rounded-[22px] p-2.5 sm:p-4 border border-[#F4E3D8] shadow-xs flex flex-col items-center text-center justify-between"
           >
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0 mb-1 sm:mb-2">
+            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl ${isGuest ? 'bg-gray-100 text-gray-400' : 'bg-[#EDFAF3] text-[#16A34A]'} flex items-center justify-center shrink-0 mb-1 sm:mb-2`}>
               <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div>
-              <div className="font-black text-lg sm:text-2xl text-[#16A34A] leading-none mb-1">
-                Active
+              <div className={`font-black text-lg sm:text-2xl ${isGuest ? 'text-gray-400' : 'text-[#16A34A]'} leading-none mb-1`}>
+                {isGuest ? 'Unverified' : 'Active'}
               </div>
               <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] leading-tight">
                 Student Verification
@@ -399,7 +466,7 @@ export default function ProfilePage() {
               Academic & Contact Details
             </h2>
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => isGuest ? navigate('/whatsapp-setup?returnTo=/profile') : setIsEditing(true)}
               className="text-xs sm:text-sm font-bold text-[#FF572E] hover:underline cursor-pointer flex items-center gap-1"
             >
               <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -416,7 +483,7 @@ export default function ProfilePage() {
                   Full Name
                 </div>
                 <div className="font-black text-[#17233C] truncate">
-                  {profile?.name || user?.fullName || 'Campus Student'}
+                  {displayName}
                 </div>
               </div>
             </div>
@@ -428,7 +495,7 @@ export default function ProfilePage() {
                   College Email
                 </div>
                 <div className="font-black text-[#17233C] truncate">
-                  {user?.primaryEmailAddress?.emailAddress || profile?.email || 'student@vitbhopal.ac.in'}
+                  {displayEmail}
                 </div>
               </div>
             </div>
@@ -445,7 +512,43 @@ export default function ProfilePage() {
                     alt="WhatsApp"
                     className="w-3.5 h-3.5 object-contain"
                   />
-                  <span className="truncate">{profile?.whatsappNumber || profile?.phone || 'Not added yet'}</span>
+                  <span className="truncate">{displayPhone}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  Registration Number
+                </div>
+                <div className="font-black text-[#17233C] truncate">
+                  {displayReg}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  Branch
+                </div>
+                <div className="font-black text-[#17233C] truncate">
+                  {displayBranch}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors">
+              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
+                  Year
+                </div>
+                <div className="font-black text-[#17233C] truncate">
+                  {displayYear}
                 </div>
               </div>
             </div>
@@ -457,19 +560,7 @@ export default function ProfilePage() {
                   College / Institution
                 </div>
                 <div className="font-black text-[#17233C] truncate">
-                  {profile?.college || 'VIT, Bhopal'}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2 sm:gap-2.5 p-2.5 sm:p-3 bg-[#FFFBF8] rounded-lg sm:rounded-xl border border-[#F4E3D8] hover:border-[#FF572E]/30 transition-colors lg:col-span-2">
-              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF572E] mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] sm:text-xs font-bold text-[#6E7587] uppercase tracking-wide mb-0.5">
-                  Program & Course
-                </div>
-                <div className="font-black text-[#17233C]">
-                  {profile?.course || 'B.Tech - Computer Science & Engineering'}
+                  {displayCollege}
                 </div>
               </div>
             </div>
@@ -523,22 +614,16 @@ export default function ProfilePage() {
 
 
         {/* ========================================================================= */}
-        {/* 7. SIGN OUT BUTTON (Responsive)                                            */}
+        {/* 7. FOOTER DECORATIVE ILLUSTRATION (NO SIGN OUT / NO EXTRA SCROLL)         */}
         {/* ========================================================================= */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.4 }}
-          className="pt-1 pb-3 sm:pb-4 flex justify-center"
-        >
-          <button
-            onClick={() => signOut()}
-            className="inline-flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 font-black text-xs sm:text-sm border border-red-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>Sign Out</span>
-          </button>
-        </motion.div>
+        <div className="relative -mx-4 sm:-mx-5 lg:-mx-6 pt-3 pb-0 overflow-hidden select-none -mb-px">
+          <img
+            src="/profile-campus-footer.png"
+            alt="Helpu Campus Students Illustration"
+            className="w-full h-auto max-h-[260px] object-contain mx-auto block pointer-events-none"
+            loading="lazy"
+          />
+        </div>
 
       </div>
 

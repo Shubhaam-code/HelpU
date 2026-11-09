@@ -1,309 +1,511 @@
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  Users, Plus, Calendar, Clock, BookOpen, GraduationCap, 
-  ArrowRight, Sparkles, CheckCircle2, ShieldCheck, Zap
+  GraduationCap, Users, BookOpen, CalendarDays, 
+  FileText, ChevronRight, Sparkles, Plus, 
+  MessageCircle, Home, PlusCircle, User, CheckCircle2, ArrowRight
 } from 'lucide-react';
-import { SlotFriendHeader } from '../components/SlotFriendHeader';
+
+import { AppHeader } from '../../../components/layout/AppHeader';
 import { ServiceSwitcher } from '../../../components/layout/ServiceSwitcher';
 import { useSlotFriend } from '../context/SlotFriendContext';
-import { Avatar } from '../../../components/ui/Avatar';
+import { useUser } from '../../../context/FirebaseAuthContext';
+import { useAuthProfile } from '../../../context/AuthProfileContext';
+import { useUserProfile, useUnreadNotificationsCount } from '../../../hooks/useAppData';
+import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
+import { getSlotMateDraft, clearSlotMateDraft } from '../../../utils/guestDraft';
+import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 
 export default function SlotFriendHomePage() {
   const navigate = useNavigate();
-  const { myPosts, allMatches } = useSlotFriend();
+  const { user } = useUser();
+  const { hasWhatsApp } = useAuthProfile();
+  const { data: profile } = useUserProfile();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'slotmate' });
 
-  // Top 3 sample matches to highlight on the landing page
-  const sampleMatches = allMatches.slice(0, 3);
+  const { myPosts = [], totalMatchesCount = 0, getPostMatchCount, createPost } = useSlotFriend();
+
+  const [pendingDraft, setPendingDraft] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isPublishingDraft, setIsPublishingDraft] = useState(false);
+
+  useEffect(() => {
+    const draft = getSlotMateDraft();
+    if (draft && draft.data) {
+      setPendingDraft(draft);
+    } else {
+      setPendingDraft(null);
+    }
+  }, []);
+
+  const handlePublishDraft = async () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (!hasWhatsApp) {
+      navigate(`/whatsapp-setup?returnTo=${encodeURIComponent('/slotmate')}`);
+      return;
+    }
+    const draft = getSlotMateDraft();
+    if (!draft || !draft.data) return;
+
+    setIsPublishingDraft(true);
+    try {
+      const d = draft.data;
+      await createPost({
+        courseId: d.courseId,
+        courseCode: d.courseCode,
+        slot: d.slot,
+        teacherName: d.teacherName,
+        additionalNotes: d.notes || ''
+      });
+      clearSlotMateDraft();
+      setPendingDraft(null);
+    } catch (err) {
+      console.warn('Publish draft failed:', err);
+    } finally {
+      setIsPublishingDraft(false);
+    }
+  };
+
+  const firstName = profile?.name ? profile.name.split(' ')[0] : (user?.firstName || 'Student');
+
+  // Dynamic Statistics from Actual User Data
+  const myPostsCount = myPosts.length;
+  const coursesCount = useMemo(() => {
+    return new Set(myPosts.map((p) => (p.courseCode || p.course || '').toLowerCase().trim())).size;
+  }, [myPosts]);
+  const slotsCount = useMemo(() => {
+    return new Set(myPosts.map((p) => p.slot.toUpperCase().trim())).size;
+  }, [myPosts]);
 
   return (
-    <div className="min-h-screen bg-[#FFF8F3] pb-24 md:pb-16">
-      <SlotFriendHeader 
-        title="SlotMate" 
-        subtitle="Find your study partner studying the same subject & slot"
+    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
+      {/* ========================================================================= */}
+      {/* 1. APP HEADER: ORIGINAL HELPU LOGO + NOTIFICATION BELL + AVATAR           */}
+      {/* ========================================================================= */}
+      <AppHeader
+        avatarId={profile?.avatarId}
+        onBell={() => {
+          if (!user) {
+            setShowAuthModal(true);
+            return;
+          }
+          navigate('/slotmate/notifications');
+        }}
+        profileRoute="/slotmate/profile"
+        unreadCount={unreadCount}
       />
 
-      <div className="max-w-6xl mx-auto px-3.5 sm:px-6 pt-3 sm:pt-6 space-y-4 sm:space-y-6">
+      {/* ========================================================================= */}
+      {/* MAIN CONTENT CONTAINER                                                    */}
+      {/* ========================================================================= */}
+      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-28 sm:pb-32 space-y-4 sm:space-y-5">
+        
+        {/* Welcome Greeting */}
+        <div className="flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-1.5">
+            <h2 className="font-black text-[#17233C] text-lg sm:text-xl md:text-2xl tracking-tight">
+              Welcome back, {firstName}
+            </h2>
+            <span className="text-lg">👋</span>
+          </div>
+        </div>
 
-        {/* ========================================================================= */}
-        {/* FLIPKART-STYLE TOP SERVICE SWITCHER: [ PoolMate ]   [ SlotMate ]          */}
-        {/* ========================================================================= */}
+        {/* 2. Dual Service Switcher: [ Ride ]  [ SlotMate ] (Active: SlotMate) */}
         <ServiceSwitcher activeService="slotmate" />
 
         {/* ========================================================================= */}
-        {/* 1. HERO SERVICE BANNER                                                   */}
+        {/* 3. HERO BANNER: SLOTMATE FIND YOUR SLOT PARTNER                           */}
         {/* ========================================================================= */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="relative bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden p-4 sm:p-6"
+          className="relative bg-[#FFFBEB] rounded-[24px] sm:rounded-[28px] border border-[#FEF3C7] p-4 sm:p-5 overflow-hidden shadow-2xs"
         >
-          {/* Subtle warm glow background */}
-          <div className="absolute top-0 right-0 left-0 h-32 bg-gradient-to-b from-[#EAF5FF]/60 to-transparent pointer-events-none" />
+          {/* Subtle glow effect */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-[#FEF08A]/40 to-transparent pointer-events-none rounded-full" />
 
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
-            <div className="max-w-xl space-y-2">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EAF5FF] border border-[#BAE6FD] text-[#0284C7] text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-[#0284C7]" />
-                <span>Academic Peer Matching</span>
-              </div>
-
-              <h1 className="font-black text-[#17233C] text-xl sm:text-2xl md:text-3xl tracking-tight leading-tight">
-                Slot<span className="text-[#0284C7]">Mate</span>
+          <div className="relative z-10 flex items-center justify-between gap-2.5 sm:gap-4">
+            {/* Left Content */}
+            <div className="flex-1 min-w-0 pr-0.5 sm:pr-1 space-y-1.5">
+              <h1 className="font-black text-[#17233C] text-[20px] min-[360px]:text-[22px] sm:text-2xl md:text-3xl leading-[1.15] tracking-tight">
+                Find Your <br />
+                <span className="text-[#FF572E]">Slot Partner</span>
               </h1>
 
-              <p className="text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed">
-                Connect with fellow students studying the <strong>exact same subject in the same slot</strong>. 
-                Compare lecture notes, clarify assignment doubts, prepare for exams, and find your study partner!
+              <p className="text-[11px] min-[360px]:text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed max-w-[210px] min-[390px]:max-w-[245px] sm:max-w-md">
+                Connect with students who have the{' '}
+                <span className="bg-[#FEF08A] text-[#17233C] px-1 py-0.5 rounded font-bold">
+                  same course
+                </span>{' '}
+                in the{' '}
+                <span className="bg-[#FEF08A] text-[#17233C] px-1 py-0.5 rounded font-bold">
+                  same slot
+                </span>
+                .
               </p>
-
-              {/* Primary & Secondary Action CTAs */}
-              <div className="flex flex-wrap items-center gap-2.5 pt-2 sm:pt-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/slot-friend/matches')}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-[#0284C7] hover:bg-[#0369A1] active:scale-95 text-white rounded-full font-black text-xs sm:text-sm shadow-md shadow-[#0284C7]/25 transition-all cursor-pointer"
-                >
-                  <Users className="w-4 h-4 stroke-[2.5]" />
-                  <span>Find Partners ({allMatches.length})</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/slot-friend/create')}
-                  className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-white hover:bg-[#F0F9FF] active:scale-95 border border-[#BAE6FD] hover:border-[#0284C7]/40 text-[#17233C] rounded-full font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 text-[#0284C7] stroke-[2.5]" />
-                  <span>Create My Slot Post</span>
-                </button>
-              </div>
             </div>
 
-            {/* Quick Stats Pill Panel */}
-            <div className="w-full md:w-auto shrink-0 grid grid-cols-2 gap-2.5 pt-2 md:pt-0 border-t md:border-t-0 border-[#F4E3D8]/60">
-              <div 
-                onClick={() => navigate('/slot-friend/my-posts')}
-                className="bg-[#FFF8F3] hover:bg-[#FFF2EB] border border-[#F4E3D8] rounded-2xl p-3 text-center cursor-pointer transition-colors"
-              >
-                <span className="block font-black text-xl sm:text-2xl text-[#17233C]">
-                  {myPosts.length}
-                </span>
-                <span className="text-[11px] font-bold text-[#6E7587]">
-                  My Slot Posts
-                </span>
-              </div>
-
-              <div 
-                onClick={() => navigate('/slot-friend/matches')}
-                className="bg-[#EDFAF3] hover:bg-[#E0F7EB] border border-[#BCECD4] rounded-2xl p-3 text-center cursor-pointer transition-colors"
-              >
-                <span className="block font-black text-xl sm:text-2xl text-[#16A34A]">
-                  {allMatches.length}
-                </span>
-                <span className="text-[11px] font-bold text-[#16A34A]">
-                  Active Matches
-                </span>
-              </div>
+            {/* Right Illustration: slot-hero.png (Prominent & larger) */}
+            <div 
+              className="shrink-0 w-[155px] min-[360px]:w-[170px] min-[390px]:w-[185px] min-[470px]:w-[215px] sm:w-[260px] md:w-[300px] -mr-1 min-[360px]:-mr-2 sm:-mr-3 flex justify-end items-center"
+              style={{ maxWidth: '54%' }}
+            >
+              <img
+                src="/slot-hero.png"
+                alt="Find Your Slot Partner"
+                className="w-full h-auto max-h-[145px] sm:max-h-[185px] md:max-h-[210px] object-contain select-none pointer-events-none drop-shadow-xs"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             </div>
           </div>
         </motion.div>
 
         {/* ========================================================================= */}
-        {/* 2. HOW SLOT FRIEND MATCHING WORKS (3 STEPS)                              */}
+        {/* 4. STATISTICS SECTION (4 REAL DYNAMIC VALUES IN A ROW)                    */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-white rounded-2xl p-4 border border-[#F4E3D8] shadow-2xs space-y-1.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center font-black text-xs">
-              1
+        <div className="grid grid-cols-4 gap-2 min-[360px]:gap-2.5 sm:gap-4 py-1">
+          {/* 1. My Posts */}
+          <div 
+            onClick={() => navigate('/slotmate/matches')}
+            className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+          >
+            <div className="w-12 h-12 min-[360px]:w-13 min-[360px]:h-13 sm:w-14 sm:h-14 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-all">
+              <GraduationCap className="w-5 h-5 min-[360px]:w-5.5 min-[360px]:h-5.5 sm:w-6 sm:h-6 stroke-[2.2]" />
             </div>
-            <h3 className="font-black text-xs sm:text-sm text-[#17233C]">
-              Post Course & Slot
-            </h3>
-            <p className="text-[11px] text-[#6E7587] leading-relaxed">
-              Select your registered subject and theoretical or lab slot (e.g. B1, A2).
-            </p>
+            <span className="text-[11px] min-[360px]:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+              My Posts
+            </span>
+            <span className="mt-1 px-2.5 py-0.5 rounded-full bg-[#FEF08A] text-[#854D0E] font-black text-xs leading-none">
+              {myPostsCount}
+            </span>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 border border-[#F4E3D8] shadow-2xs space-y-1.5">
-            <div className="w-8 h-8 rounded-xl bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center font-black text-xs">
-              2
+          {/* 2. Total Matches */}
+          <div 
+            onClick={() => navigate('/slotmate/matches')}
+            className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+          >
+            <div className="w-12 h-12 min-[360px]:w-13 min-[360px]:h-13 sm:w-14 sm:h-14 rounded-full bg-[#F3E8FF] text-[#9333EA] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-all">
+              <Users className="w-5 h-5 min-[360px]:w-5.5 min-[360px]:h-5.5 sm:w-6 sm:h-6 stroke-[2.2]" />
             </div>
-            <h3 className="font-black text-xs sm:text-sm text-[#17233C]">
-              Instant Smart Match
-            </h3>
-            <p className="text-[11px] text-[#6E7587] leading-relaxed">
-              We match you with all students registered in the same subject and slot.
-            </p>
+            <span className="text-[11px] min-[360px]:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+              Total Matches
+            </span>
+            <span className="mt-1 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] font-black text-xs leading-none">
+              {totalMatchesCount}
+            </span>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 border border-[#F4E3D8] shadow-2xs space-y-1.5">
-            <div className="w-8 h-8 rounded-xl bg-[#EAF5FF] text-[#0284C7] flex items-center justify-center font-black text-xs">
-              3
+          {/* 3. Courses */}
+          <div 
+            onClick={() => navigate('/slotmate/matches')}
+            className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+          >
+            <div className="w-12 h-12 min-[360px]:w-13 min-[360px]:h-13 sm:w-14 sm:h-14 rounded-full bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-all">
+              <BookOpen className="w-5 h-5 min-[360px]:w-5.5 min-[360px]:h-5.5 sm:w-6 sm:h-6 stroke-[2.2]" />
             </div>
-            <h3 className="font-black text-xs sm:text-sm text-[#17233C]">
-              Study & Prep Together
-            </h3>
-            <p className="text-[11px] text-[#6E7587] leading-relaxed">
-              Reach out on WhatsApp, share notes, compare assignments, and attend class together.
-            </p>
+            <span className="text-[11px] min-[360px]:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+              Courses
+            </span>
+            <span className="mt-1 px-2.5 py-0.5 rounded-full bg-[#E0F2FE] text-[#0284C7] font-black text-xs leading-none">
+              {coursesCount}
+            </span>
+          </div>
+
+          {/* 4. My Slots */}
+          <div 
+            onClick={() => navigate('/slotmate/matches')}
+            className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+          >
+            <div className="w-12 h-12 min-[360px]:w-13 min-[360px]:h-13 sm:w-14 sm:h-14 rounded-full bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-all">
+              <CalendarDays className="w-5 h-5 min-[360px]:w-5.5 min-[360px]:h-5.5 sm:w-6 sm:h-6 stroke-[2.2]" />
+            </div>
+            <span className="text-[11px] min-[360px]:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+              My Slots
+            </span>
+            <span className="mt-1 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] font-black text-xs leading-none">
+              {slotsCount}
+            </span>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* 3. SAMPLE COMPATIBLE MATCHES SHOWCASE                                     */}
+        {/* 5. HOW SLOTMATE WORKS? (3 COMPACT STEPS)                                  */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
+        <div className="bg-[#FFFBEB] rounded-[24px] sm:rounded-[26px] p-4 sm:p-5 border border-[#FEF3C7] shadow-2xs space-y-3.5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
+              How SlotMate Works?
+            </h3>
+            <Sparkles className="w-4 h-4 text-[#F59E0B]" />
+          </div>
+
+          <div className="flex items-center justify-between gap-1 sm:gap-2">
+            {/* Step 1 */}
+            <div className="flex flex-col items-center text-center flex-1">
+              <div className="relative">
+                <div className="w-13 h-13 min-[360px]:w-14 min-[360px]:h-14 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shadow-xs">
+                  <FileText className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#FBBF24] text-[#78350F] text-[10px] font-black flex items-center justify-center border-2 border-white shadow-xs">
+                  1
+                </span>
+              </div>
+              <span className="text-xs font-black text-[#17233C] mt-2 leading-tight">
+                Post
+              </span>
+              <span className="text-[10px] text-[#6E7587] font-medium leading-tight">
+                Course &amp; Slot
+              </span>
+            </div>
+
+            {/* Connecting Arrow */}
+            <span className="text-[#FBBF24] font-black text-base -mt-4">→</span>
+
+            {/* Step 2 */}
+            <div className="flex flex-col items-center text-center flex-1">
+              <div className="relative">
+                <div className="w-13 h-13 min-[360px]:w-14 min-[360px]:h-14 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shadow-xs">
+                  <Users className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#FBBF24] text-[#78350F] text-[10px] font-black flex items-center justify-center border-2 border-white shadow-xs">
+                  2
+                </span>
+              </div>
+              <span className="text-xs font-black text-[#17233C] mt-2 leading-tight">
+                Get
+              </span>
+              <span className="text-[10px] text-[#6E7587] font-medium leading-tight">
+                Matched
+              </span>
+            </div>
+
+            {/* Connecting Arrow */}
+            <span className="text-[#FBBF24] font-black text-base -mt-4">→</span>
+
+            {/* Step 3: WhatsApp Connect */}
+            <div className="flex flex-col items-center text-center flex-1">
+              <div className="relative">
+                <div className="w-13 h-13 min-[360px]:w-14 min-[360px]:h-14 rounded-full bg-[#DCFCE7] flex items-center justify-center shadow-xs p-1.5 transition-transform group-hover:scale-105">
+                  <img
+                    src="/whatsapp.svg"
+                    alt="WhatsApp"
+                    className="w-9 h-9 min-[360px]:w-10 min-[360px]:h-10 object-contain select-none pointer-events-none drop-shadow-xs"
+                    onError={(e) => { e.currentTarget.src = '/whatsapp.png'; }}
+                  />
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#FBBF24] text-[#78350F] text-[10px] font-black flex items-center justify-center border-2 border-white shadow-xs">
+                  3
+                </span>
+              </div>
+              <span className="text-xs font-black text-[#17233C] mt-2 leading-tight">
+                Connect
+              </span>
+              <span className="text-[10px] text-[#6E7587] font-medium leading-tight">
+                on WhatsApp
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* SAVED SLOT DRAFT REVIEW CARD                                              */}
+        {/* ========================================================================= */}
+        {pendingDraft && (
+          <div className="bg-[#FFFDF7] rounded-[24px] sm:rounded-[28px] p-4 sm:p-5 border border-[#FDE68A] shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4 stroke-[2.4]" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                    Saved Slot Draft
+                  </h3>
+                  <span className="text-[10px] text-[#D97706] font-bold">Ready to publish when you choose</span>
+                </div>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-[#FEF08A] text-[#854D0E] font-black text-[11px]">
+                Draft
+              </span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-white border border-[#FCE7C8] flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h4 className="font-black text-xs sm:text-sm text-[#17233C] truncate">
+                  {pendingDraft.data?.courseCode} – {pendingDraft.data?.courseName || 'Course'}
+                </h4>
+                <p className="text-[11px] text-[#6E7587] font-medium truncate mt-0.5">
+                  Slot {pendingDraft.data?.slot} • {pendingDraft.data?.teacherName}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => navigate('/slotmate/create')}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-[#FFFDF9] border border-[#F4E3D8] text-[#17233C] font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95"
+              >
+                Review &amp; Edit
+              </button>
+              <button
+                type="button"
+                onClick={handlePublishDraft}
+                disabled={isPublishingDraft}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-[#17233C] font-black text-xs shadow-xs transition-all cursor-pointer active:scale-95 border border-[#EAB308] flex items-center justify-center gap-1.5"
+              >
+                {isPublishingDraft ? 'Publishing...' : 'Publish to Campus'}
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.4]" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 6. MY SLOT POSTS (EXACT DESIGN MATCHING REFERENCE SCREENSHOT)              */}
+        {/* ========================================================================= */}
+        <div className="bg-white rounded-[24px] sm:rounded-[28px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-[#F4E3D8]/60">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center shrink-0">
-                <Zap className="w-4 h-4 fill-[#FF572E]/10 stroke-[2.4]" />
+              <div className="w-7 h-7 rounded-lg bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 stroke-[2.4]" />
               </div>
-              <h2 className="font-black text-sm sm:text-base text-[#17233C]">
-                Compatible Student Matches
-              </h2>
+              <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                My Slot Posts
+              </h3>
             </div>
 
             <button
               type="button"
-              onClick={() => navigate('/slot-friend/matches')}
+              onClick={() => navigate('/slotmate/matches')}
               className="text-xs font-black text-[#FF572E] hover:underline cursor-pointer flex items-center gap-1"
             >
-              <span>View All ({allMatches.length})</span>
-              <ArrowRight className="w-3 h-3 stroke-[2.5]" />
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
           </div>
 
-          {sampleMatches.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {sampleMatches.map((student) => (
-                <div
-                  key={student.id}
-                  onClick={() => navigate(`/slot-friend/student/${student.id}`)}
-                  className="p-3.5 rounded-2xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-xs cursor-pointer transition-all active:scale-[0.99] flex flex-col justify-between gap-3 group"
-                >
-                  <div className="space-y-2">
-                    {/* Top: Avatar + Name + Verified */}
-                    <div className="flex items-center gap-2.5">
-                      <Avatar
-                        avatarId={student.avatarId || 'm1'}
-                        size="sm"
-                        name={student.name}
-                      />
+          {/* Actual Logged-In User Posts (Maximum 3 on Home Page) or Clean Empty State */}
+          {myPosts.length > 0 ? (
+            <div className="space-y-2.5">
+              {myPosts.slice(0, 3).map((post) => {
+                const postMatchCount = post.matchCount ?? 0;
+                const postId = post.id || post._id;
+                const courseCode = post.courseCode || post.course?.split(/[-–]/)?.[0]?.trim();
+
+                return (
+                  <div
+                    key={postId}
+                    onClick={() =>
+                      navigate(
+                        `/slotmate/matches?postId=${postId}&course=${encodeURIComponent(
+                          courseCode
+                        )}&slot=${encodeURIComponent(post.slot)}`
+                      )
+                    }
+                    className="p-3 sm:p-3.5 rounded-2xl bg-[#FFFDF9] border border-[#F4E3D8] hover:border-[#F59E0B]/50 hover:bg-[#FFFBF2] flex items-center justify-between gap-3 cursor-pointer active:scale-[0.99] transition-all group"
+                  >
+                    {/* Left: Icon + Info */}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center shrink-0 border border-[#FED7AA]">
+                        <GraduationCap className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1">
-                          <h4 className="font-black text-xs sm:text-sm text-[#17233C] truncate group-hover:text-[#FF572E] transition-colors">
-                            {student.name}
-                          </h4>
-                          {student.isVerified && (
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-[10px] text-[#6E7587] truncate font-medium">
-                          {student.department} • {student.year}
+                        <h4 className="font-black text-xs sm:text-sm text-[#17233C] truncate group-hover:text-[#D97706] transition-colors">
+                          {post.course}
+                        </h4>
+                        <p className="text-[11px] text-[#6E7587] font-medium truncate mt-0.5">
+                          Slot {post.slot} • {post.teacher}
                         </p>
                       </div>
                     </div>
 
-                    {/* Middle: Course & Slot Chips */}
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4] text-[10px] font-black">
-                        <CheckCircle2 className="w-3 h-3 stroke-[2.4]" />
-                        <span>{student.matchBadge}</span>
-                      </div>
-
-                      <div className="text-[11px] font-bold text-[#17233C] line-clamp-1">
-                        {student.course}
-                      </div>
-
-                      <div className="flex items-center gap-2 text-[10px] text-[#6E7587]">
-                        <span className="font-black text-[#FF572E] bg-[#FFF0E6] px-1.5 py-0.2 rounded">
-                          Slot {student.slot}
-                        </span>
-                        <span className="truncate">
-                          Faculty: {student.teacher.split('(')[0]}
-                        </span>
-                      </div>
+                    {/* Right: Matches Badge + Chevron */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]">
+                        {postMatchCount} Matches
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#17233C] group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
-
-                  {/* Bottom: View Profile Action */}
-                  <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between text-[11px] font-bold text-[#FF572E]">
-                    <span>View Student Profile</span>
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="py-6 text-center text-xs text-[#6E7587] font-medium">
-              No matches found for your current posts yet. Create a slot post to discover friends!
+            /* Clean Empty State for New User */
+            <div className="py-7 px-3 text-center flex flex-col items-center justify-center">
+              <div className="w-11 h-11 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-2">
+                <GraduationCap className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <h4 className="font-extrabold text-xs sm:text-sm text-[#17233C]">
+                No Slot Posts Yet
+              </h4>
+              <p className="text-[11px] text-[#6E7587] max-w-xs mt-1 leading-relaxed">
+                Create your first slot post to find campus peers registered in your exact courses and slots!
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/slot-friend/create')}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Create Slot Post</span>
+              </button>
             </div>
           )}
         </div>
 
         {/* ========================================================================= */}
-        {/* 4. CURRENT STUDENT ACTIVE POSTS PREVIEW                                    */}
+        {/* 7. STUDY BANNER: STUDY BETTER TOGETHER                                    */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-[#F4E3D8]/60">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#EAF5FF] text-[#0284C7] flex items-center justify-center shrink-0">
-                <BookOpen className="w-4 h-4 stroke-[2.4]" />
-              </div>
-              <h2 className="font-black text-sm sm:text-base text-[#17233C]">
-                My Published Slot Posts ({myPosts.length})
-              </h2>
+        <div className="relative bg-[#FFFBEB] rounded-[24px] sm:rounded-[28px] border border-[#FEF3C7] p-4 sm:p-5 overflow-hidden shadow-2xs">
+          <div className="relative z-10 flex items-center justify-between gap-3 sm:gap-4">
+            {/* Left Illustration: slot-study-partner.png */}
+            <div className="shrink-0 w-[120px] min-[360px]:w-[135px] min-[400px]:w-[150px] sm:w-[175px] -ml-1 sm:-ml-2 flex items-center">
+              <img
+                src="/slot-study-partner.png"
+                alt="Study Better Together"
+                className="w-full h-auto max-h-[105px] sm:max-h-[125px] object-contain select-none pointer-events-none drop-shadow-xs"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             </div>
 
-            <button
-              type="button"
-              onClick={() => navigate('/slot-friend/my-posts')}
-              className="text-xs font-black text-[#FF572E] hover:underline cursor-pointer flex items-center gap-1"
-            >
-              <span>Manage Posts</span>
-              <ArrowRight className="w-3 h-3 stroke-[2.5]" />
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {myPosts.map((post) => (
-              <div
-                key={post.id}
-                onClick={() => navigate('/slot-friend/my-posts')}
-                className="p-3 rounded-2xl bg-[#FFFBF8] border border-[#F4E3D8] hover:border-[#FF572E]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] transition-all"
-              >
-                <div className="min-w-0 space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#FFF0E6] text-[#FF572E] font-black text-[11px] border border-[#FDD0BE]">
-                      Slot {post.slot}
-                    </span>
-                    <h3 className="font-black text-xs sm:text-sm text-[#17233C] truncate">
-                      {post.course}
-                    </h3>
-                  </div>
-                  <p className="text-[11px] text-[#6E7587] font-medium truncate">
-                    Teacher: {post.teacher}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    Active
-                  </span>
-                  <span className="text-xs font-bold text-[#FF572E] hover:underline">
-                    Find Matches →
-                  </span>
-                </div>
+            {/* Right Text */}
+            <div className="flex-1 min-w-0 pr-1">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base min-[360px]:text-lg sm:text-xl text-[#17233C] leading-tight">
+                  Study Better Together
+                </h3>
+                <span className="text-[#F59E0B] text-sm">✨</span>
               </div>
-            ))}
+              <p className="text-[11px] min-[360px]:text-xs sm:text-sm text-[#6E7587] font-medium leading-relaxed mt-1">
+                Find slot mates, discuss concepts and prepare for exams together.
+              </p>
+            </div>
           </div>
         </div>
 
-      </div>
+      </main>
+
+      {/* ========================================================================= */}
+      {/* 8. BOTTOM NAVIGATION: 5 ITEMS WITH HOME ACTIVE                            */}
+      {/* ========================================================================= */}
+      <SlotMateBottomNav active="home" />
+
+      {/* Guest Authentication Prompt Modal */}
+      <GuestAuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        moduleName="SlotMate"
+        returnPath="/slotmate"
+      />
     </div>
   );
 }
-

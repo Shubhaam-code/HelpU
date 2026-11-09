@@ -207,11 +207,13 @@ export async function initPushNotifications({
       try {
         const data = notification.data || {};
         const notificationType = data.type || data.eventType || 'BOOKING_REQUESTED';
-        const imageUri = data.imageUrl || notification.imageUrl || data.senderAvatar || data.passengerImage || data.ownerImage || '';
-        const displayName = data.passengerName || data.ownerName || data.senderName || '';
-        const fallbackRoute = data.bookingId
-          ? `/bookings/${data.bookingId}`
-          : (data.travelId || data.postId ? `/rides/${data.travelId || data.postId}` : '/notifications');
+        const imageUri = data.imageUrl || notification.imageUrl || data.senderAvatar || data.matchedStudentAvatar || data.passengerImage || data.ownerImage || '';
+        const displayName = data.matchedStudentName || data.passengerName || data.ownerName || data.senderName || '';
+        const fallbackRoute = data.module === 'slotmate' || notificationType === 'SLOT_MATCH_FOUND'
+          ? (data.postId ? `/slotmate/matches?postId=${data.postId}` : '/slotmate/notifications')
+          : (data.bookingId
+            ? `/bookings/${data.bookingId}`
+            : (data.travelId || data.postId ? `/rides/${data.travelId || data.postId}` : '/notifications'));
 
         triggerInAppNotification({
           id: notification.id || data.eventId || data.id,
@@ -265,22 +267,24 @@ export async function initPushNotifications({
         targetRoute = data.url;
       } else if (data.navigationUrl) {
         targetRoute = data.navigationUrl;
+      } else if (data.module === 'slotmate' || notifType === 'SLOT_MATCH_FOUND') {
+        targetRoute = data.postId ? `/slotmate/matches?postId=${data.postId}` : '/slotmate/matches';
       } else if (data.groupId) {
         targetRoute = `/groups/${data.groupId}`;
-      } else if (notifType.includes('MATCH')) {
+      } else if (notifType.includes('MATCH') && !notifType.includes('SLOT')) {
         targetRoute = data.travelId || data.postId ? `/rides/${data.travelId || data.postId}` : '/match';
       } else if (data.bookingId) {
         targetRoute = `/bookings/${data.bookingId}`;
       } else if (data.travelId || data.postId) {
         targetRoute = `/rides/${data.travelId || data.postId}`;
       } else {
-        targetRoute = '/notifications';
+        targetRoute = data.module === 'slotmate' ? '/slotmate/notifications' : '/notifications';
       }
 
       if (targetRoute && typeof navigate === 'function') {
         navigate(targetRoute);
       } else if (typeof navigate === 'function') {
-        navigate('/notifications');
+        navigate(data.module === 'slotmate' ? '/slotmate/notifications' : '/notifications');
       }
 
       if (typeof onNotificationActionPerformed === 'function') {

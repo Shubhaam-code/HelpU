@@ -1,39 +1,24 @@
 import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  POPULAR_COURSES, 
-  POPULAR_TEACHERS, 
-  SLOT_DEFINITIONS, 
-  INITIAL_USER_POSTS, 
-  MOCK_STUDENTS_POOL 
-} from '../data/mockData';
+  getMySlotPosts, 
+  createSlotPost as createSlotPostApi, 
+  updateSlotPost as updateSlotPostApi,
+  deleteSlotPost as deleteSlotPostApi,
+  getPostMatches,
+  getSlotMatchDetails,
+  searchCourses
+} from '../../../lib/api';
+import { useFirebaseAuth } from '../../../context/FirebaseAuthContext';
 
 const SlotFriendContext = createContext(null);
 
-const STORAGE_KEY = 'helpu_slot_friend_posts_v1';
-
 export function SlotFriendProvider({ children }) {
-  // 1. My Posts State (with localStorage persistence)
-  const [myPosts, setMyPosts] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore JSON parse error
-    }
-    return INITIAL_USER_POSTS;
-  });
+  const { user } = useFirebaseAuth();
 
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(myPosts));
-    } catch {
-      // ignore storage error
-    }
-  }, [myPosts]);
+  // 1. My Posts State (real data from MongoDB)
+  const [myPosts, setMyPosts] = useState([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [postsError, setPostsError] = useState(null);
 
   // 2. Feedback Toast State
   const [toast, setToast] = useState(null);
@@ -44,141 +29,175 @@ export function SlotFriendProvider({ children }) {
     }, 4000);
   }, []);
 
-  // 3. Create a Slot Post
-  const createPost = useCallback((postData) => {
-    const newPost = {
-      id: `post-${Date.now()}`,
-      course: postData.course.trim(),
-      slot: postData.slot.trim(),
-      teacher: postData.teacher.trim(),
-      notes: (postData.notes || '').trim(),
-      createdAt: new Date().toISOString(),
-      isActive: true,
+  // Helper to normalize backend post object to work smoothly with all UI components
+  const formatPost = useCallback((p) => {
+    if (!p) return null;
+    const postId = p._id || p.id;
+    const code = p.courseCode || '';
+    const name = p.courseName || '';
+    const fullCourse = code && name ? `${code} - ${name}` : (name || code);
+    const teacher = p.teacherName || p.teacher || '';
+    const notes = p.additionalNotes || p.notes || '';
+    const count = typeof p.matchCount === 'number' ? p.matchCount : 0;
+
+    return {
+      id: postId,
+      _id: postId,
+      courseId: p.courseId,
+      courseCode: code,
+      courseName: name,
+      course: fullCourse,
+      slot: p.slot || '',
+      teacher,
+      teacherName: teacher,
+      notes,
+      additionalNotes: notes,
+      status: p.status || 'active',
+      matchCount: count,
+      createdAt: p.createdAt || new Date().toISOString()
     };
-
-    setMyPosts((prev) => [newPost, ...prev]);
-    showToast('Slot post created! Compatible students are now discoverable.', 'success');
-    return newPost;
-  }, [showToast]);
-
-  // 4. Update an existing Slot Post
-  const updatePost = useCallback((id, updatedData) => {
-    setMyPosts((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              course: updatedData.course.trim(),
-              slot: updatedData.slot.trim(),
-              teacher: updatedData.teacher.trim(),
-              notes: (updatedData.notes || '').trim(),
-              updatedAt: new Date().toISOString(),
-            }
-          : p
-      )
-    );
-    showToast('Slot post updated successfully.', 'info');
-  }, [showToast]);
-
-  // 5. Delete a Slot Post
-  const deletePost = useCallback((id) => {
-    setMyPosts((prev) => prev.filter((p) => p.id !== id));
-    showToast('Slot post removed.', 'info');
-  }, [showToast]);
-
-  // 6. Reset to default demo posts
-  const resetDemoPosts = useCallback(() => {
-    setMyPosts(INITIAL_USER_POSTS);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    showToast('Reset to default campus sample posts.', 'info');
-  }, [showToast]);
-
-  // 7. Dynamic Match Computation: Same Course + Same Slot
-  // Teacher can be different.
-  const computeMatches = useCallback((postsList) => {
-    if (!Array.isArray(postsList) || postsList.length === 0) return [];
-
-    const matchesMap = new Map();
-
-    postsList.forEach((post) => {
-      if (!post.isActive) return;
-
-      // Find all students matching exact Course and Slot
-      const matchingStudents = MOCK_STUDENTS_POOL.filter(
-        (student) =>
-          student.course.toLowerCase().trim() === post.course.toLowerCase().trim() &&
-          student.slot.toUpperCase().trim() === post.slot.toUpperCase().trim()
-      );
-
-      matchingStudents.forEach((student) => {
-        const isSameTeacher =
-          student.teacher.toLowerCase().trim() === post.teacher.toLowerCase().trim();
-
-        // Calculate match metadata
-        const matchRecord = {
-          ...student,
-          matchedPostId: post.id,
-          matchedCourse: post.course,
-          matchedSlot: post.slot,
-          userTeacher: post.teacher,
-          isSameTeacher,
-          matchBadge: isSameTeacher ? 'Same Course, Slot & Faculty' : 'Same Course & Slot',
-          matchBadgeType: isSameTeacher ? 'faculty-match' : 'slot-match',
-        };
-
-        // De-duplicate if student matches multiple posts
-        if (!matchesMap.has(student.id)) {
-          matchesMap.set(student.id, matchRecord);
-        }
-      });
-    });
-
-    return Array.from(matchesMap.values());
   }, []);
 
-  // All matches for user's current posts
-  const allMatches = useMemo(() => {
-    return computeMatches(myPosts);
-  }, [computeMatches, myPosts]);
-
-  // Find single student by ID
-  const getStudentById = useCallback((id) => {
-    const found = MOCK_STUDENTS_POOL.find((s) => s.id === id);
-    if (found) {
-      // Find which post of user matched this student
-      const matchedPost = myPosts.find(
-        (p) =>
-          p.course.toLowerCase().trim() === found.course.toLowerCase().trim() &&
-          p.slot.toUpperCase().trim() === found.slot.toUpperCase().trim()
-      );
-      const isSameTeacher = matchedPost
-        ? found.teacher.toLowerCase().trim() === matchedPost.teacher.toLowerCase().trim()
-        : false;
-
-      return {
-        ...found,
-        matchedPost,
-        isSameTeacher,
-        matchBadge: isSameTeacher ? 'Same Course, Slot & Faculty' : 'Same Course & Slot',
-      };
+  // 3. Fetch user's real posts from backend
+  const fetchMyPosts = useCallback(async () => {
+    setIsLoadingPosts(true);
+    setPostsError(null);
+    try {
+      const res = await getMySlotPosts();
+      const rawPosts = res?.data?.posts || [];
+      const formatted = rawPosts.map(formatPost);
+      setMyPosts(formatted);
+      return formatted;
+    } catch (err) {
+      console.warn('[SlotMate] Failed to fetch user posts:', err?.message);
+      setPostsError(err?.message || 'Failed to load slot posts');
+      return [];
+    } finally {
+      setIsLoadingPosts(false);
     }
-    return null;
+  }, [formatPost]);
+
+  // Load posts on user auth ready
+  useEffect(() => {
+    if (user) {
+      fetchMyPosts();
+    } else {
+      setMyPosts([]);
+    }
+  }, [user, fetchMyPosts]);
+
+  // 4. Create a Slot Post via backend API
+  const createPost = useCallback(async (postData, options = {}) => {
+    try {
+      const res = await createSlotPostApi({
+        courseId: postData.courseId,
+        courseCode: postData.courseCode,
+        slot: postData.slot.trim(),
+        teacherName: postData.teacherName || postData.teacher,
+        additionalNotes: postData.additionalNotes || postData.notes || ''
+      }, options);
+
+      const newPost = res?.data?.post;
+      const matchCount = res?.data?.matchCount ?? 0;
+
+      // Refresh real posts from backend (Success modal handles visual confirmation)
+      await fetchMyPosts();
+      return { post: newPost, matchCount };
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to publish slot post';
+      showToast(message, 'error');
+      throw err;
+    }
+  }, [showToast, fetchMyPosts]);
+
+  // 4b. Update an existing Slot Post via backend API
+  const updatePost = useCallback(async (postId, postData) => {
+    try {
+      const res = await updateSlotPostApi(postId, {
+        courseId: postData.courseId,
+        courseCode: postData.courseCode,
+        slot: postData.slot.trim(),
+        teacherName: postData.teacherName || postData.teacher,
+        additionalNotes: postData.additionalNotes || postData.notes || ''
+      });
+
+      const updated = res?.data?.post;
+      const matchCount = res?.data?.matchCount ?? 0;
+
+      showToast('Slot post updated successfully!', 'success');
+      await fetchMyPosts();
+      return { post: updated, matchCount };
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to update slot post';
+      showToast(message, 'error');
+      throw err;
+    }
+  }, [showToast, fetchMyPosts]);
+
+  // 5. Delete / Close a Slot Post via backend API
+  const deletePost = useCallback(async (postId) => {
+    try {
+      await deleteSlotPostApi(postId);
+      setMyPosts((prev) => prev.filter((p) => p.id !== postId && p._id !== postId));
+      showToast('Slot post removed.', 'info');
+      await fetchMyPosts();
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to delete slot post';
+      showToast(message, 'error');
+      throw err;
+    }
+  }, [showToast, fetchMyPosts]);
+
+  // 6. Fetch matching students for a specific post
+  const fetchMatchesForPost = useCallback(async (postId) => {
+    try {
+      const res = await getPostMatches(postId);
+      return {
+        post: res?.data?.post,
+        matches: res?.data?.matches || [],
+        totalMatches: res?.data?.totalMatches || 0
+      };
+    } catch (err) {
+      console.error('[SlotMate] Failed to fetch matches for post:', err);
+      return { post: null, matches: [], totalMatches: 0 };
+    }
+  }, []);
+
+  // 7. Fetch details for a specific match
+  const fetchMatchDetails = useCallback(async (matchId) => {
+    try {
+      const res = await getSlotMatchDetails(matchId);
+      return res?.data?.match || null;
+    } catch (err) {
+      console.error('[SlotMate] Failed to fetch match details:', err);
+      return null;
+    }
+  }, []);
+
+  // 8. Match count helper
+  const getPostMatchCount = useCallback((post) => {
+    if (!post) return 0;
+    return typeof post.matchCount === 'number' ? post.matchCount : 0;
+  }, []);
+
+  // Total matches across all posts
+  const totalMatchesCount = useMemo(() => {
+    return myPosts.reduce((sum, p) => sum + (p.matchCount || 0), 0);
   }, [myPosts]);
 
   const value = {
     myPosts,
-    allMatches,
-    courses: POPULAR_COURSES,
-    teachers: POPULAR_TEACHERS,
-    slotDefinitions: SLOT_DEFINITIONS,
+    isLoadingPosts,
+    postsError,
+    fetchMyPosts,
     createPost,
     updatePost,
     deletePost,
-    resetDemoPosts,
-    computeMatches,
-    getStudentById,
+    fetchMatchesForPost,
+    fetchMatchDetails,
+    getPostMatchCount,
+    totalMatchesCount,
+    allMatches: myPosts, // for backward-compatible array references
     toast,
     showToast,
   };
@@ -188,12 +207,18 @@ export function SlotFriendProvider({ children }) {
       {children}
       {/* Toast Notification Container */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] px-4 py-3 rounded-2xl bg-[#17233C] text-white text-xs font-bold shadow-xl flex items-center justify-between gap-3 animate-bounce">
+        <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] px-4 py-3 rounded-2xl text-xs font-black shadow-xl flex items-center justify-between gap-3 animate-bounce ${
+          toast.type === 'error'
+            ? 'bg-red-600 text-white'
+            : toast.type === 'info'
+            ? 'bg-[#17233C] text-white'
+            : 'bg-[#16A34A] text-white'
+        }`}>
           <span>{toast.message}</span>
           <button
             type="button"
             onClick={() => setToast(null)}
-            className="text-white/70 hover:text-white text-sm"
+            className="text-white/80 hover:text-white text-sm"
           >
             ✕
           </button>
@@ -210,4 +235,3 @@ export function useSlotFriend() {
   }
   return context;
 }
-

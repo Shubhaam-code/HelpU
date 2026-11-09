@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
+import { useAuthProfile } from '../context/AuthProfileContext';
+import { 
+  savePoolMateDraft, 
+  getPoolMateDraft, 
+  clearPoolMateDraft, 
+  generateIdempotencyKey 
+} from '../utils/guestDraft';
+import { GuestAuthPromptModal } from '../components/auth/GuestAuthPromptModal';
 import {
   MapPin, Calendar, Clock, Users, ArrowUpDown,
   Search, Check, Sparkles, ChevronDown, User,
@@ -188,6 +196,32 @@ export default function OfferRidePage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdSummary, setCreatedSummary] = useState(null);
 
+  const { isSignedIn } = useUser();
+  const { hasWhatsApp } = useAuthProfile();
+
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
+  const idempotencyKeyRef = useRef(null);
+
+  // Restore PoolMate guest draft on mount
+  useEffect(() => {
+    const draft = getPoolMateDraft();
+    if (draft && draft.data) {
+      const d = draft.data;
+      if (d.fromLoc) setFromLoc(d.fromLoc);
+      if (d.toLoc) setToLoc(d.toLoc);
+      if (d.date) setDate(d.date);
+      if (d.time) setTime(d.time);
+      if (d.travellers) setTravellers(d.travellers);
+      if (d.pricePerSeat) setPricePerSeat(d.pricePerSeat);
+      if (d.vehicleModel) setVehicleModel(d.vehicleModel);
+      if (d.notes) setNotes(d.notes);
+      if (d.gender) setGender(d.gender);
+      if (d.activeTab) setActiveTab(d.activeTab);
+      setIsDraftRestored(true);
+    }
+  }, []);
+
   // My Rides query & state
   const { data: rawTravels, isLoading: travelsLoading, refetch: refetchTravels } = useMyTravels();
   const myTravels = Array.isArray(rawTravels) ? rawTravels : [];
@@ -212,7 +246,7 @@ export default function OfferRidePage() {
     setToLoc(preset.to);
   };
 
-  // Submit Handler: Posts real ride Offer or Find request
+  // Submit Handler: Posts real ride Offer or Find request with guest protection & idempotency
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!fromLoc.trim() || !toLoc.trim()) {
@@ -228,6 +262,43 @@ export default function OfferRidePage() {
       return;
     }
 
+    // 1. If guest, save draft and prompt Google authentication
+    if (!isSignedIn) {
+      savePoolMateDraft({
+        fromLoc: fromLoc.trim(),
+        toLoc: toLoc.trim(),
+        date,
+        time,
+        travellers,
+        pricePerSeat,
+        vehicleModel,
+        notes,
+        gender,
+        activeTab
+      }, location.pathname + location.search, activeTab);
+      setShowAuthModal(true);
+      return;
+    }
+
+    // 2. If authenticated but missing WhatsApp, preserve draft & route to onboarding
+    if (!hasWhatsApp) {
+      savePoolMateDraft({
+        fromLoc: fromLoc.trim(),
+        toLoc: toLoc.trim(),
+        date,
+        time,
+        travellers,
+        pricePerSeat,
+        vehicleModel,
+        notes,
+        gender,
+        activeTab
+      }, location.pathname + location.search, activeTab);
+      navigate(`/whatsapp-setup?returnTo=${encodeURIComponent(location.pathname + location.search)}`);
+      return;
+    }
+
+    // 3. User is authenticated and verified: EXPLICIT CONFIRMATION SUBMISSION
     setLoading(true);
     setError('');
 
@@ -257,8 +328,22 @@ export default function OfferRidePage() {
         authorEmail: user?.primaryEmailAddress?.emailAddress || null,
       };
 
-      const res = await createTravel(payload);
+      // Generate or reuse UUID idempotency key for this submission attempt
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = generateIdempotencyKey();
+      }
+
+      const options = {
+        headers: {
+          'Idempotency-Key': idempotencyKeyRef.current
+        }
+      };
+
+      const res = await createTravel(payload, options);
       const createdPost = res.data?.data || res.data;
+      idempotencyKeyRef.current = null;
+      clearPoolMateDraft();
+      setIsDraftRestored(false);
       invalidateRideQueries();
 
       setCreatedSummary({
@@ -278,7 +363,13 @@ export default function OfferRidePage() {
       setShowSuccessModal(true);
     } catch (err) {
       console.error('Ride post error:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to post ride. Please try again.');
+      if (err.response?.status === 409) {
+        setError('A ride submission is currently being processed. Please wait a moment.');
+      } else if (err.response?.status === 503) {
+        setError('Verification service is momentarily busy. Please try again in a few seconds.');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Failed to post ride. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -435,6 +526,26 @@ export default function OfferRidePage() {
             feedbackMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
           }`}>
             {feedbackMsg.text}
+          </div>
+        )}
+
+        {/* Restored Draft Review Banner */}
+        {isDraftRestored && activeTab !== 'my-rides' && (
+          <div className="bg-[#FFFBEB] border border-[#FEF3C7] rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs text-[#92400E]">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#EA580C] shrink-0" />
+              <span><strong>Draft restored:</strong> Please review your travel details before clicking '{activeTab === 'offer' ? 'Publish Offer' : 'Submit Request'}'.</span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => {
+                clearPoolMateDraft();
+                setIsDraftRestored(false);
+              }} 
+              className="text-[#B45309] font-bold underline hover:no-underline text-[11px] shrink-0 cursor-pointer"
+            >
+              Clear
+            </button>
           </div>
         )}
 
@@ -1124,6 +1235,17 @@ export default function OfferRidePage() {
         onSelectTime={(newTime) => {
           setTime(newTime);
           setShowTimePicker(false);
+        }}
+      />
+      {/* Guest Authentication Prompt Modal */}
+      <GuestAuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        moduleName="PoolMate"
+        returnPath={location.pathname + location.search}
+        onAuthSuccess={() => {
+          setShowAuthModal(false);
+          setIsDraftRestored(true);
         }}
       />
     </ResponsiveShell>

@@ -2,16 +2,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Plus, Users, FileText, Home, CalendarDays } from 'lucide-react';
 import { useSlotFriend } from '../context/SlotFriendContext';
 
-export function SlotFriendHeader({ title, subtitle, showTabs = true, backTo = '/home' }) {
+export function SlotFriendHeader({ title, subtitle, showTabs = true, backTo = '/slotmate' }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { myPosts, allMatches } = useSlotFriend();
+  const { myPosts = [] } = useSlotFriend();
+  const totalMatches = myPosts.reduce((acc, p) => acc + (p.matchCount || 0), 0);
 
   const navTabs = [
-    { label: 'Overview', path: '/slot-friend', icon: Home },
-    { label: 'Matches', path: '/slot-friend/matches', icon: Users, badge: allMatches.length },
-    { label: 'Create Post', path: '/slot-friend/create', icon: Plus },
-    { label: 'My Posts', path: '/slot-friend/my-posts', icon: FileText, badge: myPosts.length },
+    { label: 'Overview', path: '/slotmate', icon: Home },
+    { label: 'Matches', path: '/slotmate/matches', icon: Users, badge: totalMatches },
+    { label: 'Create Post', path: '/slotmate/create', icon: Plus },
   ];
 
   return (

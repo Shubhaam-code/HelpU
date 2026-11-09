@@ -38,9 +38,10 @@ import {
   SlotFriendProvider, 
   SlotFriendHomePage, 
   CreateSlotPostPage, 
-  MySlotPostsPage, 
   SlotMatchesPage, 
-  SlotStudentProfilePage 
+  SlotStudentProfilePage,
+  SlotMateProfilePage,
+  SlotMateNotificationsPage
 } from './features/slot-friend';
 
 // PWA Utilities & Banners
@@ -139,7 +140,7 @@ function MobileBridgeInitializer() {
 
 // Protected route wrapper:
 // Seamlessly verifies Firebase authentication AND WhatsApp onboarding status
-// BEFORE rendering any protected page, completely eliminating Home page flicker.
+// BEFORE rendering any strictly protected page.
 function ProtectedRoute({ children }) {
   const { isLoaded, isSignedIn } = useUser();
   const { isProfileLoading, hasWhatsApp } = useAuthProfile();
@@ -162,20 +163,22 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // 2. Unauthenticated users redirected to /auth
+  // 2. Unauthenticated users redirected to /auth with return path preserved
   if (!isSignedIn) {
-    return <Navigate to="/auth" replace />;
+    const returnTarget = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/auth?returnTo=${returnTarget}`} replace />;
   }
 
   const isOnWhatsAppSetup = location.pathname === '/whatsapp-setup';
 
   // 3. User does NOT have WhatsApp number:
-  // Redirect IMMEDIATELY to /whatsapp-setup BEFORE Home or any protected page ever mounts!
+  // Redirect to /whatsapp-setup preserving return path
   if (!hasWhatsApp) {
     if (isOnWhatsAppSetup) {
       return children;
     }
-    return <Navigate to="/whatsapp-setup" replace />;
+    const returnTarget = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/whatsapp-setup?returnTo=${returnTarget}`} replace />;
   }
 
   // 4. User ALREADY has WhatsApp number and attempts to open /whatsapp-setup:
@@ -184,6 +187,54 @@ function ProtectedRoute({ children }) {
   }
 
   // 5. User has completed setup: render requested protected route
+  return children;
+}
+
+// Guest-friendly route wrapper:
+// Allows unauthenticated guests to explore, view public previews, and fill draft forms.
+// If authenticated, ensures WhatsApp onboarding is completed.
+function GuestFriendlyRoute({ children }) {
+  const { isLoaded, isSignedIn } = useUser();
+  const { isProfileLoading, hasWhatsApp } = useAuthProfile();
+  const location = useLocation();
+
+  if (!isLoaded || (isSignedIn && isProfileLoading)) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-cream">
+        <div className="flex flex-col items-center gap-5">
+          <img
+            src="/logo.png"
+            alt="Helpu"
+            className="h-10 sm:h-12 w-auto object-contain select-none"
+            draggable="false"
+          />
+          <div className="w-6 h-6 border-2 border-coral border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  const isOnWhatsAppSetup = location.pathname === '/whatsapp-setup';
+
+  // If unauthenticated guest, allow exploring and draft editing
+  if (!isSignedIn) {
+    return children;
+  }
+
+  // If signed-in user already has WhatsApp and visits setup page, redirect to home
+  if (isOnWhatsAppSetup && hasWhatsApp) {
+    return <Navigate to="/home" replace />;
+  }
+
+  // If signed in, ensure WhatsApp onboarding is completed
+  if (!hasWhatsApp) {
+    if (isOnWhatsAppSetup) {
+      return children;
+    }
+    const returnTarget = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/whatsapp-setup?returnTo=${returnTarget}`} replace />;
+  }
+
   return children;
 }
 
@@ -205,34 +256,42 @@ export default function App() {
           <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
           <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
           <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
-          <Route path="/oauth-callback" element={<Navigate to="/home" replace />} />
-          <Route path="/callback" element={<Navigate to="/home" replace />} />
+          <Route path="/oauth-callback" element={<Navigate to="/slotmate" replace />} />
+          <Route path="/callback" element={<Navigate to="/slotmate" replace />} />
 
-          {/* WhatsApp Onboarding */}
-          <Route path="/whatsapp-setup" element={<ProtectedRoute><WhatsAppOnboardingPage /></ProtectedRoute>} />
+          {/* WhatsApp / Student Profile Onboarding (Guest-Friendly) */}
+          <Route path="/whatsapp-setup" element={<GuestFriendlyRoute><WhatsAppOnboardingPage /></GuestFriendlyRoute>} />
 
-          {/* Protected */}
-          <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-          <Route path="/rides" element={<ProtectedRoute><Navigate to="/rides/offer" replace /></ProtectedRoute>} />
-          <Route path="/rides/offer" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
-          <Route path="/rides/request" element={<ProtectedRoute><OfferRidePage /></ProtectedRoute>} />
-          <Route path="/rides/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
+          {/* Guest-Friendly Exploration & Form Pages */}
+          <Route path="/home" element={<GuestFriendlyRoute><HomePage /></GuestFriendlyRoute>} />
+          <Route path="/rides" element={<Navigate to="/rides/offer" replace />} />
+          <Route path="/rides/offer" element={<GuestFriendlyRoute><OfferRidePage /></GuestFriendlyRoute>} />
+          <Route path="/rides/request" element={<GuestFriendlyRoute><OfferRidePage /></GuestFriendlyRoute>} />
+          <Route path="/rides/:id" element={<GuestFriendlyRoute><RideDetailsPage /></GuestFriendlyRoute>} />
+          <Route path="/slotmate" element={<GuestFriendlyRoute><SlotFriendHomePage /></GuestFriendlyRoute>} />
+          <Route path="/slotmate/create" element={<GuestFriendlyRoute><CreateSlotPostPage /></GuestFriendlyRoute>} />
+          <Route path="/slot-friend" element={<GuestFriendlyRoute><SlotFriendHomePage /></GuestFriendlyRoute>} />
+          <Route path="/slot-friend/create" element={<GuestFriendlyRoute><CreateSlotPostPage /></GuestFriendlyRoute>} />
+          <Route path="/match" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
+          <Route path="/matches" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
+          <Route path="/match/my" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
+          <Route path="/match/explore" element={<GuestFriendlyRoute><MatchPage /></GuestFriendlyRoute>} />
+          <Route path="/match/preferences" element={<GuestFriendlyRoute><MatchPreferencesPage /></GuestFriendlyRoute>} />
+          <Route path="/match/success" element={<GuestFriendlyRoute><MatchSuccessPage /></GuestFriendlyRoute>} />
+          <Route path="/match/:id" element={<GuestFriendlyRoute><MatchDetailsPage /></GuestFriendlyRoute>} />
+          <Route path="/slotmate/matches" element={<GuestFriendlyRoute><SlotMatchesPage /></GuestFriendlyRoute>} />
+          <Route path="/slot-friend/matches" element={<GuestFriendlyRoute><SlotMatchesPage /></GuestFriendlyRoute>} />
+
+          {/* Strictly Protected User Features */}
           <Route path="/book/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
           <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
           <Route path="/confirmed-rides" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
           <Route path="/rides/confirmed" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
-          <Route path="/match" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
-          <Route path="/matches" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
-          <Route path="/match/my" element={<ProtectedRoute><MyMatchesPage /></ProtectedRoute>} />
-          <Route path="/match/explore" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
-          <Route path="/match/preferences" element={<ProtectedRoute><MatchPreferencesPage /></ProtectedRoute>} />
-          <Route path="/match/success" element={<ProtectedRoute><MatchSuccessPage /></ProtectedRoute>} />
-          <Route path="/match/:id" element={<ProtectedRoute><MatchDetailsPage /></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
           <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/shared-rides" element={<ProtectedRoute><SharedRidesPage /></ProtectedRoute>} />
+          <Route path="/profile" element={<GuestFriendlyRoute><ProfilePage /></GuestFriendlyRoute>} />
+          <Route path="/shared-rides" element={<GuestFriendlyRoute><SharedRidesPage /></GuestFriendlyRoute>} />
           <Route path="/groups" element={<ProtectedRoute><Navigate to="/shared-rides" replace /></ProtectedRoute>} />
           <Route path="/groups/:groupId" element={<ProtectedRoute><GroupDetailsPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
@@ -248,18 +307,16 @@ export default function App() {
           <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
           <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
 
-          {/* SlotMate Routes (aliases supported for /slotmate and /slot-friend) */}
-          <Route path="/slotmate" element={<ProtectedRoute><SlotFriendHomePage /></ProtectedRoute>} />
-          <Route path="/slotmate/create" element={<ProtectedRoute><CreateSlotPostPage /></ProtectedRoute>} />
-          <Route path="/slotmate/my-posts" element={<ProtectedRoute><MySlotPostsPage /></ProtectedRoute>} />
-          <Route path="/slotmate/matches" element={<ProtectedRoute><SlotMatchesPage /></ProtectedRoute>} />
+          {/* SlotMate Protected Match & Notification Pages */}
+          <Route path="/slotmate/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
+          <Route path="/slotmate/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
           <Route path="/slotmate/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
+          <Route path="/slotmate/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
 
-          <Route path="/slot-friend" element={<ProtectedRoute><SlotFriendHomePage /></ProtectedRoute>} />
-          <Route path="/slot-friend/create" element={<ProtectedRoute><CreateSlotPostPage /></ProtectedRoute>} />
-          <Route path="/slot-friend/my-posts" element={<ProtectedRoute><MySlotPostsPage /></ProtectedRoute>} />
-          <Route path="/slot-friend/matches" element={<ProtectedRoute><SlotMatchesPage /></ProtectedRoute>} />
+          <Route path="/slot-friend/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
+          <Route path="/slot-friend/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
           <Route path="/slot-friend/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
+          <Route path="/slot-friend/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

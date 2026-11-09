@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useUser, useAuth } from './FirebaseAuthContext';
 import { getProfile, saveProfile, setTokenGetter } from '../lib/api';
+import { getProfileDraft, clearProfileDraft } from '../utils/guestDraft';
 
 const AuthProfileContext = createContext(null);
 
@@ -53,8 +54,39 @@ export function AuthProfileProvider({ children }) {
     }
 
     try {
+      // Check if user filled out guest student profile draft before authenticating
+      const guestDraft = getProfileDraft();
       const res = await getProfile();
-      const p = res?.data?.data;
+      let p = res?.data?.data;
+
+      if (guestDraft && guestDraft.data) {
+        const d = guestDraft.data;
+        const email = p?.email || user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || user.email || '';
+        const currentImg = user.imageUrl || p?.imageUrl || '';
+
+        const payload = {
+          name: d.name || user.fullName || p?.name || 'Campus Student',
+          email,
+          college: d.college || p?.college || 'VIT, Bhopal',
+          registrationNumber: d.registrationNumber || p?.registrationNumber || '',
+          branch: d.branch || p?.branch || '',
+          year: d.year || p?.year || '',
+          phone: d.phone || d.whatsappNumber || p?.phone || '',
+          whatsappNumber: d.whatsappNumber || d.phone || p?.whatsappNumber || '',
+          whatsappCountryCode: d.whatsappCountryCode || 'IN',
+          imageUrl: currentImg
+        };
+
+        try {
+          const savedRes = await saveProfile(payload);
+          if (savedRes?.data?.data) {
+            p = savedRes.data.data;
+            clearProfileDraft();
+          }
+        } catch (saveErr) {
+          console.warn('[ProfileProvider] Error syncing guest profile draft:', saveErr?.message);
+        }
+      }
 
       if (p) {
         setProfile(p);

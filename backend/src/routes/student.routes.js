@@ -70,7 +70,7 @@ async function handleSaveProfile(req, res) {
       });
     }
 
-    const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio, gender } = req.body;
+    const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio, gender, registrationNumber, branch, year } = req.body;
 
     // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
     const existing = await Student.findOne(
@@ -115,6 +115,18 @@ async function handleSaveProfile(req, res) {
 
     if (course !== undefined) {
       updateData.course = typeof course === 'string' ? course.trim() : '';
+    }
+
+    if (registrationNumber !== undefined) {
+      updateData.registrationNumber = typeof registrationNumber === 'string' ? registrationNumber.trim().toUpperCase() : '';
+    }
+
+    if (branch !== undefined) {
+      updateData.branch = typeof branch === 'string' ? branch.trim() : '';
+    }
+
+    if (year !== undefined) {
+      updateData.year = typeof year === 'string' ? year.trim() : '';
     }
 
     if (bio !== undefined) {

@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { requireAuth } from '../middlewares/auth.js';
+import { requireAuth, optionalAuth } from '../middlewares/auth.js';
+import { requireIdempotency } from '../middlewares/idempotency.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
 import Student from '../models/Student.js';
 import Booking from '../models/Booking.js';
@@ -165,7 +166,7 @@ const router = express.Router();
  * @desc    Create a new travel offer or request
  * @access  Protected
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireIdempotency({ required: false }), async (req, res) => {
   try {
     const { source, destination, travelDate, departureTime, timeFlexibility, seats, type, carModel, pricePerSeat, authorImage, authorName, authorEmail, notes, description, gender } = req.body;
 
@@ -356,10 +357,87 @@ function escapeRegex(str) {
  *          - Rejects opposite-direction rides and unrelated routes.
  * @access  Protected
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const now = new Date();
 
+    // -------------------------------------------------------------
+    // GUEST-FIRST PUBLIC EXPLORATION FEED
+    // Unauthenticated visitors receive a preview of active rides with ALL PII redacted.
+    // -------------------------------------------------------------
+    if (!req.userId) {
+      const query = {
+        status: 'active',
+        expiresAt: { $gt: now }
+      };
+
+      if (req.query.type === 'offer' || req.query.type === 'request') {
+        query.type = req.query.type;
+      }
+
+      let publicTravels = await Travel.find(query).sort({ createdAt: -1 }).limit(30).lean();
+
+      if (req.query.search) {
+        const term = req.query.search.trim().toLowerCase();
+        publicTravels = publicTravels.filter(t =>
+          (t.source || '').toLowerCase().includes(term) ||
+          (t.destination || '').toLowerCase().includes(term)
+        );
+      }
+
+      // STRICT PRIVACY PROTECTION: Redact all contact numbers, emails, and identifiers for guests
+      const sanitizedGuestData = publicTravels.map(t => {
+        const isOffer = t.type === 'offer';
+        const isFulfilled = !isOffer && Boolean((t.bookedSeats || 0) >= 1 || t.isFulfilled || t.status === 'completed');
+        const availableSeats = Math.max(0, (t.seats || 1) - (t.bookedSeats || 0));
+
+        return {
+          _id: t._id,
+          source: t.source,
+          destination: t.destination,
+          travelDate: t.travelDate,
+          departureTime: t.departureTime,
+          type: t.type || 'offer',
+          seats: t.seats || 1,
+          availableSeats,
+          bookedSeats: t.bookedSeats || 0,
+          pricePerSeat: t.pricePerSeat || 0,
+          vehicleType: t.vehicleType || 'car',
+          carModel: t.carModel || 'Campus Ride',
+          genderPreference: t.genderPreference || 'any',
+          status: t.status,
+          isFulfilled,
+          isMine: false,
+          phone: null,
+          authorPhone: null,
+          authorEmail: null,
+          student: {
+            name: t.authorName ? t.authorName.split(' ')[0] : 'Campus Student',
+            email: null,
+            phone: null,
+            whatsappNumber: null,
+            registrationNumber: null,
+            imageUrl: t.authorImage || null,
+            avatarId: 'm1',
+            college: 'VIT, Bhopal',
+            isVerified: true
+          }
+        };
+      });
+
+      return res.status(200).json({
+        success: true,
+        count: sanitizedGuestData.length,
+        hasPostedTravel: false,
+        isGuest: true,
+        data: sanitizedGuestData
+      });
+    }
+
+    // -------------------------------------------------------------
+    // AUTHENTICATED MATCHING ENGINE
+    // Preserves existing matching behavior, overdue ride expiration, and contact visibility.
+    // -------------------------------------------------------------
     // Automatically transition user's active posts that passed expiresAt to 'expired' and notify owner
     await expireOverdueRidesAndNotify(req.userId);
 
@@ -754,7 +832,7 @@ router.get('/my-matches', requireAuth, handleGetUserMatches);
  * @desc    Get single travel post by ID with student profile
  * @access  Protected
  */
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -780,8 +858,9 @@ router.get('/:id', requireAuth, async (req, res) => {
       await Travel.updateOne({ _id: travel._id }, { $set: { status: 'expired' } });
     }
 
-    const isMine = travel.userId === req.userId;
-    const student = await Student.findOne({ clerkId: travel.userId }).lean();
+    const isGuest = !req.userId;
+    const isMine = !isGuest && travel.userId === req.userId;
+    const student = isGuest ? null : await Student.findOne({ clerkId: travel.userId }).lean();
 
     // Compute real-time confirmed and available seats
     let isFulfilled = false;
@@ -828,10 +907,16 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const availableSeats = Math.max(0, (travel.seats || 1) - bookedSeats);
 
+    // Privacy formatting: For guests, completely scrub private contact information
+    const phoneDisplay = isGuest ? null : (isMine ? '' : (student?.phone || ''));
+    const emailDisplay = isGuest ? null : (student?.email || travel.authorEmail || '');
+
     return res.status(200).json({
       success: true,
       data: {
         ...travel,
+        authorPhone: isGuest ? null : travel.authorPhone,
+        authorEmail: isGuest ? null : travel.authorEmail,
         status: effectiveStatus,
         isFulfilled,
         bookedSeats,
@@ -839,15 +924,20 @@ router.get('/:id', requireAuth, async (req, res) => {
         pricePerSeat: travel.pricePerSeat || 350,
         carModel: travel.carModel || 'Campus Ride',
         isMine,
+        isGuest,
+        phone: phoneDisplay,
         student: {
-          name: student?.name || travel.authorName || 'Campus Student',
-          email: student?.email || travel.authorEmail || '',
+          name: isGuest
+            ? (travel.authorName ? travel.authorName.split(' ')[0] : 'Campus Student')
+            : (student?.name || travel.authorName || 'Campus Student'),
+          email: emailDisplay,
           imageUrl: student?.imageUrl || travel.authorImage || null,
           college: student?.college || 'VIT, Bhopal',
           gender: travel.gender || student?.gender || null,
-          isVerified: Boolean(student?.isVerified),
-          // Strictly withhold phone number if viewing own post to prevent self WhatsApp contact
-          phone: isMine ? '' : (student?.phone || '')
+          isVerified: Boolean(student?.isVerified ?? true),
+          phone: phoneDisplay,
+          whatsappNumber: isGuest ? null : (student?.whatsappNumber || phoneDisplay),
+          registrationNumber: null
         }
       }
     });

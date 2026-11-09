@@ -21,6 +21,12 @@ const notificationSchema = new mongoose.Schema(
       trim: true,
       index: true
     },
+    module: {
+      type: String,
+      enum: ['poolmate', 'slotmate'],
+      default: 'poolmate',
+      index: true
+    },
     title: {
       type: String,
       required: [true, 'Notification title is required'],
@@ -44,6 +50,15 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Travel'
     },
+    relatedSlotPostId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SlotPost',
+      index: true
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
     isRead: {
       type: Boolean,
       default: false,
@@ -58,6 +73,7 @@ const notificationSchema = new mongoose.Schema(
 // Compound index for fast user notification listing sorted newest first
 notificationSchema.index({ recipientId: 1, createdAt: -1 });
 notificationSchema.index({ recipientId: 1, isRead: 1 });
+notificationSchema.index({ recipientId: 1, module: 1, createdAt: -1 });
 
 const Notification = mongoose.model('Notification', notificationSchema);
 

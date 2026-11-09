@@ -1,9 +1,53 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseAuth } from '../context/FirebaseAuthContext';
-import { ArrowLeft, ShieldCheck, Sparkles, Car, Mail, Lock, User as UserIcon, Loader2 } from 'lucide-react';
+import { 
+  ArrowLeft, ShieldCheck, Mail, Lock, User as UserIcon, 
+  Eye, EyeOff, Car, GraduationCap, CheckCircle2, X
+} from 'lucide-react';
 import { useAuthProfile } from '../context/AuthProfileContext';
+import { getPendingDraftReturnPath } from '../utils/guestDraft';
+
+/**
+ * Sanitize a returnTo URL so that only safe internal application paths are
+ * accepted. External URLs, protocol-relative URLs (//), and any non-path
+ * strings are rejected and fall back to '/home'.
+ */
+function sanitizeReturnTo(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  // Must begin with a single '/' and not with '//' (protocol-relative attack)
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null;
+  // Reject any embedded protocol scheme
+  if (/^\/[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(trimmed)) return null;
+  // Reject absolute URLs
+  if (/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
+}
+
+function GoogleIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" className={className}>
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+      />
+    </svg>
+  );
+}
 
 function formatFirebaseError(err) {
   if (!err) return '';
@@ -30,12 +74,12 @@ function formatFirebaseError(err) {
 }
 
 export default function AuthPage({ initialMode = 'signIn' }) {
-  const { isLoaded, isSignedIn, signInWithGoogle, signInWithEmail, signUpWithEmail } = useFirebaseAuth();
+  const { isLoaded, isSignedIn, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useFirebaseAuth();
   const { hasWhatsApp, isProfileLoading, isSkipped } = useAuthProfile();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Mode state: 'signIn' | 'signUp'
+  // Mode: 'signIn' | 'signUp'
   const modeParam = searchParams.get('mode');
   const [mode, setMode] = useState(modeParam === 'signUp' ? 'signUp' : initialMode);
 
@@ -43,9 +87,18 @@ export default function AuthPage({ initialMode = 'signIn' }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Forgot password modal
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [forgotError, setForgotError] = useState('');
 
   // Sync mode state with query params
   useEffect(() => {
@@ -57,17 +110,31 @@ export default function AuthPage({ initialMode = 'signIn' }) {
   // Redirect if already authenticated
   useEffect(() => {
     if (isLoaded && isSignedIn && !isProfileLoading) {
+      const rawReturn = searchParams.get('returnTo') || searchParams.get('redirectUrl');
+      const safeReturn = sanitizeReturnTo(rawReturn) || sanitizeReturnTo(getPendingDraftReturnPath()) || '/home';
+
       if (!hasWhatsApp && !isSkipped) {
-        navigate('/whatsapp-setup', { replace: true });
+        navigate(`/whatsapp-setup?returnTo=${encodeURIComponent(safeReturn)}`, { replace: true });
       } else {
-        navigate('/home', { replace: true });
+        navigate(safeReturn, { replace: true });
       }
     }
-  }, [isLoaded, isSignedIn, isProfileLoading, hasWhatsApp, isSkipped, navigate]);
+  }, [isLoaded, isSignedIn, isProfileLoading, hasWhatsApp, isSkipped, navigate, searchParams]);
+
+  const handleBack = () => {
+    const rawReturn = searchParams.get('returnTo') || searchParams.get('redirectUrl');
+    const safeReturn = sanitizeReturnTo(rawReturn);
+    if (safeReturn && safeReturn !== '/auth' && safeReturn !== '/') {
+      navigate(safeReturn);
+    } else {
+      navigate('/home');
+    }
+  };
 
   const switchMode = (newMode) => {
     setMode(newMode);
     setErrorMessage('');
+    setSuccessMessage('');
     setSearchParams({ mode: newMode });
   };
 
@@ -76,7 +143,6 @@ export default function AuthPage({ initialMode = 'signIn' }) {
       setErrorMessage('');
       setIsGoogleLoading(true);
       await signInWithGoogle();
-      // Navigation will be automatically handled by the useEffect above
     } catch (err) {
       setErrorMessage(formatFirebaseError(err));
     } finally {
@@ -87,6 +153,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setSuccessMessage('');
 
     if (!email.trim() || !password) {
       setErrorMessage('Please fill in all required fields.');
@@ -112,318 +179,418 @@ export default function AuthPage({ initialMode = 'signIn' }) {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      setForgotError('Please enter your registered email address.');
+      return;
+    }
+
+    try {
+      setForgotLoading(true);
+      setForgotError('');
+      if (resetPassword) {
+        await resetPassword(forgotEmail.trim());
+      }
+      setForgotSuccess('Password reset link sent! Please check your email inbox.');
+    } catch (err) {
+      setForgotError(formatFirebaseError(err));
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen lg:h-screen lg:max-h-screen bg-[#FFF7F2] text-[#17213D] font-sans relative flex flex-col justify-between overflow-x-hidden lg:overflow-hidden selection:bg-[#FF572E]/20 selection:text-[#FF572E]">
+    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] font-sans relative overflow-x-hidden selection:bg-[#F59E0B]/20 selection:text-[#D97706] pb-0">
       
       {/* Decorative ambient background glows */}
-      <div className="absolute top-0 left-0 w-80 h-80 bg-[#FFE4D5]/50 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFE0D0]/40 rounded-full blur-3xl pointer-events-none translate-x-1/3 translate-y-1/3" />
+      <div 
+        aria-hidden="true" 
+        className="absolute top-0 right-0 w-72 sm:w-80 h-72 sm:h-80 bg-gradient-to-bl from-[#FDE68A]/50 via-[#FDE047]/15 to-transparent pointer-events-none rounded-bl-full blur-2xl" 
+      />
 
-      {/* ========================================================================= */}
-      {/* TOP HEADER / BRAND NAVIGATION (72–76px HEIGHT)                           */}
-      {/* ========================================================================= */}
-      <header className="relative z-20 h-[72px] sm:h-[76px] px-4 sm:px-8 lg:px-12 border-b border-[#F4E3D8] bg-[#FFF7F2]/95 backdrop-blur-md shrink-0 flex items-center">
-        <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
-          
-          {/* Logo & Brand Name */}
-          <Link to="/" className="flex items-center gap-2.5 group cursor-pointer">
+      {/* Main Container - Mobile First */}
+      <div className="max-w-md sm:max-w-lg mx-auto px-4 sm:px-6 pt-3 space-y-4 sm:space-y-4.5 relative z-10">
+
+        {/* ======================================================================= */}
+        {/* 1. TOP BAR: BACK ARROW + CENTERED HELPU LOGO                            */}
+        {/* ======================================================================= */}
+        <header className="relative flex items-center justify-between py-1">
+          {/* Back button */}
+          <button
+            type="button"
+            onClick={handleBack}
+            className="p-1.5 -ml-1.5 rounded-full text-[#17233C] hover:bg-white border border-transparent hover:border-[#F4E3D8] transition-colors cursor-pointer"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
+          </button>
+
+          {/* Centered Logo */}
+          <div className="flex items-center gap-1.5 select-none">
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="h-9 sm:h-10 w-auto object-contain transition-transform group-hover:scale-105" 
+              className="h-8 sm:h-9 w-auto object-contain"
             />
-          </Link>
+          </div>
 
-          {/* Back to Home Button */}
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold text-[#17213D] bg-white border border-[#E8D8CD] hover:bg-[#FFF3EC] hover:border-[#D9C4B7] shadow-2xs hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+          {/* Empty spacer for perfect centering */}
+          <div className="w-8" />
+        </header>
+
+        {/* ======================================================================= */}
+        {/* 2. TOP CELEBRATION ILLUSTRATION BANNER                                  */}
+        {/* ======================================================================= */}
+        <div className="relative w-full overflow-hidden select-none">
+          <img
+            src="/login-students-banner.png"
+            alt="Helpu Students Celebrating with Laptop"
+            className="w-full h-auto max-h-[200px] sm:max-h-[230px] object-contain mx-auto"
+            loading="eager"
+          />
+        </div>
+
+        {/* ======================================================================= */}
+        {/* 3. WELCOME SECTION                                                      */}
+        {/* ======================================================================= */}
+        <div className="text-center space-y-1">
+          <h1 className="text-2xl sm:text-[28px] font-black text-[#17233C] tracking-tight leading-tight">
+            <span>Welcome to </span>
+            <span className="text-[#FF572E]">Helpu</span>
+            <span> 👋</span>
+          </h1>
+
+          <p className="text-xs sm:text-[13px] text-[#5A6275] font-medium leading-relaxed max-w-xs sm:max-w-sm mx-auto">
+            Your campus community for rides, classmates and more.
+          </p>
+
+          {/* Subtle curved yellow accent line */}
+          <div className="w-20 h-1 bg-gradient-to-r from-transparent via-[#FBBF24] to-transparent mx-auto rounded-full mt-1.5 opacity-80" />
+        </div>
+
+        {/* ======================================================================= */}
+        {/* 4. FEATURE CARDS (POOLMATE & SLOTMATE)                                  */}
+        {/* ======================================================================= */}
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full">
+          {/* Card 1: PoolMate */}
+          <div className="rounded-2xl bg-[#FFF5ED] border border-[#FFE4D6] p-2.5 sm:p-3 flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-full bg-[#FFEFE6] text-[#FF572E] border border-[#FFD9C7] flex items-center justify-center shrink-0 shadow-2xs">
+              <Car className="w-4 h-4 stroke-[2.4]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-black text-xs sm:text-[13px] text-[#17233C] truncate">
+                PoolMate
+              </h3>
+              <p className="text-[9.5px] min-[360px]:text-[10px] text-[#6E7587] font-medium leading-tight truncate">
+                Share rides & travel together
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2: SlotMate */}
+          <div className="rounded-2xl bg-[#FEFCE8] border border-[#FEF08A] p-2.5 sm:p-3 flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A] flex items-center justify-center shrink-0 shadow-2xs">
+              <GraduationCap className="w-4 h-4 stroke-[2.4]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-black text-xs sm:text-[13px] text-[#17233C] truncate">
+                SlotMate
+              </h3>
+              <p className="text-[9.5px] min-[360px]:text-[10px] text-[#6E7587] font-medium leading-tight truncate">
+                Find classmates by course & slot
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* 5. AUTHENTICATION SECTION                                               */}
+        {/* ======================================================================= */}
+        <div className="bg-white rounded-[26px] sm:rounded-[30px] border border-[#F4E3D8] shadow-sm shadow-[#F4E3D8]/50 p-4 min-[380px]:p-5 sm:p-6 space-y-4">
+          
+          {/* Tab Switcher: Sign In | Create Account */}
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-[#FFF8F3] border border-[#F4E3D8]">
+            <button
+              type="button"
+              onClick={() => switchMode('signIn')}
+              className={`py-2 rounded-full font-black text-xs sm:text-[13px] transition-all cursor-pointer ${
+                mode === 'signIn'
+                  ? 'bg-gradient-to-r from-[#FF6B35] to-[#FF451A] text-white shadow-xs'
+                  : 'text-[#6E7587] hover:text-[#17233C]'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('signUp')}
+              className={`py-2 rounded-full font-black text-xs sm:text-[13px] transition-all cursor-pointer ${
+                mode === 'signUp'
+                  ? 'bg-gradient-to-r from-[#FF6B35] to-[#FF451A] text-white shadow-xs'
+                  : 'text-[#6E7587] hover:text-[#17233C]'
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+
+          {/* Continue with Google Button */}
+          <button
+            type="button"
+            onClick={handleGoogleAuth}
+            disabled={isGoogleLoading || isSubmitting}
+            className="w-full py-2.5 sm:py-3 px-4 rounded-2xl bg-white border border-[#E5E7EB] hover:bg-[#FFFDF9] hover:border-[#D1D5DB] shadow-2xs flex items-center justify-center gap-2.5 font-bold text-xs sm:text-sm text-[#17233C] transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
           >
-            <ArrowLeft className="w-4 h-4 text-[#FF572E]" />
-            <span>Back to Home</span>
-          </Link>
+            {isGoogleLoading ? (
+              <div className="w-4 h-4 border-2 border-[#17233C] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <GoogleIcon className="w-4.5 h-4.5 shrink-0" />
+            )}
+            <span>Continue with Google</span>
+          </button>
+
+          {/* OR Divider */}
+          <div className="relative flex items-center justify-center py-1">
+            <div className="border-t border-[#F4E3D8] w-full" />
+            <span className="bg-white px-3 text-[10px] font-black text-[#9CA3AF] tracking-wider uppercase absolute">
+              OR
+            </span>
+          </div>
+
+          {/* Error & Success Messages */}
+          {errorMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 bg-rose-50 border border-rose-200 rounded-2xl"
+            >
+              <p className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>{errorMessage}</span>
+              </p>
+            </motion.div>
+          )}
+
+          {successMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl"
+            >
+              <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{successMessage}</span>
+              </p>
+            </motion.div>
+          )}
+
+          {/* Email / Password Form */}
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
+            
+            {/* If Sign Up, ask for Full Name */}
+            {mode === 'signUp' && (
+              <div className="space-y-1">
+                <label className="text-xs font-black text-[#17233C]">
+                  Full Name
+                </label>
+                <div className="relative flex items-center">
+                  <div className="absolute left-3.5 text-[#9CA3AF]">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Shubham Narayan"
+                    required
+                    className="w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-2xl bg-[#FFFDF9] border border-[#F4E3D8] focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 text-[#17233C] font-bold text-xs sm:text-sm placeholder:text-[#9CA3AF] transition-all outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Email Address */}
+            <div className="space-y-1">
+              <label className="text-xs font-black text-[#17233C]">
+                Email Address
+              </label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3.5 text-[#9CA3AF]">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@college.edu"
+                  required
+                  className="w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-2xl bg-[#FFFDF9] border border-[#F4E3D8] focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 text-[#17233C] font-bold text-xs sm:text-sm placeholder:text-[#9CA3AF] transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1">
+              <label className="text-xs font-black text-[#17233C]">
+                Password
+              </label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3.5 text-[#9CA3AF]">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-2xl bg-[#FFFDF9] border border-[#F4E3D8] focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 text-[#17233C] font-bold text-xs sm:text-sm placeholder:text-[#9CA3AF] transition-all outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 text-[#9CA3AF] hover:text-[#17233C] transition-colors cursor-pointer"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Forgot Password link */}
+            {mode === 'signIn' && (
+              <div className="flex justify-end pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(email);
+                    setForgotError('');
+                    setForgotSuccess('');
+                    setShowForgotModal(true);
+                  }}
+                  className="text-xs font-bold text-[#DC2626] hover:text-[#B91C1C] hover:underline cursor-pointer"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            {/* Orange / Yellow Sign In Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 sm:py-3.5 rounded-full bg-gradient-to-r from-[#FF6B35] to-[#FF451A] hover:from-[#FF572E] hover:to-[#E63E15] text-white font-black text-sm sm:text-base shadow-md shadow-[#FF572E]/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>{mode === 'signIn' ? 'Signing In...' : 'Creating Account...'}</span>
+                </div>
+              ) : (
+                <span>{mode === 'signIn' ? 'Sign In →' : 'Create Account →'}</span>
+              )}
+            </button>
+          </form>
 
         </div>
-      </header>
+
+        {/* ======================================================================= */}
+        {/* 6. TRUST SECTION                                                        */}
+        {/* ======================================================================= */}
+        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#16A34A] select-none">
+          <ShieldCheck className="w-4 h-4 text-[#16A34A] stroke-[2.4]" />
+          <span>Verified college students only</span>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* 7. BOTTOM FOOTER ILLUSTRATION                                           */}
+        {/* ======================================================================= */}
+        <footer className="w-full pt-1 pb-0 overflow-hidden select-none">
+          <img
+            src="/auth-footer-students.png"
+            alt="Helpu Campus Students Studying Together"
+            className="w-full h-auto object-contain mx-auto block pointer-events-none"
+            loading="eager"
+          />
+        </footer>
+
+      </div>
 
       {/* ========================================================================= */}
-      {/* MAIN TWO-COLUMN CONTENT                                                   */}
+      {/* 8. FORGOT PASSWORD MODAL                                                  */}
       {/* ========================================================================= */}
-      <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-2 flex items-center justify-center min-h-0">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 xl:gap-10 items-center w-full my-auto">
-          
-          {/* --------------------------------------------------------------------- */}
-          {/* LEFT COLUMN: BRANDING, VALUE PROPS & ILLUSTRATION                     */}
-          {/* --------------------------------------------------------------------- */}
-          <motion.div 
-            initial={{ opacity: 0, x: -15 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center space-y-2.5 lg:pr-2"
-          >
-            {/* Top Text & Value Points */}
-            <div className="space-y-1.5 sm:space-y-2">
-              
-              {/* Badge */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE3CF] border border-[#FFD1B5] text-[#FF572E] text-[11px] sm:text-xs font-extrabold shadow-2xs w-fit">
-                <Sparkles className="w-3 h-3 text-[#FF572E]" />
-                <span>Student-Only Campus Network</span>
-              </div>
+      <AnimatePresence>
+        {showForgotModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm sm:max-w-md bg-[#FFFDF9] rounded-[28px] border border-[#F4E3D8] shadow-2xl p-5 sm:p-6 space-y-4 relative overflow-hidden"
+            >
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-white text-[#6E7587] hover:text-[#17233C] border border-[#F4E3D8] shadow-2xs transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
 
-              {/* Main Heading */}
-              <h1 className="font-black text-[#17213D] text-2xl sm:text-3xl lg:text-[34px] leading-[1.12] tracking-tight">
-                {mode === 'signIn' ? (
-                  <>
-                    <span>Welcome back to </span>
-                    <span className="text-[#FF572E]">HelpU</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Join Your Campus </span>
-                    <span className="text-[#FF572E]">Ride Network</span>
-                  </>
-                )}
-              </h1>
-
-              {/* Subtitle */}
-              <p className="text-[#596277] text-xs sm:text-sm lg:text-[15px] font-medium leading-relaxed max-w-md">
-                Connect with verified college peers, share daily rides, split fuel costs, and get quick campus assistance safely.
-              </p>
-
-              {/* Feature Highlights Pills (Compact) */}
-              <div className="hidden sm:flex flex-wrap items-center gap-2 pt-0.5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 border border-[#F2DDD2] text-[#17213D] text-[11px] font-bold shadow-2xs">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>Verified Campus Emails</span>
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 border border-[#F2DDD2] text-[#17213D] text-[11px] font-bold shadow-2xs">
-                  <Car className="w-3.5 h-3.5 text-[#FF572E]" />
-                  <span>Fast Route Matching</span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Background Illustration */}
-            <div className="relative w-full overflow-hidden flex justify-center lg:justify-start items-end pt-1">
-              <img 
-                src="/auth.png" 
-                alt="HelpU Campus Community Illustration" 
-                className="w-auto max-w-full h-auto max-h-[190px] sm:max-h-[250px] lg:max-h-[300px] xl:max-h-[330px] object-contain object-left-bottom select-none pointer-events-none drop-shadow-sm"
-              />
-            </div>
-
-          </motion.div>
-
-          {/* --------------------------------------------------------------------- */}
-          {/* RIGHT COLUMN: FIREBASE AUTHENTICATION CARD                            */}
-          {/* --------------------------------------------------------------------- */}
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="lg:col-span-6 xl:col-span-6 flex justify-center lg:justify-start w-full"
-          >
-            <div className="w-full max-w-[430px] sm:max-w-[460px] lg:max-w-[475px] bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-6 sm:p-7 lg:p-8 shadow-xl shadow-[#17213D]/5 border border-[#F4E3D8] relative">
-              
-              {/* Header Title inside card */}
-              <div className="mb-3.5">
-                <h2 className="font-black text-[#17213D] text-xl sm:text-2xl tracking-tight">
-                  {mode === 'signIn' ? 'Sign In to HelpU' : 'Create an Account'}
-                </h2>
-                <p className="text-[#6E7587] text-xs sm:text-sm font-medium mt-1">
-                  {mode === 'signIn' ? 'Continue with your college credentials' : 'Get started in under a minute'}
+              <div className="space-y-1">
+                <h3 className="text-lg sm:text-xl font-black text-[#17233C] tracking-tight">
+                  Reset Password
+                </h3>
+                <p className="text-xs text-[#6E7587] font-medium leading-relaxed">
+                  Enter your registered campus email address and we'll send you a link to reset your password.
                 </p>
               </div>
 
-              {/* Mode Switcher Tabs (Sign In / Sign Up) */}
-              <div className="flex bg-[#FFF7F2] rounded-xl p-0.5 mb-4 border border-[#F4E3D8]">
-                <button
-                  type="button"
-                  onClick={() => switchMode('signIn')}
-                  className={`flex-1 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
-                    mode === 'signIn'
-                      ? 'bg-white text-[#17213D] shadow-xs'
-                      : 'text-[#6E7587] hover:text-[#17213D]'
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchMode('signUp')}
-                  className={`flex-1 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
-                    mode === 'signUp'
-                      ? 'bg-white text-[#17213D] shadow-xs'
-                      : 'text-[#6E7587] hover:text-[#17213D]'
-                  }`}
-                >
-                  Create Account
-                </button>
-              </div>
+              {forgotError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-600">
+                  {forgotError}
+                </div>
+              )}
 
-              {/* Authentication Form */}
-              <div className="w-full">
-                {/* Google Sign-In Button */}
-                <div className="mb-3">
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={isGoogleLoading || isSubmitting}
-                    className="w-full flex items-center justify-center gap-3 border border-gray-200 rounded-xl font-bold text-[#17213D] hover:bg-[#FFF7F2] active:scale-[0.99] transition-all py-2.5 sm:py-3 text-xs sm:text-sm bg-white shadow-2xs cursor-pointer disabled:opacity-60"
-                  >
-                    {isGoogleLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#FF572E]" />
-                    ) : (
-                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                      </svg>
-                    )}
-                    <span>{isGoogleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
-                  </button>
+              {forgotSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700">
+                  {forgotSuccess}
+                </div>
+              )}
 
-                  <div className="relative flex py-2.5 items-center">
-                    <div className="flex-grow border-t border-gray-200"></div>
-                    <span className="flex-shrink mx-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">or</span>
-                    <div className="flex-grow border-t border-gray-200"></div>
-                  </div>
+              <form onSubmit={handleForgotPassword} className="space-y-3 pt-1">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-[#17233C]">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="name@college.edu"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#F4E3D8] focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 text-[#17233C] font-bold text-xs sm:text-sm outline-none"
+                  />
                 </div>
 
-                {/* Error Banner */}
-                {errorMessage && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-3.5 p-3 rounded-xl bg-red-50 border border-red-200/80 text-red-600 text-xs font-medium leading-relaxed"
-                  >
-                    {errorMessage}
-                  </motion.div>
-                )}
-
-                {/* Email / Password Form */}
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <AnimatePresence mode="wait">
-                    {mode === 'signUp' && (
-                      <motion.div
-                        key="fullNameField"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.18 }}
-                      >
-                        <label className="block font-bold text-[#17213D] text-xs mb-1.5">
-                          Full Name
-                        </label>
-                        <div className="relative">
-                          <UserIcon className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="e.g. Priya Sharma"
-                            required={mode === 'signUp'}
-                            className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#FF572E] focus:ring-2 focus:ring-[#FF572E]/20 text-[#17213D] text-sm transition-all outline-none bg-white placeholder:text-gray-400"
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div>
-                    <label className="block font-bold text-[#17213D] text-xs mb-1.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@college.edu"
-                        required
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#FF572E] focus:ring-2 focus:ring-[#FF572E]/20 text-[#17213D] text-sm transition-all outline-none bg-white placeholder:text-gray-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-[#17213D] text-xs mb-1.5">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter password (min. 6 characters)"
-                        required
-                        minLength={6}
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#FF572E] focus:ring-2 focus:ring-[#FF572E]/20 text-[#17213D] text-sm transition-all outline-none bg-white placeholder:text-gray-400"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || isGoogleLoading}
-                    className="w-full mt-2 py-2.5 sm:py-3 rounded-xl font-black text-white text-xs sm:text-sm bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] transition-all shadow-md shadow-[#FF572E]/20 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                    <span>{mode === 'signIn' ? 'Sign In' : 'Create Account'}</span>
-                  </button>
-                </form>
-
-              </div>
-
-              {/* Bottom Security Note */}
-              <div className="mt-4 pt-3 border-t border-[#F5E5DC] flex items-center justify-center gap-1.5 text-[10px] text-[#6E7587] font-semibold text-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
-                <span>Protected by verified college student security</span>
-              </div>
-
-            </div>
-          </motion.div>
-
-        </div>
-      </main>
-
-      {/* ========================================================================= */}
-      {/* PREMIUM MINIMAL FOOTER                                                    */}
-      {/* ========================================================================= */}
-      <footer className="relative z-10 px-4 sm:px-8 lg:px-12 py-3 sm:py-3.5 border-t border-[#F2DDD2] bg-[#FFF7F2]/95 backdrop-blur-md shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-[#6E7587]">
-          
-          {/* Left: Brand & Copyright */}
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-[#17213D]">HelpU</span>
-            <span className="text-[#D9C4B7]">•</span>
-            <span>Campus Student Ride & Community Network</span>
-            <span className="hidden md:inline text-[#D9C4B7]">•</span>
-            <span className="hidden md:inline">© {new Date().getFullYear()}</span>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-3 rounded-full bg-gradient-to-r from-[#FF6B35] to-[#FF451A] hover:from-[#FF572E] text-white font-black text-sm shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {forgotLoading ? 'Sending link...' : 'Send Reset Link →'}
+                </button>
+              </form>
+            </motion.div>
           </div>
-
-          {/* Right: Security & Support */}
-          <div className="flex items-center gap-3.5 text-[11px] font-medium">
-            <span className="flex items-center gap-1.5 text-[#16A34A] font-bold">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Verified Campus ID Only</span>
-            </span>
-            <span className="text-[#D9C4B7]">•</span>
-            <Link to="/about" className="hover:text-[#FF572E] transition-colors">
-              Privacy & Safety
-            </Link>
-            <span className="text-[#D9C4B7]">•</span>
-            <Link to="/support" className="hover:text-[#FF572E] transition-colors">
-              Support
-            </Link>
-          </div>
-
-        </div>
-      </footer>
+        )}
+      </AnimatePresence>
 
     </div>
   );

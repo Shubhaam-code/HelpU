@@ -15,6 +15,7 @@ import { ServiceSwitcher } from '../components/layout/ServiceSwitcher';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { GuestAuthPromptModal } from '../components/auth/GuestAuthPromptModal';
 import { 
   useUserProfile, 
   useMyTravels, 
@@ -52,7 +53,18 @@ function formatTravelDate(dateStr) {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authReturnPath, setAuthReturnPath] = useState('/home');
+
+  const handleProtectedNavigate = (path) => {
+    if (!isSignedIn) {
+      setAuthReturnPath(path);
+      setShowAuthModal(true);
+      return;
+    }
+    navigate(path);
+  };
 
   // Cached global data queries (real backend data)
   const { data: profile } = useUserProfile();
@@ -77,7 +89,7 @@ export default function HomePage() {
       customMobileHeader={
         <AppHeader
           avatarId={profile?.avatarId}
-          onBell={() => navigate('/notifications')}
+          onBell={() => handleProtectedNavigate('/notifications')}
           unreadCount={unreadCount}
         />
       }
@@ -145,7 +157,7 @@ export default function HomePage() {
           {/* 3. Shared Groups */}
           <button
             type="button"
-            onClick={() => navigate('/shared-rides')}
+            onClick={() => handleProtectedNavigate('/shared-rides')}
             className="flex flex-col items-center justify-center gap-1.5 p-1 sm:p-2 rounded-2xl hover:bg-white/80 active:scale-95 transition-all cursor-pointer group"
           >
             <div className="w-12 h-12 min-[360px]:w-13 min-[360px]:h-13 sm:w-14 sm:h-14 rounded-full bg-[#F3E8FF] text-[#9333EA] flex items-center justify-center shadow-2xs group-hover:shadow-xs group-hover:scale-105 transition-all">
@@ -159,7 +171,7 @@ export default function HomePage() {
           {/* 4. My Posts */}
           <button
             type="button"
-            onClick={() => navigate('/posts')}
+            onClick={() => handleProtectedNavigate('/posts')}
             className="flex flex-col items-center justify-center gap-1.5 p-1 sm:p-2 rounded-2xl hover:bg-white/80 active:scale-95 transition-all cursor-pointer group"
           >
             <div className="w-12 h-12 min-[360px]:w-13 min-[360px]:h-13 sm:w-14 sm:h-14 rounded-full bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shadow-2xs group-hover:shadow-xs group-hover:scale-105 transition-all">
@@ -506,6 +518,13 @@ export default function HomePage() {
         </div>
 
       </div>
+
+      <GuestAuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        moduleName="Helpu"
+        returnPath={authReturnPath}
+      />
     </ResponsiveShell>
   );
 }

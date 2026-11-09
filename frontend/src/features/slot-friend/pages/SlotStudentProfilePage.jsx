@@ -1,318 +1,246 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, ShieldCheck, CheckCircle2, BookOpen, Clock, 
-  GraduationCap, Calendar, MessageCircle, Sparkles, MapPin, 
-  HelpCircle, Share2, Info 
+  ArrowLeft, Check, User, 
+  GraduationCap, Calendar, FileText, Sparkles, Loader2 
 } from 'lucide-react';
-import { SlotFriendHeader } from '../components/SlotFriendHeader';
 import { useSlotFriend } from '../context/SlotFriendContext';
-import { Avatar } from '../../../components/ui/Avatar';
 
 export default function SlotStudentProfilePage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { getStudentById, showToast } = useSlotFriend();
+  const { fetchMatchDetails } = useSlotFriend();
 
-  const student = getStudentById(studentId);
+  const [student, setStudent] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  useEffect(() => {
+    let isMounted = true;
+    if (studentId) {
+      setIsLoading(true);
+      fetchMatchDetails(studentId)
+        .then((data) => {
+          if (isMounted) setStudent(data);
+        })
+        .catch((err) => {
+          console.warn('[SlotMate] Failed to load match profile:', err);
+          if (isMounted) setStudent(null);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [studentId, fetchMatchDetails]);
 
-  if (!student) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FFF8F3] pb-24 md:pb-16">
-        <SlotFriendHeader title="Student Profile" backTo="/slot-friend/matches" />
-        <div className="max-w-md mx-auto px-4 pt-12 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl">
-            ⚠️
-          </div>
-          <h2 className="font-black text-lg text-[#17233C]">Student Not Found</h2>
-          <p className="text-xs text-[#6E7587]">
-            This student profile may have expired or was removed.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate('/slot-friend/matches')}
-            className="px-5 py-2.5 bg-[#FF572E] text-white rounded-full font-bold text-xs"
-          >
-            Back to Matches
-          </button>
-        </div>
+      <div className="min-h-screen bg-[#FFFDF9] flex flex-col items-center justify-center p-4 text-center">
+        <Loader2 className="w-8 h-8 text-[#D97706] animate-spin mb-2" />
+        <p className="text-xs font-bold text-[#6E7587]">Loading student profile...</p>
       </div>
     );
   }
 
+  if (!student) {
+    return (
+      <div className="min-h-screen bg-[#FFFDF9] flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center text-2xl mb-3">
+          ⚠️
+        </div>
+        <h2 className="font-black text-lg text-[#17233C]">Match Not Found</h2>
+        <p className="text-xs text-[#6E7587] max-w-xs mt-1 mb-4">
+          This match profile may have been removed or updated.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate('/slotmate/matches')}
+          className="px-5 py-2.5 bg-[#FACC15] text-[#17233C] font-black text-xs rounded-full shadow-xs cursor-pointer"
+        >
+          Back to Matches
+        </button>
+      </div>
+    );
+  }
+
+  const rawPhone = student.whatsappNumber || student.phone || '9876543210';
+  const cleanPhone = rawPhone.replace(/\D/g, '');
+
   const handleWhatsAppClick = () => {
-    setShowWhatsAppModal(true);
+    window.open(`https://wa.me/${cleanPhone}`, '_blank');
   };
 
+  const studentName = student.studentName || 'Classmate';
+  const teacherName = student.teacherName ? student.teacherName.split('(')[0].trim() : 'Faculty';
+  const courseDisplay = student.courseCode && student.courseName 
+    ? `${student.courseCode} – ${student.courseName}`
+    : (student.courseName || student.courseCode || 'Course');
+
   return (
-    <div className="min-h-screen bg-[#FFF8F3] pb-24 md:pb-16">
-      <SlotFriendHeader 
-        title={`${student.name}'s Profile`}
-        subtitle="Slot Friend Connection Details"
-        backTo="/slot-friend/matches"
-      />
+    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col pb-24">
+      {/* ========================================================================= */}
+      {/* 1. HEADER: BACK ARROW + MATCH DETAILS TITLE + THREE-DOT MENU             */}
+      {/* ========================================================================= */}
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="p-1 -ml-1 text-[#17233C] hover:bg-white rounded-xl transition-colors cursor-pointer"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#17233C] stroke-[2.4]" />
+          </button>
+          <h1 className="font-black text-[#17233C] text-lg sm:text-xl tracking-tight">
+            Match Details
+          </h1>
+        </div>
+      </header>
 
-      <div className="max-w-3xl mx-auto px-3.5 sm:px-6 pt-3 sm:pt-6 space-y-4 sm:space-y-6">
+      {/* ========================================================================= */}
+      {/* MAIN CONTENT AREA                                                         */}
+      {/* ========================================================================= */}
+      <main className="w-full max-w-xl mx-auto px-4 pt-4 space-y-4 flex-1">
+        {/* ======================================================================= */}
+        {/* 2. PROFILE HEADER CARD (WARM YELLOW GRADIENT)                           */}
+        {/* ======================================================================= */}
+        <div className="relative w-full rounded-[26px] overflow-hidden bg-gradient-to-br from-[#FEF9C3] via-[#FEF08A]/60 to-[#FFFBEB] border border-[#FDE68A] p-4 sm:p-5 shadow-xs">
+          {/* Subtle background glow */}
+          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-white/40 to-transparent pointer-events-none rounded-full" />
 
-        {/* ========================================================================= */}
-        {/* 1. STUDENT IDENTITY HERO CARD                                             */}
-        {/* ========================================================================= */}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] p-5 sm:p-7 shadow-xs space-y-5"
-        >
-          {/* Avatar + Main Details */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 sm:gap-5">
-            <div className="relative">
-              <Avatar
-                avatarId={student.avatarId || 'm1'}
-                size="xl"
-                name={student.name}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-[#FFEBE0] shadow-sm"
-              />
-              {student.isVerified && (
-                <div 
-                  title="Verified VIT Student"
-                  className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-xs border border-emerald-200"
-                >
-                  <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <h1 className="font-black text-lg sm:text-2xl text-[#17233C] tracking-tight">
-                  {student.name}
-                </h1>
-                {student.isVerified && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#EDFAF3] text-[#16A34A] border border-[#BCECD4]">
-                    <ShieldCheck className="w-3 h-3 stroke-[2.4]" />
-                    <span>Verified Student</span>
-                  </span>
-                )}
+          <div className="relative z-10 flex items-center gap-4">
+            {/* Avatar with Sunburst & Active Green Dot */}
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full border-3 border-white shadow-md overflow-hidden bg-white">
+                <img
+                  src={student.profileImage || '/image.png'}
+                  alt={studentName}
+                  className="w-full h-full object-cover select-none"
+                  onError={(e) => {
+                    e.currentTarget.src = '/image.png';
+                  }}
+                />
               </div>
 
-              <p className="text-xs sm:text-sm font-semibold text-[#6E7587]">
-                {student.department} • {student.year}
-              </p>
-
-              <p className="text-xs text-[#8C93A4] font-medium flex items-center justify-center sm:justify-start gap-1">
-                <MapPin className="w-3.5 h-3.5 text-[#FF572E]" />
-                <span>{student.college || 'VIT, Bhopal Campus'}</span>
-              </p>
-            </div>
-
-            {/* Slot Badge */}
-            <div className="shrink-0 px-3.5 py-2 rounded-2xl bg-[#FFF0E6] border border-[#FDD0BE] text-[#FF572E] text-center">
-              <span className="block font-black text-sm sm:text-base">
-                Slot {student.slot}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF572E]/80">
-                Registered
-              </span>
-            </div>
-          </div>
-
-          {/* Student Bio */}
-          {student.bio && (
-            <div className="p-3.5 rounded-2xl bg-[#FFFBF8] border border-[#F4E3D8] text-xs text-[#17233C] font-medium leading-relaxed">
-              <span className="font-black text-[#8C93A4] text-[10px] uppercase block mb-1">
-                About & Study Style
-              </span>
-              "{student.bio}"
-            </div>
-          )}
-
-          {/* Academic Interests / Topics */}
-          {student.interests && student.interests.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block">
-                Focus Areas & Topics
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {student.interests.map((topic) => (
-                  <span
-                    key={topic}
-                    className="px-2.5 py-1 rounded-lg bg-[#FFF8F3] border border-[#F4E3D8] text-xs font-bold text-[#17233C]"
-                  >
-                    #{topic}
-                  </span>
-                ))}
+              {/* Sunburst Mark at Top-Right */}
+              <div className="absolute -top-1 -right-1 text-[#F59E0B]">
+                <Sparkles className="w-5 h-5 text-[#F59E0B] fill-[#FACC15]" />
               </div>
-            </div>
-          )}
-        </motion.div>
 
-        {/* ========================================================================= */}
-        {/* 2. MUTUAL ACADEMIC MATCH DETAILS                                         */}
-        {/* ========================================================================= */}
-        <div className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-[#F4E3D8]/60">
-            <div className="w-7 h-7 rounded-lg bg-[#EDFAF3] text-[#16A34A] flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-4 h-4 stroke-[2.4]" />
-            </div>
-            <h2 className="font-black text-sm sm:text-base text-[#17233C]">
-              Why You Two Match (Exact Course & Slot)
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            {/* Registered Course */}
-            <div className="p-3.5 rounded-2xl bg-[#FFFBF8] border border-[#F4E3D8] space-y-1">
-              <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block">
-                Mutual Registered Course
-              </span>
-              <p className="font-black text-xs sm:text-sm text-[#17233C]">
-                {student.course}
-              </p>
-              <span className="text-[10px] text-emerald-600 font-bold inline-block">
-                ✓ Identical Course Syllabus & Tests
-              </span>
+              {/* Active Online Green Dot at Bottom-Right */}
+              <div className="absolute bottom-0 right-1 w-4 h-4 rounded-full bg-[#22C55E] border-2 border-white shadow-xs" />
             </div>
 
-            {/* Timetable Slot */}
-            <div className="p-3.5 rounded-2xl bg-[#FFFBF8] border border-[#F4E3D8] space-y-1">
-              <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block">
-                Class Timetable Slot
-              </span>
-              <p className="font-black text-xs sm:text-sm text-[#FF572E]">
-                Slot {student.slot}
-              </p>
-              <span className="text-[10px] text-[#6E7587] font-medium inline-block">
-                Same class hours & lecture schedule
-              </span>
-            </div>
-
-            {/* Faculty Comparison */}
-            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-[#FFF8F3] border border-[#FDD0BE] space-y-1.5">
-              <span className="text-[10px] font-black text-[#8C93A4] uppercase tracking-wider block">
-                Faculty Instructor Comparison
-              </span>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <div>
-                  <span className="text-[#8C93A4]">Their Teacher: </span>
-                  <strong className="text-[#17233C]">{student.teacher}</strong>
-                </div>
-
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border self-start sm:self-auto ${
-                  student.isSameTeacher
-                    ? 'bg-[#EDFAF3] text-[#16A34A] border-[#BCECD4]'
-                    : 'bg-[#FFF0E6] text-[#FF572E] border-[#FDD0BE]'
-                }`}>
-                  {student.isSameTeacher ? 'Identical Instructor' : 'Different Instructor (Same Curriculum)'}
-                </span>
+            {/* Student Info: Verified Badge + Name + Teacher */}
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] text-xs font-black border border-[#BBF7D0] shadow-2xs">
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Verified Student</span>
               </div>
+
+              <h2 className="font-black text-xl sm:text-2xl text-[#17233C] tracking-tight leading-tight mt-1.5 truncate">
+                {studentName}
+              </h2>
+
+              <p className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6E7587] mt-1 truncate">
+                <User className="w-4 h-4 text-[#6E7587] shrink-0" />
+                <span>{teacherName}</span>
+              </p>
             </div>
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* 3. VISUALLY PROMINENT WHATSAPP CONNECT ACTION                            */}
-        {/* ========================================================================= */}
-        <div className="bg-gradient-to-br from-[#128C7E]/10 via-[#25D366]/5 to-transparent rounded-[24px] sm:rounded-[28px] border border-[#25D366]/30 p-5 sm:p-6 shadow-xs space-y-3.5 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="space-y-1 max-w-md">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E8F8F0] border border-[#25D366]/40 text-[#128C7E] text-[10px] font-black uppercase tracking-wider">
-              <span>💬 Direct Campus Connect</span>
-            </div>
-            <h3 className="font-black text-sm sm:text-base text-[#17233C]">
-              Connect with {student.name.split(' ')[0]} on WhatsApp
+        {/* ======================================================================= */}
+        {/* 3. POST & COURSE DETAILS CARD                                           */}
+        {/* ======================================================================= */}
+        <div className="bg-white rounded-[26px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3.5">
+          {/* Card Title */}
+          <div className="flex items-center gap-2 pb-2 border-b border-[#F4E3D8]/60">
+            <GraduationCap className="w-5 h-5 text-[#D97706] stroke-[2.2]" />
+            <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
+              Post &amp; Course Details
             </h3>
-            <p className="text-xs text-[#6E7587] leading-relaxed">
-              Introduce yourself, exchange lecture notes, sit together in Slot {student.slot}, and prepare for exams!
-            </p>
           </div>
 
+          {/* Row 1: Course */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+              <GraduationCap className="w-4.5 h-4.5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
+              <span className="text-xs text-[#6E7587] font-bold w-14 shrink-0">Course</span>
+              <span className="font-black text-xs sm:text-sm text-[#17233C] text-right truncate">
+                {courseDisplay}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 2: Slot */}
+          <div className="flex items-center gap-3 pt-2 border-t border-[#F4E3D8]/60">
+            <div className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+              <Calendar className="w-4.5 h-4.5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
+              <span className="text-xs text-[#6E7587] font-bold w-14 shrink-0">Slot</span>
+              <span className="font-black text-xs sm:text-sm text-[#78350F] bg-[#FEF08A] px-2.5 py-0.5 rounded-md">
+                {student.slot}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 3: Teacher */}
+          <div className="flex items-center gap-3 pt-2 border-t border-[#F4E3D8]/60">
+            <div className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+              <User className="w-4.5 h-4.5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
+              <span className="text-xs text-[#6E7587] font-bold w-14 shrink-0">Teacher</span>
+              <span className="font-black text-xs sm:text-sm text-[#17233C] text-right truncate">
+                {teacherName}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 4: Post Note */}
+          <div className="space-y-1.5 pt-2 border-t border-[#F4E3D8]/60">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+                <FileText className="w-4.5 h-4.5 stroke-[2.2]" />
+              </div>
+              <span className="text-xs text-[#6E7587] font-bold">Post Note</span>
+            </div>
+
+            <div className="bg-[#FEFCE8] border border-[#FEF08A] rounded-2xl p-3 sm:p-3.5 text-xs sm:text-sm text-[#17233C] font-medium leading-relaxed">
+              {student.additionalNotes || 'Looking for classmates in the same slot to discuss, solve assignments and prepare for exams together.'}
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* ========================================================================= */}
+      {/* 4. FIXED BOTTOM BAR: CONTACT ON WHATSAPP BUTTON                           */}
+      {/* ========================================================================= */}
+      <footer className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#F4E3D8] p-3 z-40">
+        <div className="max-w-md mx-auto">
           <button
             type="button"
             onClick={handleWhatsAppClick}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-[#25D366] hover:bg-[#20BD5A] active:scale-95 text-white rounded-full font-black text-xs sm:text-sm shadow-md shadow-[#25D366]/30 transition-all cursor-pointer shrink-0"
+            className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#FACC15] via-[#FBBF24] to-[#F59E0B] hover:brightness-105 active:scale-98 text-[#17233C] font-black text-sm sm:text-base shadow-md shadow-yellow-500/20 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
           >
-            <MessageCircle className="w-5 h-5 fill-white stroke-none" />
-            <span>Connect on WhatsApp</span>
+            <img
+              src="/whatsapp.svg"
+              alt="WhatsApp"
+              className="w-5 h-5 object-contain"
+              onError={(e) => {
+                e.currentTarget.src = '/whatsapp.png';
+              }}
+            />
+            <span>Contact on WhatsApp</span>
           </button>
         </div>
-
-      </div>
-
-      {/* WhatsApp Connect Modal Placeholder */}
-      <AnimatePresence>
-        {showWhatsAppModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowWhatsAppModal(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-xs"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative bg-white rounded-[28px] p-6 border border-[#F4E3D8] shadow-2xl max-w-md w-full space-y-4 z-10 text-center"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#E8F8F0] text-[#25D366] flex items-center justify-center mx-auto text-2xl shadow-xs">
-                💬
-              </div>
-
-              <div className="space-y-1">
-                <h3 className="font-black text-base sm:text-lg text-[#17233C]">
-                  Connect with {student.name}
-                </h3>
-                <p className="text-xs text-[#6E7587]">
-                  Slot Friend WhatsApp Direct Connect Placeholder
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#FFF8F3] border border-[#F4E3D8] text-xs space-y-1 text-left">
-                <div className="flex justify-between text-[#6E7587]">
-                  <span>Student Phone:</span>
-                  <span className="font-bold text-[#17233C]">{student.phone}</span>
-                </div>
-                <div className="flex justify-between text-[#6E7587]">
-                  <span>Mutual Slot:</span>
-                  <span className="font-bold text-[#FF572E]">Slot {student.slot}</span>
-                </div>
-                <div className="flex justify-between text-[#6E7587]">
-                  <span>Subject:</span>
-                  <span className="font-bold text-[#17233C] truncate max-w-[180px]">{student.course}</span>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-[#8C93A4] leading-relaxed">
-                In production, tapping continue will safely open WhatsApp with a pre-composed greeting mentioning your mutual <strong>Slot {student.slot}</strong> class!
-              </p>
-
-              <div className="flex items-center justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowWhatsAppModal(false)}
-                  className="px-4 py-2.5 rounded-full border border-[#F4E3D8] text-xs font-bold text-[#6E7587] hover:bg-[#FFF8F3] cursor-pointer"
-                >
-                  Close
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowWhatsAppModal(false);
-                    showToast(`Simulated WhatsApp chat opened with ${student.name}!`, 'success');
-                  }}
-                  className="px-6 py-2.5 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white text-xs font-black shadow-xs cursor-pointer flex items-center gap-1.5"
-                >
-                  <span>Open Chat (Mock)</span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </footer>
     </div>
   );
 }
-

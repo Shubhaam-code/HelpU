@@ -58,6 +58,21 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    registrationNumber: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    branch: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    year: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     gender: {
       type: String,
       enum: ['Male', 'Female', 'Prefer not to say', null],

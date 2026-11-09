@@ -19,7 +19,9 @@ export function AppHeader({
   onBell, 
   unreadCount = 0, 
   showLogo = false,
-  rightAction = null 
+  rightAction = null,
+  profileRoute = '/profile',
+  onAvatar = null
 }) {
   const navigate = useNavigate();
   const { user } = useUser();
@@ -91,17 +93,17 @@ export function AppHeader({
           </button>
         )}
 
-        {/* Profile Avatar: One tap to /profile */}
+        {/* Profile Avatar (both authenticated users and guests navigate to profileRoute or /profile) */}
         <button 
           type="button"
-          onClick={() => navigate('/profile')}
+          onClick={onAvatar ? onAvatar : () => navigate(profileRoute || '/profile')}
           className="relative flex items-center p-0.5 rounded-full transition-all duration-150 hover:ring-2 hover:ring-[#FF572E]/40 focus:outline-none cursor-pointer active:scale-95"
           aria-label="User Profile"
         >
           <div className="relative rounded-full p-[1.5px] bg-gradient-to-tr from-[#FF572E]/40 via-transparent to-[#FF572E]/20">
             <Avatar 
-              src={resolvedSrc} 
-              name={user?.fullName || 'Student'} 
+              src={user ? resolvedSrc : null} 
+              name={user ? (user?.fullName || 'Student') : 'Guest Mode'} 
               email={user?.primaryEmailAddress?.emailAddress} 
               size="sm" 
               className="border border-white shadow-xs" 

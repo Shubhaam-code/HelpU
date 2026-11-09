@@ -19,6 +19,17 @@ export async function getMyNotifications(req, res) {
       filter.isRead = false;
     }
 
+    // Module-specific filtering to cleanly isolate PoolMate and SlotMate
+    if (req.query.module === 'slotmate') {
+      filter.$or = [
+        { module: 'slotmate' },
+        { type: 'SLOT_MATCH_FOUND' }
+      ];
+    } else if (req.query.module === 'poolmate') {
+      filter.module = { $ne: 'slotmate' };
+      filter.type = { $ne: 'SLOT_MATCH_FOUND' };
+    }
+
     const [total, notifications] = await Promise.all([
       Notification.countDocuments(filter),
       Notification.find(filter)
@@ -55,10 +66,22 @@ export async function getMyNotifications(req, res) {
 export async function getUnreadNotificationCount(req, res) {
   try {
     const recipientId = req.userId;
-    const unreadCount = await Notification.countDocuments({
+    const filter = {
       recipientId,
       isRead: false
-    });
+    };
+
+    if (req.query.module === 'slotmate') {
+      filter.$or = [
+        { module: 'slotmate' },
+        { type: 'SLOT_MATCH_FOUND' }
+      ];
+    } else if (req.query.module === 'poolmate') {
+      filter.module = { $ne: 'slotmate' };
+      filter.type = { $ne: 'SLOT_MATCH_FOUND' };
+    }
+
+    const unreadCount = await Notification.countDocuments(filter);
 
     return res.status(200).json({
       success: true,
@@ -132,9 +155,20 @@ export async function markNotificationAsRead(req, res) {
 export async function markAllNotificationsAsRead(req, res) {
   try {
     const recipientId = req.userId;
+    const filter = { recipientId, isRead: false };
+
+    if (req.query.module === 'slotmate') {
+      filter.$or = [
+        { module: 'slotmate' },
+        { type: 'SLOT_MATCH_FOUND' }
+      ];
+    } else if (req.query.module === 'poolmate') {
+      filter.module = { $ne: 'slotmate' };
+      filter.type = { $ne: 'SLOT_MATCH_FOUND' };
+    }
 
     const result = await Notification.updateMany(
-      { recipientId, isRead: false },
+      filter,
       { $set: { isRead: true } }
     );
 
@@ -151,6 +185,24 @@ export async function markAllNotificationsAsRead(req, res) {
       error: error.message
     });
   }
+}
+
+/**
+ * SlotMate-specific notification handlers for clean isolation
+ */
+export async function getSlotMateNotifications(req, res) {
+  req.query.module = 'slotmate';
+  return getMyNotifications(req, res);
+}
+
+export async function getSlotMateUnreadCount(req, res) {
+  req.query.module = 'slotmate';
+  return getUnreadNotificationCount(req, res);
+}
+
+export async function markAllSlotMateNotificationsAsRead(req, res) {
+  req.query.module = 'slotmate';
+  return markAllNotificationsAsRead(req, res);
 }
 
 /**

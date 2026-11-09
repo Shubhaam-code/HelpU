@@ -76,12 +76,16 @@ export function triggerInAppNotification({
 function resolveTargetRoute(data = {}, type = '') {
   if (data?.route) return data.route;
   if (data?.url) return data.url;
+  if (data?.module === 'slotmate' || type === 'SLOT_MATCH_FOUND') {
+    return data?.postId ? `/slotmate/matches?postId=${data.postId}` : '/slotmate/matches';
+  }
   if (data?.bookingId) return `/bookings/${data.bookingId}`;
   if (data?.relatedBookingId) return `/bookings/${data.relatedBookingId}`;
   if (data?.travelId) return `/rides/${data.travelId}`;
   if (data?.relatedTravelId) return `/rides/${data.relatedTravelId}`;
 
   const t = (type || '').toUpperCase();
+  if (t === 'SLOT_MATCH_FOUND') return '/slotmate/matches';
   if (t.includes('MATCH')) return '/matches';
   if (t.includes('BOOKING')) return '/bookings';
   return '/notifications';
@@ -92,6 +96,18 @@ function resolveTargetRoute(data = {}, type = '') {
  */
 function getBannerVisuals(type = '') {
   const t = (type || '').toUpperCase();
+
+  if (t === 'SLOT_MATCH_FOUND') {
+    return {
+      icon: Users,
+      badgeText: 'SlotMate Match Found!',
+      badgeBg: 'bg-[#FEF9C3]',
+      badgeColor: 'text-[#854D0E]',
+      actionLabel: 'View Match',
+      borderColor: 'border-[#FACC15]',
+      accentColor: '#EAB308'
+    };
+  }
 
   if (t.includes('REQUESTED') || t.includes('CONTACTED')) {
     return {

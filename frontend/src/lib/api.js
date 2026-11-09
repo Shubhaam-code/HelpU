@@ -195,7 +195,7 @@ export const getMe = () => apiClient.get('/api/auth/me');
 export const getTravels = (params) => apiClient.get('/api/travels', { params });
 export const getMyTravels = () => apiClient.get('/api/travels/my');
 export const getUserMatches = () => apiClient.get('/api/travels/user/matches');
-export const createTravel = (data) => apiClient.post('/api/travels', data);
+export const createTravel = (data, options = {}) => apiClient.post('/api/travels', data, options);
 export const getTravelById = (id) => {
   if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
     return Promise.reject(new Error('Invalid travel ID format'));
@@ -256,7 +256,7 @@ export const deleteTravel = async (id) => {
 };
 
 // ── Bookings ──────────────────────────────────────────────────────────────
-export const createBooking = (data) => apiClient.post('/api/bookings', data);
+export const createBooking = (data, options = {}) => apiClient.post('/api/bookings', data, options);
 export const getMyBookings = () => apiClient.get('/api/bookings/my');
 export const getReceivedBookings = () => apiClient.get('/api/bookings/received');
 export const getConfirmedBookings = () => apiClient.get('/api/bookings/confirmed');
@@ -269,9 +269,12 @@ export const completeBooking = (id) => apiClient.patch(`/api/bookings/${id}/comp
 
 // ── Notifications ─────────────────────────────────────────────────────────
 export const getNotifications = (params) => apiClient.get('/api/notifications', { params });
-export const getUnreadCount = () => apiClient.get('/api/notifications/unread-count');
+export const getUnreadCount = (params) => apiClient.get('/api/notifications/unread-count', { params });
 export const markRead = (id) => apiClient.patch(`/api/notifications/${id}/read`);
-export const markAllRead = () => apiClient.patch('/api/notifications/read-all');
+export const markAllRead = (params) => apiClient.patch('/api/notifications/read-all', null, { params });
+export const getSlotMateNotifications = (params) => apiClient.get('/api/slotmate/notifications', { params });
+export const getSlotMateUnreadCount = () => apiClient.get('/api/slotmate/notifications/unread-count');
+export const markAllSlotMateRead = () => apiClient.patch('/api/slotmate/notifications/read-all');
 export const registerFcmToken = (token, platform = 'android') =>
   apiClient.post('/api/notifications/fcm-token', { token, platform });
 export const unregisterFcmToken = (token) =>
@@ -320,6 +323,16 @@ export const directJoinSharedRideGroup = (groupId, data) =>
   apiClient.post(`/api/groups/${groupId}/join`, data);
 export const leaveSharedRideGroup = (groupId) =>
   apiClient.post(`/api/groups/${groupId}/leave`);
+
+// ── SlotMate ─────────────────────────────────────────────────────────────────
+export const searchCourses = (q) => apiClient.get('/api/slotmate/courses', { params: { q } });
+export const createSlotPost = (data, options = {}) => apiClient.post('/api/slotmate/posts', data, options);
+export const updateSlotPost = (postId, data) => apiClient.put(`/api/slotmate/posts/${postId}`, data);
+export const getMySlotPosts = () => apiClient.get('/api/slotmate/posts/my');
+export const getMySlotMatches = () => apiClient.get('/api/slotmate/matches/my');
+export const getPostMatches = (postId) => apiClient.get(`/api/slotmate/posts/${postId}/matches`);
+export const getSlotMatchDetails = (matchId) => apiClient.get(`/api/slotmate/matches/${matchId}`);
+export const deleteSlotPost = (postId) => apiClient.delete(`/api/slotmate/posts/${postId}`);
 
 export default apiClient;
 

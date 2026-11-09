@@ -74,6 +74,35 @@ export function getRedisConfig() {
 let redisClientInstance = null;
 
 /**
+ * Get or initialize shared Redis client singleton.
+ * Returns null if Redis is not configured or fails to connect.
+ */
+export function getSharedRedisClient() {
+  if (redisClientInstance) {
+    return redisClientInstance;
+  }
+
+  if (!hasRedisConfigured()) {
+    return null;
+  }
+
+  try {
+    redisClientInstance = createRedisConnection();
+    return redisClientInstance;
+  } catch (err) {
+    console.warn('[Redis] Failed to initialize shared Redis client:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Allow explicitly setting the shared Redis client (e.g. for testing outages or mocks)
+ */
+export function setSharedRedisClient(client) {
+  redisClientInstance = client;
+}
+
+/**
  * Safely inspect Redis memory eviction policy on startup and issue non-blocking warning if needed
  */
 export async function checkRedisEvictionPolicy(client) {

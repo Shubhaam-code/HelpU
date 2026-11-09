@@ -32,6 +32,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { CreateGroupModal } from '../components/groups/CreateGroupModal';
+import { GuestAuthPromptModal } from '../components/auth/GuestAuthPromptModal';
 import {
   useUserProfile,
   useMyTravels,
@@ -88,6 +89,7 @@ export default function SharedRidesPage() {
   const [feedbackMsg, setFeedbackMsg] = useState(null); // { type: 'success' | 'error' | 'info', text: string }
   const [requestedGroupIds, setRequestedGroupIds] = useState(() => new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [creatingMatchGroupId, setCreatingMatchGroupId] = useState(null);
   const [confirmJoinGroup, setConfirmJoinGroup] = useState(null);
@@ -208,6 +210,10 @@ export default function SharedRidesPage() {
 
   // Handle Initiating a Shared Ride Group with a compatible peer student
   const handleCreateGroupWithPeer = async (peerTravel) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (!currentTravelId || !peerTravel?._id) return;
     setCreatingMatchGroupId(peerTravel._id);
     try {
@@ -233,6 +239,10 @@ export default function SharedRidesPage() {
 
   // Handle direct join into an open Shared Ride Group
   const handleDirectJoin = async (group) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (!currentTravelId) {
       showFeedback('error', 'Please create or select an active FIND ride post first.');
       return;
@@ -402,7 +412,7 @@ export default function SharedRidesPage() {
               <div className="flex flex-wrap items-center gap-2.5 pt-3.5 mt-0.5">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={() => user ? setShowCreateModal(true) : setShowAuthModal(true)}
                   className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.98] text-white rounded-full font-black text-xs sm:text-sm shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
@@ -875,7 +885,7 @@ export default function SharedRidesPage() {
                   </div>
                   <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
                     <button
-                      onClick={() => setShowCreateModal(true)}
+                      onClick={() => user ? setShowCreateModal(true) : setShowAuthModal(true)}
                       className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-black rounded-full shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer active:scale-95"
                     >
                       Create a Group for This Route
@@ -1425,6 +1435,16 @@ export default function SharedRidesPage() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         userTravels={userTravels}
+      />
+
+      {/* Guest Authentication Prompt Modal */}
+      <GuestAuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        moduleName="PoolMate Shared Rides"
+        returnPath="/shared-rides"
+        title="Sign In to Manage Groups"
+        subtitle="Sign in with your campus account to create and join shared ride groups with peers."
       />
     </ResponsiveShell>
   );

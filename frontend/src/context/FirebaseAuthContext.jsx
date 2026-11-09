@@ -4,6 +4,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile as updateFirebaseProfile,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
@@ -223,6 +224,18 @@ export function FirebaseAuthProvider({ children }) {
     }
   }, []);
 
+  // Password Reset Email
+  const resetPassword = useCallback(async (email) => {
+    try {
+      setAuthError(null);
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch (err) {
+      console.error('[FirebaseAuth] Password reset error:', err);
+      setAuthError(err.message);
+      throw err;
+    }
+  }, []);
+
   // Sign Out (Native Android + Web Firebase)
   const signOutUser = useCallback(async () => {
     try {
@@ -253,6 +266,7 @@ export function FirebaseAuthProvider({ children }) {
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
+    resetPassword,
     signOut: signOutUser,
     authError,
     setAuthError
