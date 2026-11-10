@@ -195,6 +195,9 @@ function ProtectedRoute({ children }) {
 // Guest-friendly route wrapper:
 // Allows unauthenticated guests to explore, view public previews, and fill draft forms.
 // If authenticated, ensures WhatsApp onboarding is completed.
+// CRITICAL: When a signed-in user is on /whatsapp-setup (mid-form), do NOT redirect them away
+// even if hasWhatsApp briefly becomes truthy from a background profile event.
+// The WhatsAppOnboardingPage handles its own navigation after successful save.
 function GuestFriendlyRoute({ children }) {
   const { isLoaded, isSignedIn } = useUser();
   const { isProfileLoading, hasWhatsApp } = useAuthProfile();
@@ -223,18 +226,19 @@ function GuestFriendlyRoute({ children }) {
     return children;
   }
 
-  // If signed-in user already has WhatsApp and visits setup page, redirect to home
-  if (isOnWhatsAppSetup && hasWhatsApp) {
-    return <Navigate to="/home" replace />;
-  }
-
-  // If signed in, ensure WhatsApp onboarding is completed
+  // If signed in without WhatsApp: redirect to onboarding (unless already there)
   if (!hasWhatsApp) {
     if (isOnWhatsAppSetup) {
+      // Stay on the onboarding page — form is in progress, do NOT redirect mid-form
       return children;
     }
     const returnTarget = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/whatsapp-setup?returnTo=${returnTarget}`} replace />;
+  }
+
+  // If signed-in user has completed onboarding and manually navigates to setup, redirect home
+  if (isOnWhatsAppSetup && hasWhatsApp) {
+    return <Navigate to="/home" replace />;
   }
 
   return children;

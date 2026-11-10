@@ -23,13 +23,15 @@ html, body {
   background-color: var(--color-cream);
   color: var(--color-navy);
   -webkit-font-smoothing: antialiased;
-  scroll-behavior: smooth;
+  /* Removed: scroll-behavior: smooth — this causes jerky scroll on Android WebView */
   overflow-x: hidden;
   /* Prevent accidental long-press text selection popup on mobile */
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  /* Enable momentum scrolling on iOS and smooth touch scroll on Android WebView */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Allow text selection only in actual editable inputs */
@@ -321,3 +323,36 @@ body.keyboard-open nav.fixed.bottom-0 {
   display: none !important;
 }
 
+
+/* =====================================================================
+   Landing Page Performance: smooth touch-scroll on Android WebView
+   ===================================================================== */
+
+/* The landing page wrapper should scroll natively without nested scroll traps */
+.landing-scroll-container {
+  /* Enable GPU-accelerated native scroll — avoids JS scroll handlers */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Prevent paint storms from decorative background glows during scroll */
+.landing-bg-glow {
+  /* Promote to compositor layer once — stays there, no repaint on scroll */
+  will-change: opacity;
+  contain: strict;
+  pointer-events: none;
+}
+
+/* Landing page images: pre-decode and size hints to prevent layout shifts */
+.landing-img {
+  display: block;
+  /* content-visibility speeds up below-the-fold paint */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
+}
+
+/* Hero image above fold: always eager, never lazy */
+.landing-img-eager {
+  display: block;
+}

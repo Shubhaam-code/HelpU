@@ -22,9 +22,12 @@ let isSyncInProgress = false;
 export const getCachedFcmToken = () => cachedFcmToken;
 
 /**
- * High-importance Android notification channel ID for heads-up notifications (v2 fresh channel)
+ * High-importance Android notification channel ID with custom Helpu chime sound (v3).
+ * v3 is a new channel because Android channels are IMMUTABLE after creation —
+ * the previous helpu_alerts_v2 used the default system sound.
+ * This constant must match MainActivity.java CHANNEL_ID = "helpu_alerts_v3".
  */
-export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_alerts_v2';
+export const HELPU_NOTIFICATION_CHANNEL_ID = 'helpu_alerts_v3';
 
 /**
  * Synchronize the current device FCM token with the backend for the authenticated user.
@@ -313,7 +316,7 @@ export async function initPushNotifications({
       };
     }
 
-    // 4. Create High-Importance Android Notification Channel for Heads-up popups in background
+    // 4. Create High-Importance Android Notification Channel with custom Helpu chime
     if (Capacitor.getPlatform() === 'android') {
       try {
         await PushNotifications.createChannel({
@@ -322,12 +325,17 @@ export async function initPushNotifications({
           description: 'Instant heads-up popup alerts for booking requests, confirmations, matches, and ride updates',
           importance: 5, // NotificationManager.IMPORTANCE_HIGH / MAX
           visibility: 1, // NotificationCompat.VISIBILITY_PUBLIC
-          sound: 'default',
+          // Custom Helpu chime sound — references res/raw/helpu_notification_chime.wav
+          // The Android native channel (MainActivity.java) is authoritative for sound config;
+          // this JS-side call is a no-op for existing channels (Android ignores updates to
+          // existing channel sound/importance), but ensures correctness for fresh installs
+          // where MainActivity hasn't yet run before this JS code executes.
+          sound: 'helpu_notification_chime',
           vibration: true,
           lights: true,
           lightColor: '#FF572E'
         });
-        console.log('[HelpuPush] Android High Importance notification channel created:', HELPU_NOTIFICATION_CHANNEL_ID);
+        console.log('[HelpuPush] Android notification channel verified/created:', HELPU_NOTIFICATION_CHANNEL_ID);
       } catch (channelErr) {
         console.warn('[HelpuPush] Warning creating Android notification channel:', channelErr);
       }

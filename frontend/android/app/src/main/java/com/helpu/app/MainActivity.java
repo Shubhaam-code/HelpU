@@ -7,7 +7,6 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.media.AudioAttributes;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -23,7 +22,15 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "HelpuApp";
-    public static final String CHANNEL_ID = "helpu_alerts_v2";
+
+    /**
+     * Channel ID for all Helpu push notifications.
+     * v3 = new channel with custom WAV notification chime.
+     * Android notification channels are IMMUTABLE after first creation — if sound or
+     * importance changes are needed, we must use a new channel ID.
+     * Match this value with HELPU_NOTIFICATION_CHANNEL_ID in pushNotifications.js.
+     */
+    public static final String CHANNEL_ID = "helpu_alerts_v3";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -95,10 +102,17 @@ public class MainActivity extends BridgeActivity {
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             if (notificationManager == null) return;
 
-            // Delete legacy channel if present to clean up any stuck/muted settings
-            try {
-                notificationManager.deleteNotificationChannel("helpu_high_importance");
-            } catch (Exception ignored) {}
+            // Clean up legacy channels from previous versions
+            try { notificationManager.deleteNotificationChannel("helpu_high_importance"); } catch (Exception ignored) {}
+            // Note: We do NOT delete helpu_alerts_v2 — existing notifications in that channel
+            // remain accessible. We simply create v3 as the active channel going forward.
+
+            // Check if the v3 channel already exists (avoid duplicate creation on every launch)
+            NotificationChannel existingChannel = notificationManager.getNotificationChannel(CHANNEL_ID);
+            if (existingChannel != null) {
+                Log.i(TAG, "[HelpuPush] Notification channel '" + CHANNEL_ID + "' already exists, skipping creation.");
+                return;
+            }
 
             CharSequence name = "Helpu Booking & Ride Alerts";
             String description = "Instant heads-up popup alerts for booking requests, confirmations, matches, and ride updates";
@@ -113,15 +127,21 @@ public class MainActivity extends BridgeActivity {
             channel.setShowBadge(true);
             channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
-            Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            // ─── CUSTOM HELPU NOTIFICATION SOUND ───────────────────────────────
+            // Use the supplied helpu_notification_chime.wav from res/raw/
+            // URI format: android.resource://package/raw/filename_without_extension
+            Uri customSoundUri = Uri.parse(
+                "android.resource://" + getPackageName() + "/raw/helpu_notification_chime"
+            );
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
-            channel.setSound(defaultSoundUri, audioAttributes);
+            channel.setSound(customSoundUri, audioAttributes);
+            // ────────────────────────────────────────────────────────────────────
 
             notificationManager.createNotificationChannel(channel);
-            Log.i(TAG, "[HelpuPush] Native NotificationChannel '" + CHANNEL_ID + "' initialized successfully with IMPORTANCE_HIGH.");
+            Log.i(TAG, "[HelpuPush] Native NotificationChannel '" + CHANNEL_ID + "' created with IMPORTANCE_HIGH and custom Helpu chime sound.");
         }
     }
 

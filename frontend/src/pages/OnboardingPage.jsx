@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
 import { 
-  ArrowRight, Play, Zap, ShieldCheck, Users, Sprout, 
-  User, LayoutGrid, Plus, X, Car, GraduationCap, CheckCircle2, Sparkles
+  ArrowRight, Zap, ShieldCheck, Users, Sprout, 
+  User, LayoutGrid, Plus, Car, GraduationCap
 } from 'lucide-react';
 
 export default function OnboardingPage() {
@@ -26,14 +25,14 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] font-sans relative overflow-x-hidden selection:bg-[#F59E0B]/20 selection:text-[#D97706]">
       
       {/* ========================================================================= */}
-      {/* 0. TOP-RIGHT WARM GLOW & SPARKS (MATCHES REFERENCE DESIGN)                */}
+      {/* 0. TOP-RIGHT WARM GLOW — painted once, no scroll repaints                 */}
       {/* ========================================================================= */}
       <div 
         aria-hidden="true" 
-        className="absolute top-0 right-0 w-64 sm:w-80 h-64 sm:h-80 bg-gradient-to-bl from-[#FDE68A]/60 via-[#FDE047]/20 to-transparent pointer-events-none rounded-bl-full blur-2xl" 
+        className="landing-bg-glow absolute top-0 right-0 w-64 sm:w-80 h-64 sm:h-80 bg-gradient-to-bl from-[#FDE68A]/60 via-[#FDE047]/20 to-transparent rounded-bl-full blur-2xl" 
       />
 
-      {/* Decorative top-right flame swoosh & sparkles */}
+      {/* Decorative top-right flame swoosh — SVG is lightweight, no blur needed */}
       <div className="absolute top-1 right-2 sm:right-6 pointer-events-none select-none opacity-90">
         <svg width="120" height="90" viewBox="0 0 120 90" fill="none" className="text-[#FBBF24]">
           <path 
@@ -65,13 +64,17 @@ export default function OnboardingPage() {
         {/* ======================================================================= */}
         <header className="flex items-center justify-between py-1">
           <div 
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => window.scrollTo({ top: 0 })}
             className="flex items-center cursor-pointer select-none"
           >
             <img 
               src="/logo.png" 
               alt="HelpU" 
               className="h-8 sm:h-9 w-auto object-contain"
+              loading="eager"
+              decoding="async"
+              width="72"
+              height="36"
             />
           </div>
 
@@ -125,31 +128,38 @@ export default function OnboardingPage() {
             </button>
           </div>
 
-          {/* Boy and Girl Student Illustration */}
+          {/* Boy and Girl Student Illustration — above the fold, eager load */}
           <div className="relative w-full pt-1 overflow-hidden select-none">
             <img
               src="/landing-hero-students.png"
               alt="Helpu Students with Yellow Car and Campus"
-              className="w-full h-auto max-h-[290px] sm:max-h-[350px] object-contain mx-auto"
+              className="landing-img-eager w-full h-auto max-h-[290px] sm:max-h-[350px] object-contain mx-auto"
               loading="eager"
+              decoding="async"
+              width="600"
+              height="290"
             />
           </div>
         </section>
 
         {/* ======================================================================= */}
-        {/* C. MAIN FEATURES (TWO ATTRACTIVE 2-COL CARDS) - STATIC PRESENTATION      */}
+        {/* C. MAIN FEATURES (TWO ATTRACTIVE 2-COL CARDS) - STATIC PRESENTATION    */}
         {/* ======================================================================= */}
         <section className="grid grid-cols-2 gap-3 sm:gap-3.5 w-full select-none">
           {/* Card 1: PoolMate */}
           <div 
             className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FFF5ED] via-[#FFF9F5] to-white border border-[#FFE4D6] p-3 sm:p-4 flex flex-col justify-between shadow-2xs"
           >
-            {/* Top Car Illustration */}
+            {/* Top Car Illustration — lazy load below fold */}
             <div className="w-full flex items-center justify-center py-1 sm:py-2">
               <img
                 src="/landing-car.png"
                 alt="PoolMate Yellow Car"
-                className="h-14 sm:h-18 w-auto object-contain"
+                className="landing-img h-14 sm:h-18 w-auto object-contain"
+                loading="lazy"
+                decoding="async"
+                width="120"
+                height="80"
               />
             </div>
 
@@ -188,12 +198,16 @@ export default function OnboardingPage() {
           <div 
             className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FEFCE8] via-[#FFFDF5] to-white border border-[#FEF08A] p-3 sm:p-4 flex flex-col justify-between shadow-2xs"
           >
-            {/* Top Books & Graduation Cap Illustration */}
+            {/* Top Books & Graduation Cap Illustration — lazy load below fold */}
             <div className="w-full flex items-center justify-center py-1 sm:py-2">
               <img
                 src="/landing-cap-books.png"
                 alt="SlotMate Books & Cap"
-                className="h-14 sm:h-18 w-auto object-contain"
+                className="landing-img h-14 sm:h-18 w-auto object-contain"
+                loading="lazy"
+                decoding="async"
+                width="120"
+                height="80"
               />
             </div>
 
@@ -230,7 +244,7 @@ export default function OnboardingPage() {
         </section>
 
         {/* ======================================================================= */}
-        {/* D. WHY STUDENTS LOVE HELPU? ❤️                                           */}
+        {/* D. WHY STUDENTS LOVE HELPU? ❤️                                         */}
         {/* ======================================================================= */}
         <section className="space-y-2.5 w-full">
           <h2 className="font-black text-sm min-[360px]:text-base sm:text-lg text-[#17233C] flex items-center gap-1.5 tracking-tight">
@@ -346,14 +360,17 @@ export default function OnboardingPage() {
         </section>
 
         {/* ======================================================================= */}
-        {/* F. BOTTOM CAMPUS DECORATIVE ILLUSTRATION                                 */}
+        {/* F. BOTTOM CAMPUS DECORATIVE ILLUSTRATION — lazy load, no extra scroll   */}
         {/* ======================================================================= */}
         <section className="relative -mx-4 sm:-mx-6 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] pt-2 pb-0 overflow-hidden select-none -mb-px">
           <img
             src="/landing-campus-footer.png"
             alt="Helpu Campus Road Car Landscape"
-            className="w-full h-auto object-cover mx-auto block pointer-events-none"
+            className="landing-img w-full h-auto object-cover mx-auto block pointer-events-none"
             loading="lazy"
+            decoding="async"
+            width="800"
+            height="300"
           />
         </section>
 

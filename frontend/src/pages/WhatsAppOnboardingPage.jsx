@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -48,7 +48,11 @@ export default function WhatsAppOnboardingPage() {
   const { user } = useUser();
   const { profile, setWhatsAppNumber, refreshProfile } = useAuthProfile();
 
-  // Initial values from profile or draft
+  // Track whether the user has started filling the form — once true, we do NOT auto-populate
+  // from background profile syncs to prevent premature navigation or state clobbering mid-form.
+  const hasUserStartedTypingRef = useRef(false);
+
+  // Initial values from profile or draft (read once on mount)
   const initialReg = profile?.registrationNumber || '';
   const existingNum = (profile?.whatsappNumber || profile?.phone || '').replace(/^\+91/, '').replace(/[^\d]/g, '');
 
@@ -62,15 +66,17 @@ export default function WhatsAppOnboardingPage() {
   const [loading, setLoading] = useState(false);
   const countryDropdownRef = useRef(null);
 
-  // Sync if profile loads dynamically
+  // Sync if profile loads dynamically — but ONLY before the user has started typing.
+  // This prevents a background profile fetch from wiping the user's partially-typed form.
   useEffect(() => {
+    if (hasUserStartedTypingRef.current) return;
     if (!registrationNumber && profile?.registrationNumber) {
       setRegistrationNumber(profile.registrationNumber);
     }
     if (!phoneNumber && (profile?.whatsappNumber || profile?.phone)) {
       setPhoneNumber((profile.whatsappNumber || profile.phone).replace(/^\+91/, '').replace(/[^\d]/g, ''));
     }
-  }, [profile]);
+  }, [profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Restore guest draft on mount if present
   useEffect(() => {
@@ -86,7 +92,7 @@ export default function WhatsAppOnboardingPage() {
         if (matched) setSelectedCountry(matched);
       }
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -100,6 +106,7 @@ export default function WhatsAppOnboardingPage() {
   }, []);
 
   const handlePhoneChange = (e) => {
+    hasUserStartedTypingRef.current = true;
     const val = e.target.value.replace(/[^\d]/g, ''); // Digits only
     setPhoneNumber(val);
     if (error) setError('');
@@ -261,6 +268,7 @@ export default function WhatsAppOnboardingPage() {
                 type="text"
                 value={registrationNumber}
                 onChange={(e) => {
+                  hasUserStartedTypingRef.current = true;
                   setRegistrationNumber(e.target.value.toUpperCase().replace(/\s/g, ''));
                   if (error) setError('');
                 }}

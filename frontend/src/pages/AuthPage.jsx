@@ -75,7 +75,7 @@ function formatFirebaseError(err) {
 
 export default function AuthPage({ initialMode = 'signIn' }) {
   const { isLoaded, isSignedIn, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useFirebaseAuth();
-  const { hasWhatsApp, isProfileLoading, isSkipped } = useAuthProfile();
+  const { hasWhatsApp, isProfileLoading } = useAuthProfile();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -113,13 +113,13 @@ export default function AuthPage({ initialMode = 'signIn' }) {
       const rawReturn = searchParams.get('returnTo') || searchParams.get('redirectUrl');
       const safeReturn = sanitizeReturnTo(rawReturn) || sanitizeReturnTo(getPendingDraftReturnPath()) || '/home';
 
-      if (!hasWhatsApp && !isSkipped) {
+      if (!hasWhatsApp) {
         navigate(`/whatsapp-setup?returnTo=${encodeURIComponent(safeReturn)}`, { replace: true });
       } else {
         navigate(safeReturn, { replace: true });
       }
     }
-  }, [isLoaded, isSignedIn, isProfileLoading, hasWhatsApp, isSkipped, navigate, searchParams]);
+  }, [isLoaded, isSignedIn, isProfileLoading, hasWhatsApp, navigate, searchParams]);
 
   const handleBack = () => {
     const rawReturn = searchParams.get('returnTo') || searchParams.get('redirectUrl');

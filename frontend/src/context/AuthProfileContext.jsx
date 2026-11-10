@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useUser, useAuth } from './FirebaseAuthContext';
 import { getProfile, saveProfile, setTokenGetter } from '../lib/api';
 import { getProfileDraft, clearProfileDraft } from '../utils/guestDraft';
@@ -9,19 +9,29 @@ export function AuthProfileProvider({ children }) {
   const { getToken } = useAuth();
   const { isLoaded, isSignedIn, user } = useUser();
 
-  const storageKey = useMemo(() => {
-    return user?.id ? `helpu_profile_${user.id}` : 'helpu_active_profile';
-  }, [user?.id]);
+  // Track latest profile data via ref to avoid stale closure bugs in fetchProfile
+  const profileRef = useRef(null);
 
   // Restore cached profile immediately to prevent flashing or unnecessary onboarding redirects
   const [profile, setProfile] = useState(() => {
     try {
       const raw = localStorage.getItem('helpu_active_profile');
-      return raw ? JSON.parse(raw) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      profileRef.current = parsed;
+      return parsed;
     } catch {
       return null;
     }
   });
+
+  // Keep ref in sync with state
+  const setProfileAndRef = useCallback((updaterOrValue) => {
+    setProfile((prev) => {
+      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
+      profileRef.current = next;
+      return next;
+    });
+  }, []);
 
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
@@ -32,13 +42,13 @@ export function AuthProfileProvider({ children }) {
         const userSpecific = localStorage.getItem(`helpu_profile_${user.id}`);
         if (userSpecific) {
           const parsed = JSON.parse(userSpecific);
-          setProfile(parsed);
+          setProfileAndRef(parsed);
         }
       } catch (e) {
         // ignore
       }
     }
-  }, [user?.id]);
+  }, [user?.id, setProfileAndRef]);
 
   // Always ensure token getter is registered with apiClient
   useEffect(() => {
@@ -47,6 +57,7 @@ export function AuthProfileProvider({ children }) {
     }
   }, [getToken]);
 
+  // fetchProfile: uses profileRef (not profile state) to avoid stale dependency and infinite loops
   const fetchProfile = useCallback(async () => {
     if (!isLoaded || !isSignedIn || !user) {
       setIsProfileLoading(false);
@@ -89,7 +100,7 @@ export function AuthProfileProvider({ children }) {
       }
 
       if (p) {
-        setProfile(p);
+        setProfileAndRef(p);
         try {
           localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(p));
           localStorage.setItem('helpu_active_profile', JSON.stringify(p));
@@ -97,31 +108,36 @@ export function AuthProfileProvider({ children }) {
           // ignore
         }
 
-        // Auto-sync basic auth image if missing from profile, without touching phone numbers
-        const currentImg = user.imageUrl || '';
-        const email = p.email || user.primaryEmailAddress?.emailAddress || '';
-        const name = p.name || user.fullName || 'Campus Student';
+        // Auto-sync profile image ONLY if user already has onboarding complete (has whatsapp)
+        // This prevents an image-sync saveProfile from briefly setting hasWhatsApp and redirecting
+        // a user who is mid-way through filling the onboarding form.
+        const hasCompletedOnboarding = Boolean(p?.whatsappNumber?.trim() || p?.phone?.trim());
+        if (hasCompletedOnboarding) {
+          const currentImg = user.imageUrl || '';
+          const email = p.email || user.primaryEmailAddress?.emailAddress || '';
+          const name = p.name || user.fullName || 'Campus Student';
 
-        if ((!p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email && currentImg) {
-          saveProfile({
-            name,
-            email,
-            college: p.college || 'VIT, Bhopal',
-            imageUrl: currentImg
-          }).then((savedRes) => {
-            if (savedRes?.data?.data) {
-              setProfile(savedRes.data.data);
-              try {
-                localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(savedRes.data.data));
-              } catch (e) {}
-            }
-          }).catch((err) => console.warn('[ProfileProvider] Auto-sync image warning:', err?.message));
+          if ((!p.imageUrl || (currentImg && p.imageUrl !== currentImg)) && email && currentImg) {
+            saveProfile({
+              name,
+              email,
+              college: p.college || 'VIT, Bhopal',
+              imageUrl: currentImg
+            }).then((savedRes) => {
+              if (savedRes?.data?.data) {
+                setProfileAndRef(savedRes.data.data);
+                try {
+                  localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(savedRes.data.data));
+                } catch (e) {}
+              }
+            }).catch((err) => console.warn('[ProfileProvider] Auto-sync image warning:', err?.message));
+          }
         }
 
         return p;
       } else {
         // Backend returned null data (user genuinely not created in DB yet)
-        setProfile((prev) => {
+        setProfileAndRef((prev) => {
           // If we had a locally cached profile with a verified WhatsApp number, preserve it
           if (prev?.whatsappNumber || prev?.phone) {
             return prev;
@@ -132,17 +148,20 @@ export function AuthProfileProvider({ children }) {
       }
     } catch (err) {
       console.warn('[ProfileProvider] Profile fetch warning (preserving cached profile):', err?.message);
-      // Keep existing cached profile so an existing user is NEVER falsely redirected to onboarding on network error
-      return profile;
+      // Keep existing cached profile so an existing user is NEVER falsely redirected to onboarding
+      return profileRef.current;
     } finally {
       setIsProfileLoading(false);
     }
-  }, [isLoaded, isSignedIn, user, profile]);
+  // ⚠️ Intentionally omit `profile` from deps — use profileRef.current instead to prevent
+  // infinite fetch-on-profile-update loops that caused the premature onboarding redirect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn, user, setProfileAndRef]);
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
-      setProfile(null);
+      setProfileAndRef(null);
       setIsProfileLoading(false);
       try {
         localStorage.removeItem('helpu_active_profile');
@@ -150,10 +169,10 @@ export function AuthProfileProvider({ children }) {
       return;
     }
     fetchProfile();
-  }, [isLoaded, isSignedIn, user?.id]);
+  }, [isLoaded, isSignedIn, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setWhatsAppNumber = useCallback((number) => {
-    setProfile((prev) => {
+    setProfileAndRef((prev) => {
       const updated = {
         ...(prev || {}),
         whatsappNumber: number,
@@ -167,7 +186,7 @@ export function AuthProfileProvider({ children }) {
       }
       return updated;
     });
-  }, [user?.id]);
+  }, [user?.id, setProfileAndRef]);
 
   const value = {
     profile,
