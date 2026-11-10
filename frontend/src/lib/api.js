@@ -327,7 +327,7 @@ export const leaveSharedRideGroup = (groupId) =>
   apiClient.post(`/api/groups/${groupId}/leave`);
 
 // ── SlotMate ─────────────────────────────────────────────────────────────────
-export const searchCourses = (q) => apiClient.get('/api/slotmate/courses', { params: { q } });
+export const searchCourses = (q = '', limit = 200) => apiClient.get('/api/slotmate/courses', { params: { q, limit } });
 export const createSlotPost = (data, options = {}) => apiClient.post('/api/slotmate/posts', data, options);
 export const updateSlotPost = (postId, data) => apiClient.put(`/api/slotmate/posts/${postId}`, data);
 export const getMySlotPosts = () => apiClient.get('/api/slotmate/posts/my');

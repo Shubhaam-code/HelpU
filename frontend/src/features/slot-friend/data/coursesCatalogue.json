@@ -1,0 +1,906 @@
+[
+  {
+    "id": "6af2dce0a4bb6f0f82350611",
+    "courseCode": "BIO1001",
+    "courseName": "Introduction to Bioengineering",
+    "category": "University Elective - Open Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350612",
+    "courseCode": "BIO1101",
+    "courseName": "Physiology Of Cells And Tissues",
+    "category": "University Elective - Open Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350603",
+    "courseCode": "BIO1501",
+    "courseName": "Bio Inspired Design",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235060b",
+    "courseCode": "BMT1013",
+    "courseName": "Human Resource Management",
+    "category": "University Elective - Humanities, Social Sciences and Management Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235060c",
+    "courseCode": "BMT2017",
+    "courseName": "International Business",
+    "category": "University Elective - Humanities, Social Sciences and Management Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c2",
+    "courseCode": "CCA3011",
+    "courseName": "Internet of Things",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350604",
+    "courseCode": "CDS3005",
+    "courseName": "Foundations of Data Science",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c3",
+    "courseCode": "CHI2007",
+    "courseName": "Healthcare Information Systems",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350613",
+    "courseCode": "CHY1003",
+    "courseName": "Bio Chemistry",
+    "category": "University Elective - Open Electives",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e2",
+    "courseCode": "CHY1005",
+    "courseName": "Introduction to Computational chemistry",
+    "category": "University Core - Natural Science Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f1",
+    "courseCode": "CHY1006",
+    "courseName": "Environmental Sustainability",
+    "category": "University Core - Humanities Social Science and Management Core",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350614",
+    "courseCode": "CHY1007",
+    "courseName": "Forensic Chemistry and Applications",
+    "category": "University Elective - Open Electives",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505fb",
+    "courseCode": "CHY2007",
+    "courseName": "Modelling and Simulation of Biological Systems",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e8",
+    "courseCode": "CSA2001",
+    "courseName": "Fundamentals in AI & ML",
+    "category": "University Core - Basic Engineering Sciences Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350615",
+    "courseCode": "CSA2002",
+    "courseName": "Introduction To Drones",
+    "category": "University Elective - Open Electives",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c4",
+    "courseCode": "CSA3004",
+    "courseName": "Data Visualization",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c5",
+    "courseCode": "CSA3005",
+    "courseName": "Cloud Computing",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c6",
+    "courseCode": "CSA3017",
+    "courseName": "Knowledge Engineering",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c7",
+    "courseCode": "CSA3022",
+    "courseName": "Internet of Things and its Applications",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c8",
+    "courseCode": "CSA4003",
+    "courseName": "Data Mining And Data Warehousing",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c9",
+    "courseCode": "CSA4011",
+    "courseName": "Information Retrieval and Web Search",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350616",
+    "courseCode": "CSD1001",
+    "courseName": "Principles Of Digital Forensics",
+    "category": "University Elective - Open Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350605",
+    "courseCode": "CSD3010",
+    "courseName": "Cyber Physical Systems",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ca",
+    "courseCode": "CSD4002",
+    "courseName": "Ethical Hacking",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505cb",
+    "courseCode": "CSD4008",
+    "courseName": "Cyber Security Framework",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505cc",
+    "courseCode": "CSD5002",
+    "courseName": "Virtualization Essentials",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505cd",
+    "courseCode": "CSD5008",
+    "courseName": "Forensic Science",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235061d",
+    "courseCode": "CSE0001",
+    "courseName": "Digital Literacy",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235061e",
+    "courseCode": "CSE0002",
+    "courseName": "Open Source Software (LINUX Administration)",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505eb",
+    "courseCode": "CSE1021",
+    "courseName": "Introduction to Problem Solving and Programming",
+    "category": "University Core - Skill Development Courses",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505b4",
+    "courseCode": "CSE2001",
+    "courseName": "Object Oriented Programming with C++",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505b5",
+    "courseCode": "CSE2002",
+    "courseName": "Data Structures and Algorithms",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505b6",
+    "courseCode": "CSE2003",
+    "courseName": "Computer Architecture and Organization",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505b7",
+    "courseCode": "CSE2004",
+    "courseName": "Theory Of Computation And Compiler Design",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ec",
+    "courseCode": "CSE2006",
+    "courseName": "Programming in Java",
+    "category": "University Core - Skill Development Courses",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505b8",
+    "courseCode": "CSE3001",
+    "courseName": "Database Management Systems",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505b9",
+    "courseCode": "CSE3003",
+    "courseName": "Operating System",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ba",
+    "courseCode": "CSE3004",
+    "courseName": "Design and Analysis of Algorithms",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505bb",
+    "courseCode": "CSE3005",
+    "courseName": "Software Engineering",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505bc",
+    "courseCode": "CSE3006",
+    "courseName": "Computer Networks",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ce",
+    "courseCode": "CSE3008",
+    "courseName": "Soft Computing",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505bd",
+    "courseCode": "CSE3009",
+    "courseName": "Parallel and Distributed Computing",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505cf",
+    "courseCode": "CSE3010",
+    "courseName": "Computer Vision",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505be",
+    "courseCode": "CSE3011",
+    "courseName": "Python Programming",
+    "category": "Programme Core",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d0",
+    "courseCode": "CSE3012",
+    "courseName": "Mobile Application Development",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d1",
+    "courseCode": "CSE3013",
+    "courseName": "Agile Software Development",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d2",
+    "courseCode": "CSE3014",
+    "courseName": "Medical Imaging",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d3",
+    "courseCode": "CSE3015",
+    "courseName": "AWS Cloud Practitioner",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d4",
+    "courseCode": "CSE3016",
+    "courseName": "AWS Solution Architect",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d5",
+    "courseCode": "CSE3017",
+    "courseName": "Salesforce",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505bf",
+    "courseCode": "CSE4001",
+    "courseName": "Internet and Web Programming",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d6",
+    "courseCode": "CSE4003",
+    "courseName": "Bigdata Analytics",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d7",
+    "courseCode": "CSE4005",
+    "courseName": "Machine Learning",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d8",
+    "courseCode": "CSE4012",
+    "courseName": "Software Defined Network",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505d9",
+    "courseCode": "CSE4016",
+    "courseName": "Software Project Management",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505da",
+    "courseCode": "CSE4017",
+    "courseName": "Software Testing",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505db",
+    "courseCode": "CSE4019",
+    "courseName": "Advanced Java Programming",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505dc",
+    "courseCode": "CSG2001",
+    "courseName": "Augmented Reality and Virtual Reality",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350606",
+    "courseCode": "CSG2003",
+    "courseName": "Human Computer Interaction",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f4",
+    "courseCode": "DSN2092",
+    "courseName": "Summer Industrial Internship",
+    "category": "University Core - Project and Internships",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f5",
+    "courseCode": "DSN2093",
+    "courseName": "Semester Internship",
+    "category": "University Core - Project and Internships",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f6",
+    "courseCode": "DSN2098",
+    "courseName": "Project Exhibition - I",
+    "category": "University Core - Project and Internships",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f7",
+    "courseCode": "DSN2099",
+    "courseName": "Project Exhibition - II",
+    "category": "University Core - Project and Internships",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f8",
+    "courseCode": "DSN3099",
+    "courseName": "Engineering Project in Community Service",
+    "category": "University Core - Project and Internships",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f9",
+    "courseCode": "DSN4091",
+    "courseName": "Capstone Project - Phase 1",
+    "category": "University Core - Project and Internships",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505fa",
+    "courseCode": "DSN4092",
+    "courseName": "Capstone Project - Phase 2",
+    "category": "University Core - Project and Internships",
+    "credits": 5,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350607",
+    "courseCode": "EAC4012",
+    "courseName": "Body Area Networks",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c0",
+    "courseCode": "ECE2002",
+    "courseName": "Digital Logic Design",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505c1",
+    "courseCode": "ECE3004",
+    "courseName": "Microprocessors And Microcontrollers",
+    "category": "Programme Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350608",
+    "courseCode": "ECE4006",
+    "courseName": "Sensors And Iot",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505dd",
+    "courseCode": "ECE4007",
+    "courseName": "Wireless Sensor Networks",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505de",
+    "courseCode": "ECE4010",
+    "courseName": "Embedded Systems",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505df",
+    "courseCode": "ECE6012",
+    "courseName": "Pattern Recognition And Image Analysis",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e9",
+    "courseCode": "EEE1001",
+    "courseName": "Electric Circuits and Systems",
+    "category": "University Core - Basic Engineering Sciences Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f2",
+    "courseCode": "ENG1004",
+    "courseName": "Effective Technical Communication",
+    "category": "University Core - Humanities Social Science and Management Core",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f3",
+    "courseCode": "ENG2005",
+    "courseName": "Advanced Technical Communication",
+    "category": "University Core - Humanities Social Science and Management Core",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350609",
+    "courseCode": "ENG3001",
+    "courseName": "Introduction to Computational Linguistics",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235061f",
+    "courseCode": "EXC0001",
+    "courseName": "Extra Curricular Activities",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350620",
+    "courseCode": "HUM0002",
+    "courseName": "Swachh Bharat",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350621",
+    "courseCode": "HUM0003",
+    "courseName": "Indian Constitution",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350622",
+    "courseCode": "HUM0004",
+    "courseName": "Indian Heritage",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235060d",
+    "courseCode": "HUM1002",
+    "courseName": "Emotional Intelligence",
+    "category": "University Elective - Humanities, Social Sciences and Management Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235060e",
+    "courseCode": "HUM2001",
+    "courseName": "Behavioural Science",
+    "category": "University Elective - Humanities, Social Sciences and Management Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350617",
+    "courseCode": "MAT1002",
+    "courseName": "Calculus for Bioengineers",
+    "category": "University Elective - Open Electives",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e3",
+    "courseCode": "MAT1003",
+    "courseName": "Calculus",
+    "category": "University Core - Natural Science Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505fc",
+    "courseCode": "MAT2001",
+    "courseName": "Differential And Difference Equations",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e4",
+    "courseCode": "MAT2002",
+    "courseName": "Discrete Mathematics and Graph Theory",
+    "category": "University Core - Natural Science Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505fd",
+    "courseCode": "MAT2003",
+    "courseName": "Applied Numerical Method",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505fe",
+    "courseCode": "MAT2004",
+    "courseName": "Operations Research",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ff",
+    "courseCode": "MAT2005",
+    "courseName": "Transform Techniques and Difference Equations",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e0",
+    "courseCode": "MAT2009",
+    "courseName": "Applied Cryptography",
+    "category": "Programme Elective",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350618",
+    "courseCode": "MAT2101",
+    "courseName": "Applications of Differential Equations",
+    "category": "University Elective - Open Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e5",
+    "courseCode": "MAT3002",
+    "courseName": "Applied Linear Algebra",
+    "category": "University Core - Natural Science Core",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e6",
+    "courseCode": "MAT3003",
+    "courseName": "Probability, Statistics and Reliability",
+    "category": "University Core - Natural Science Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350600",
+    "courseCode": "MAT3004",
+    "courseName": "Random Process",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350601",
+    "courseCode": "MAT3008",
+    "courseName": "Computational Game Theory",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e1",
+    "courseCode": "MAT5004",
+    "courseName": "Mathematical Foundations for Cybersecurity",
+    "category": "Programme Elective",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235060a",
+    "courseCode": "MEA3015",
+    "courseName": "Unmanned Aerial Vehicles",
+    "category": "University Elective - Multidisciplinary Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ea",
+    "courseCode": "MEE2014",
+    "courseName": "Engineering Design and Modelling",
+    "category": "University Core - Basic Engineering Sciences Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235060f",
+    "courseCode": "MGT1002",
+    "courseName": "Principles Of Management And Organizational Behaviour",
+    "category": "University Elective - Humanities, Social Sciences and Management Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350610",
+    "courseCode": "MGT2003",
+    "courseName": "Technology Entrepreneurship",
+    "category": "University Elective - Humanities, Social Sciences and Management Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350619",
+    "courseCode": "ONL1022",
+    "courseName": "Industrial IoT Markets and Security",
+    "category": "University Elective - Open Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235061a",
+    "courseCode": "ONL1028",
+    "courseName": "The Bits and Bytes of Computer Networking",
+    "category": "University Elective - Open Electives",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235061b",
+    "courseCode": "ONL1032",
+    "courseName": "IBM AI Engineering Professional Certificate",
+    "category": "University Elective - Open Electives",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f8235061c",
+    "courseCode": "ONS5080",
+    "courseName": "Marketing Analytics",
+    "category": "University Elective - Open Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505e7",
+    "courseCode": "PHY1003",
+    "courseName": "Introduction to Computational Physics",
+    "category": "University Core - Natural Science Core",
+    "credits": 4,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350602",
+    "courseCode": "PHY2011",
+    "courseName": "Biophysics",
+    "category": "University Elective - Natural Science Electives",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ed",
+    "courseCode": "PLA1004",
+    "courseName": "Competitive Coding Practices",
+    "category": "University Core - Skill Development Courses",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ee",
+    "courseCode": "PLA1006",
+    "courseName": "Lateral Thinking",
+    "category": "University Core - Skill Development Courses",
+    "credits": 2,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505ef",
+    "courseCode": "SST1003",
+    "courseName": "Professional Communication Skills for Engineers",
+    "category": "University Core - Skill Development Courses",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f823505f0",
+    "courseCode": "SST2003",
+    "courseName": "Dynamics of workplace communication Skills",
+    "category": "University Core - Skill Development Courses",
+    "credits": 1,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350623",
+    "courseCode": "UHV0001",
+    "courseName": "Universal Human Values - I",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 3,
+    "isActive": true
+  },
+  {
+    "id": "6af2dce0a4bb6f0f82350624",
+    "courseCode": "UHV0002",
+    "courseName": "Universal Human Values - II",
+    "category": "Non - Graded Mandatory Courses",
+    "credits": 3,
+    "isActive": true
+  }
+]

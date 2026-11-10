@@ -10,6 +10,7 @@ import {
 
 import { useSlotFriend } from '../context/SlotFriendContext';
 import { searchCourses } from '../../../lib/api';
+import { filterCourses, syncCourseCatalogueInBackground } from '../utils/courseCatalogueManager';
 import { SlotSelectionModal } from '../components/SlotSelectionModal';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { useUser } from '../../../context/FirebaseAuthContext';
@@ -46,7 +47,7 @@ export default function CreateSlotPostPage() {
   // Form State
   const [courseQuery, setCourseQuery] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [courseSuggestions, setCourseSuggestions] = useState([]);
+  const [courseSuggestions, setCourseSuggestions] = useState(() => filterCourses('', 20));
   const [isSearchingCourses, setIsSearchingCourses] = useState(false);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
@@ -118,35 +119,24 @@ export default function CreateSlotPostPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch course suggestions dynamically from MongoDB through the backend course API
+  // Silently sync latest courses from backend in background once on mount
   useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+    syncCourseCatalogueInBackground().then((latest) => {
+      if (Array.isArray(latest) && latest.length > 0 && !selectedCourse) {
+        setCourseSuggestions(filterCourses(courseQuery, 25));
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const query = courseQuery.trim();
-    // Don't search if the query exactly matches the already selected course string
+  // Instant in-memory course search (0ms latency, always loaded, offline ready)
+  useEffect(() => {
+    // Don't re-filter if the query exactly matches the already selected course string
     if (selectedCourse && courseQuery === `[${selectedCourse.courseCode}] ${selectedCourse.courseName}`) {
       return;
     }
 
-    setIsSearchingCourses(true);
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const res = await searchCourses(query);
-        const data = res?.data?.data || [];
-        setCourseSuggestions(data);
-      } catch (err) {
-        console.warn('[SlotMate] Failed to search courses:', err);
-        setCourseSuggestions([]);
-      } finally {
-        setIsSearchingCourses(false);
-      }
-    }, 250);
-
-    return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    };
+    const matches = filterCourses(courseQuery, 25);
+    setCourseSuggestions(matches);
   }, [courseQuery, selectedCourse]);
 
   const handleSelectCourse = (course) => {
@@ -160,7 +150,8 @@ export default function CreateSlotPostPage() {
   const handleClearCourse = () => {
     setSelectedCourse(null);
     setCourseQuery('');
-    setIsCourseDropdownOpen(false);
+    setCourseSuggestions(filterCourses('', 25));
+    setIsCourseDropdownOpen(true);
     if (courseInputRef.current) {
       courseInputRef.current.focus();
     }
@@ -552,11 +543,20 @@ export default function CreateSlotPostPage() {
                       ref={courseInputRef}
                       type="text"
                       value={courseQuery}
-                      onFocus={() => setIsCourseDropdownOpen(true)}
+                      onFocus={() => {
+                        setIsCourseDropdownOpen(true);
+                        setCourseSuggestions(filterCourses(courseQuery, 25));
+                      }}
+                      onClick={() => {
+                        setIsCourseDropdownOpen(true);
+                        setCourseSuggestions(filterCourses(courseQuery, 25));
+                      }}
                       onChange={(e) => {
-                        setCourseQuery(e.target.value);
+                        const val = e.target.value;
+                        setCourseQuery(val);
                         setSelectedCourse(null);
                         setIsCourseDropdownOpen(true);
+                        setCourseSuggestions(filterCourses(val, 25));
                         if (errors.course) setErrors((prev) => ({ ...prev, course: null }));
                       }}
                       placeholder="Search course code or name (e.g. CSE2001, Data Structures)..."
@@ -579,22 +579,17 @@ export default function CreateSlotPostPage() {
 
                   {/* Autocomplete Dropdown List */}
                   <AnimatePresence>
-                    {isCourseDropdownOpen && (courseSuggestions.length > 0 || isSearchingCourses) && (
+                    {isCourseDropdownOpen && (
                       <motion.div
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="absolute z-40 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white rounded-2xl border border-[#F4E3D8] shadow-lg divide-y divide-[#F4E3D8]/60"
+                        className="absolute z-40 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white rounded-2xl border border-[#F4E3D8] shadow-xl divide-y divide-[#F4E3D8]/60"
                       >
-                        {isSearchingCourses ? (
-                          <div className="p-3 text-center text-xs text-[#6E7587] flex items-center justify-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin text-[#D97706]" />
-                            <span>Searching official curriculum...</span>
-                          </div>
-                        ) : courseSuggestions.length > 0 ? (
+                        {courseSuggestions.length > 0 ? (
                           courseSuggestions.map((course) => (
                             <div
-                              key={course._id || course.courseCode}
+                              key={course.id || course._id || course.courseCode}
                               onClick={() => handleSelectCourse(course)}
                               className="p-3 hover:bg-[#FEF9C3]/50 cursor-pointer transition-colors flex items-center justify-between gap-2 group"
                             >

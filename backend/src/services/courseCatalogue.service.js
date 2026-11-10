@@ -257,7 +257,7 @@ export async function importCoursesToDatabase(pdfPathOrBuffer) {
  */
 export async function searchCourses(query = '', limit = 10) {
   const trimmed = query.trim();
-  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 500);
 
   let filter = { isActive: true };
 
