@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
- * Premium 5-Second Startup Intro Video for Helpu (Logged-out users only)
+ * Premium Startup Intro Video for Helpu (Logged-out users only)
  *
- * FIX v2:
+ * FIX v3:
+ * - Primary trigger: onEnded event — video plays to full natural completion
+ * - Safety fallback: 8000ms timer (video is 6.29s; this gives buffer for slow decode)
  * - object-cover fills the full screen with NO white gaps top/bottom
- * - muted is REMOVED so Android WebView plays video audio natively
- *   (requires setMediaPlaybackRequiresUserGesture(false) in MainActivity, already set)
- * - Wrapper covers inset-0 with NO safe-area padding so video touches screen edges
- * - Skip button positioned using safe-area-inset-top so it stays below status bar
+ * - Audio enabled — muted removed, setMediaPlaybackRequiresUserGesture=false in MainActivity
  */
 export default function StartupVideoIntro({ onComplete }) {
   const [fading, setFading] = useState(false);
@@ -36,21 +35,22 @@ export default function StartupVideoIntro({ onComplete }) {
   }, [onComplete]);
 
   useEffect(() => {
-    // 5.0-second playback timer
-    const timer = setTimeout(() => {
+    // Safety fallback timer: 8000ms (video is 6.29s — gives 1.7s buffer for slow decode/start)
+    // Primary finish trigger is the onEnded event on the <video> element below.
+    const fallbackTimer = setTimeout(() => {
       finish();
-    }, 5000);
+    }, 8000);
 
-    // Explicit play() trigger for WebView environments
+    // Explicit play() trigger for Capacitor Android WebView
     if (videoRef.current) {
       videoRef.current.play?.().catch(() => {
-        // Autoplay restrictions or format issues — finish gracefully
-        finish();
+        // If autoplay is blocked, finish gracefully after a brief moment
+        setTimeout(finish, 500);
       });
     }
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
     };
   }, [finish]);
 
