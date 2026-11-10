@@ -18,20 +18,34 @@
   box-sizing: border-box;
 }
 
-html, body {
+html {
   font-family: var(--font-family-sans);
   background-color: var(--color-cream);
   color: var(--color-navy);
   -webkit-font-smoothing: antialiased;
-  /* Removed: scroll-behavior: smooth — this causes jerky scroll on Android WebView */
   overflow-x: hidden;
+  overflow-y: auto;
+  /* Natural momentum touch-scrolling */
+  -webkit-overflow-scrolling: touch;
+  /* Inform compositor that vertical gestures are dedicated to scrolling */
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-cream);
+  color: var(--color-navy);
+  min-height: 100%;
+  /* Use overflow-x: clip to prevent horizontal overflow without creating an accidental nested scroll container */
+  overflow-x: clip;
   /* Prevent accidental long-press text selection popup on mobile */
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  /* Enable momentum scrolling on iOS and smooth touch scroll on Android WebView */
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 /* Allow text selection only in actual editable inputs */
@@ -46,7 +60,22 @@ input, textarea, [contenteditable="true"], .selectable-text {
   min-height: 100dvh;
   position: relative;
   background-color: var(--color-cream);
-  overflow-x: hidden;
+  /* Clip horizontal overflow without establishing a nested scroll container trap */
+  overflow-x: clip;
+  touch-action: pan-y;
+}
+
+/* Prevent image dragging and touch gesture locking across Android WebView */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
+}
+
+/* Ensure inline SVGs allow vertical panning without trapping touch */
+svg {
+  touch-action: pan-y;
 }
 
 /* Helpu Design System Reusable Component Utility Classes */
@@ -356,3 +385,13 @@ body.keyboard-open nav.fixed.bottom-0 {
 .landing-img-eager {
   display: block;
 }
+
+/* Touch Action Utilities for Android WebView Gesture Routing */
+.touch-pan-y {
+  touch-action: pan-y !important;
+}
+
+.touch-manipulation {
+  touch-action: manipulation !important;
+}
+
