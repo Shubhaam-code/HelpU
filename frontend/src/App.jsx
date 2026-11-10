@@ -50,6 +50,7 @@ import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
 import { InAppNotificationBanner } from './components/ui/InAppNotificationBanner';
 import { initMobileNativeBridge } from './mobile/mobileBridge';
 import { syncDeviceTokenWithBackend, unregisterDeviceTokenFromBackend } from './mobile/pushNotifications';
+import { useNetworkSync } from './hooks/useNetworkSync';
 
 // Top-level Error Boundary to catch any child component crashes
 class ErrorBoundary extends Component {
@@ -129,6 +130,7 @@ function TokenInjector() {
 // Native mobile runtime bridge initializer (Status Bar, Back Button, Keyboard, Push Notifications)
 function MobileBridgeInitializer() {
   const navigate = useNavigate();
+  useNetworkSync(); // Phase 6: Network reconnect → stale query revalidation
 
   useEffect(() => {
     const cleanup = initMobileNativeBridge({ navigate });

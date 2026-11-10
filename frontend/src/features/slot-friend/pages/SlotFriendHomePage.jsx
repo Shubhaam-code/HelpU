@@ -16,12 +16,16 @@ import { useUserProfile, useUnreadNotificationsCount } from '../../../hooks/useA
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { getSlotMateDraft, clearSlotMateDraft } from '../../../utils/guestDraft';
 import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
+import { useScrollRestoration } from '../../../hooks/useScrollRestoration';
 
 export default function SlotFriendHomePage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const { hasWhatsApp } = useAuthProfile();
   const { data: profile } = useUserProfile();
+
+  // Phase 4: Preserve scroll position when navigating away and returning
+  useScrollRestoration();
   const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'slotmate' });
 
   const { myPosts = [], totalMatchesCount = 0, getPostMatchCount, createPost } = useSlotFriend();

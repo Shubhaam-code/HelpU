@@ -3,26 +3,32 @@ import { QueryClient } from '@tanstack/react-query';
 /**
  * Tiered Cache Duration Configurations (in milliseconds)
  * Tailored to match real-world campus mobility dynamics.
+ *
+ * Smart Caching Strategy:
+ * - Public listings (rides, slot posts) cached 5 min — instant return navigation
+ * - Profile cached 10 min — rarely changes within a session
+ * - Bookings/seat state: 0 staleTime — always backend-authoritative
+ * - gcTime 24h on public data: survives Android app restart (with IDB persistence)
  */
 export const CACHE_DURATIONS = {
-  // Profiles rarely change within a session
-  PROFILE: { staleTime: 2 * 60 * 1000, gcTime: 30 * 60 * 1000 },
-  // Home dashboard & match calculations
-  HOME_MATCHES: { staleTime: 60 * 1000, gcTime: 15 * 60 * 1000 },
-  // User's own ride offers & find requests
-  MY_RIDES: { staleTime: 45 * 1000, gcTime: 15 * 60 * 1000 },
-  // Fast-moving shared groups & discovery
-  SHARED_GROUPS: { staleTime: 20 * 1000, gcTime: 15 * 60 * 1000 },
+  // Profile: rarely changes, safe to cache longer
+  PROFILE: { staleTime: 10 * 60 * 1000, gcTime: 60 * 60 * 1000 },
+  // Home dashboard & match calculations: moderate freshness
+  HOME_MATCHES: { staleTime: 2 * 60 * 1000, gcTime: 30 * 60 * 1000 },
+  // Public ride listings: 5 min stale — returning to list page shows instantly
+  MY_RIDES: { staleTime: 5 * 60 * 1000, gcTime: 24 * 60 * 60 * 1000 },
+  // Bookings & seat availability: ALWAYS fresh from backend (safety-critical)
+  BOOKINGS: { staleTime: 0, gcTime: 5 * 60 * 1000 },
+  // Shared groups: moderate, group membership can change
+  SHARED_GROUPS: { staleTime: 60 * 1000, gcTime: 30 * 60 * 1000 },
   // Invitations & join requests
-  INVITATIONS: { staleTime: 20 * 1000, gcTime: 15 * 60 * 1000 },
+  INVITATIONS: { staleTime: 30 * 1000, gcTime: 15 * 60 * 1000 },
   // Group details (active member lists)
-  GROUP_DETAILS: { staleTime: 20 * 1000, gcTime: 15 * 60 * 1000 },
-  // Notifications
-  NOTIFICATIONS: { staleTime: 30 * 1000, gcTime: 15 * 60 * 1000 },
-  // Unread badge count
-  UNREAD_COUNT: { staleTime: 20 * 1000, gcTime: 15 * 60 * 1000 },
-  // Bookings
-  BOOKINGS: { staleTime: 45 * 1000, gcTime: 15 * 60 * 1000 },
+  GROUP_DETAILS: { staleTime: 30 * 1000, gcTime: 15 * 60 * 1000 },
+  // Notifications: fresh enough but not hammering
+  NOTIFICATIONS: { staleTime: 60 * 1000, gcTime: 15 * 60 * 1000 },
+  // Unread badge count: short freshness, cheap to refetch
+  UNREAD_COUNT: { staleTime: 30 * 1000, gcTime: 10 * 60 * 1000 },
 };
 
 /**

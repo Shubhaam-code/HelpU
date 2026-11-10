@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createIDBPersister } from './lib/idbPersister';
 import { queryClient } from './lib/queryClient';
 import { FirebaseAuthProvider } from './context/FirebaseAuthContext';
 import './index.css';
@@ -23,14 +25,40 @@ if (typeof window !== 'undefined') {
 
 console.log('[HelpuPush] 0. Web app mounted inside Capacitor WebView.');
 
+// IndexedDB persister — survives Android app restart
+// Only caches NON-sensitive public data (rides, slot posts, home listings)
+// Sensitive data (bookings, profile, notifications) is kept in-memory only
+const idbPersister = createIDBPersister('helpu-query-cache-v1');
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: idbPersister,
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours — matches public listing gcTime
+        buster: '1.0.0',             // bump this string on breaking schema changes to bust old cache
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) => {
+            const key = query.queryKey;
+            if (!Array.isArray(key)) return false;
+            const root = key[0];
+            // ✅ Persist: public ride listings and SlotMate posts (non-sensitive)
+            if (root === 'travels') return true;
+            // ✅ Persist: community posts
+            if (root === 'community') return true;
+            // ❌ Do NOT persist: private/sensitive data
+            // bookings, profile, notifications, groups are excluded
+            return false;
+          },
+        },
+      }}
+    >
       <FirebaseAuthProvider>
         <BrowserRouter>
           <App />
         </BrowserRouter>
       </FirebaseAuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </StrictMode>
 );

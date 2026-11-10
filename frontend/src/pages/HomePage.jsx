@@ -24,6 +24,7 @@ import {
   useConfirmedBookings
 } from '../hooks/useAppData';
 import { categorizeConfirmedRides } from '../lib/utils';
+import { useScrollRestoration } from '../hooks/useScrollRestoration';
 
 /**
  * Format minutes from midnight into 12-hour AM/PM format
@@ -56,6 +57,9 @@ export default function HomePage() {
   const { user, isSignedIn } = useUser();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authReturnPath, setAuthReturnPath] = useState('/home');
+
+  // Phase 4: Preserve scroll position when navigating away and returning
+  useScrollRestoration();
 
   const handleProtectedNavigate = (path) => {
     if (!isSignedIn) {
@@ -212,6 +216,8 @@ export default function HomePage() {
                 src="/webpage.png"
                 alt="PoolMate Campus Travel"
                 className="w-full h-auto max-h-[125px] sm:max-h-[165px] object-contain select-none pointer-events-none drop-shadow-xs"
+                loading="lazy"
+                decoding="async"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             </div>
@@ -300,6 +306,8 @@ export default function HomePage() {
                 src="/flight.png"
                 alt="Cab Pooling - Airport and Station"
                 className="w-full h-auto max-h-[110px] sm:max-h-[155px] object-contain select-none pointer-events-none drop-shadow-sm group-hover:scale-105 transition-transform"
+                loading="lazy"
+                decoding="async"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             </div>

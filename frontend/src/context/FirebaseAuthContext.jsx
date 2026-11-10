@@ -16,6 +16,7 @@ import { auth, googleProvider } from '../lib/firebase';
 import { setTokenGetter } from '../lib/api';
 import { setActiveAuthUser } from '../mobile/pushNotifications';
 import { clearUserCache } from '../lib/queryClient';
+import { del } from 'idb-keyval';
 
 const FirebaseAuthContext = createContext(null);
 
@@ -240,6 +241,13 @@ export function FirebaseAuthProvider({ children }) {
   const signOutUser = useCallback(async () => {
     try {
       clearUserCache();
+      // Phase 7: Also clear IDB persisted cache on logout (privacy-safe)
+      // Public cache (travels, community) is intentionally preserved for guest browsing
+      try {
+        await del('helpu-query-cache-v1');
+      } catch {
+        // IDB clear failure is non-fatal
+      }
       if (Capacitor.isNativePlatform()) {
         try {
           await FirebaseAuthentication.signOut();
