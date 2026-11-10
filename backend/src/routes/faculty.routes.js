@@ -17,3 +17,4 @@ router.get('/:id/reviews', getFacultyReviewsHandler);
 router.get('/:id', getFacultyDetailsHandler);
 
 export default router;
+

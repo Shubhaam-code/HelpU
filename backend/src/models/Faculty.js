@@ -33,8 +33,8 @@ const facultySchema = new mongoose.Schema(
     normalizedName: {
       type: String,
       required: true,
-      trim: true
-      // index defined via facultySchema.index() below
+      trim: true,
+      index: true
     },
 
     // --- Profile fields (empty in current CSV, reserved for future imports) ---

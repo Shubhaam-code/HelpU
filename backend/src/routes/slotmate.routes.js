@@ -1,5 +1,6 @@
 import express from 'express';
 import { getCourses } from '../controllers/course.controller.js';
+import facultyRoutes from './faculty.routes.js';
 import {
   createPost,
   updatePost,
@@ -23,6 +24,12 @@ const router = express.Router();
 // 1. Course catalogue lookup (Course search API) - Public
 // GET /api/slotmate/courses?q=data
 router.get('/courses', getCourses);
+
+// 1b. Faculty search & review APIs (integrated into SlotMate) - Public
+// GET /api/slotmate/faculty/search?q=vij
+// GET /api/slotmate/faculty/:id
+// GET /api/slotmate/faculty/:id/reviews
+router.use('/faculty', facultyRoutes);
 
 // 2. Public Slot Post Exploration Feed (Privacy-scrubbed) - Optional Auth
 // GET /api/slotmate/posts

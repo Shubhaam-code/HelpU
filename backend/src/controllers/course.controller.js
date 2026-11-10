@@ -7,7 +7,7 @@ import { searchCourses } from '../services/courseCatalogue.service.js';
 export async function getCourses(req, res) {
   try {
     const query = req.query.q || req.query.search || req.query.query || '';
-    const limit = parseInt(req.query.limit, 10) || 10;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 500;
 
     const courses = await searchCourses(query, limit);
 

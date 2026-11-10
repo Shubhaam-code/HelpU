@@ -10,7 +10,7 @@ import {
 
 import { useSlotFriend } from '../context/SlotFriendContext';
 import { searchCourses } from '../../../lib/api';
-import { filterCourses, syncCourseCatalogueInBackground } from '../utils/courseCatalogueManager';
+import { filterCourses, syncCourseCatalogueInBackground, getAllCourses } from '../utils/courseCatalogueManager';
 import { SlotSelectionModal } from '../components/SlotSelectionModal';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { useUser } from '../../../context/FirebaseAuthContext';
@@ -108,7 +108,7 @@ export default function CreateSlotPostPage() {
     }
   }, [existingPost]);
 
-  // Close course dropdown when clicking outside
+  // Close course dropdown when clicking or tapping outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
@@ -116,14 +116,18 @@ export default function CreateSlotPostPage() {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Silently sync latest courses from backend in background once on mount
   useEffect(() => {
     syncCourseCatalogueInBackground().then((latest) => {
       if (Array.isArray(latest) && latest.length > 0 && !selectedCourse) {
-        setCourseSuggestions(filterCourses(courseQuery, 25));
+        setCourseSuggestions(filterCourses(courseQuery, 30));
       }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -135,7 +139,7 @@ export default function CreateSlotPostPage() {
       return;
     }
 
-    const matches = filterCourses(courseQuery, 25);
+    const matches = filterCourses(courseQuery, 30);
     setCourseSuggestions(matches);
   }, [courseQuery, selectedCourse]);
 
@@ -524,19 +528,20 @@ export default function CreateSlotPostPage() {
                 {/* =================================================================== */}
                 {/* 1. COURSE SEARCH (COURSE CODE OR COURSE NAME)                       */}
                 {/* =================================================================== */}
-                <div className="space-y-1.5 relative" ref={courseDropdownRef}>
-                  <label className="block text-xs sm:text-sm font-black text-[#17233C]">
-                    Course <span className="text-red-500">*</span>
-                  </label>
+                <div className="space-y-1.5 relative z-30" ref={courseDropdownRef}>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs sm:text-sm font-black text-[#17233C]">
+                      Course <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] sm:text-[11px] text-[#D97706] font-bold bg-[#FEF3C7] px-2 py-0.5 rounded-full border border-[#FDE68A]">
+                      {getAllCourses().length} courses ready
+                    </span>
+                  </div>
 
-                  {/* Course Search Input */}
+                  {/* Course Search Input Wrapper */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#9CA3AF]">
-                      {isSearchingCourses ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-[#D97706]" />
-                      ) : (
-                        <Search className="w-4 h-4 stroke-[2.4]" />
-                      )}
+                      <Search className="w-4 h-4 stroke-[2.4]" />
                     </div>
 
                     <input
@@ -545,18 +550,18 @@ export default function CreateSlotPostPage() {
                       value={courseQuery}
                       onFocus={() => {
                         setIsCourseDropdownOpen(true);
-                        setCourseSuggestions(filterCourses(courseQuery, 25));
+                        setCourseSuggestions(filterCourses(courseQuery, 30));
                       }}
                       onClick={() => {
                         setIsCourseDropdownOpen(true);
-                        setCourseSuggestions(filterCourses(courseQuery, 25));
+                        setCourseSuggestions(filterCourses(courseQuery, 30));
                       }}
                       onChange={(e) => {
                         const val = e.target.value;
                         setCourseQuery(val);
                         setSelectedCourse(null);
                         setIsCourseDropdownOpen(true);
-                        setCourseSuggestions(filterCourses(val, 25));
+                        setCourseSuggestions(filterCourses(val, 30));
                         if (errors.course) setErrors((prev) => ({ ...prev, course: null }));
                       }}
                       placeholder="Search course code or name (e.g. CSE2001, Data Structures)..."
@@ -575,55 +580,81 @@ export default function CreateSlotPostPage() {
                         <X className="w-4 h-4" />
                       </button>
                     )}
-                  </div>
 
-                  {/* Autocomplete Dropdown List */}
-                  <AnimatePresence>
-                    {isCourseDropdownOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        className="absolute z-40 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white rounded-2xl border border-[#F4E3D8] shadow-xl divide-y divide-[#F4E3D8]/60"
-                      >
-                        {courseSuggestions.length > 0 ? (
-                          courseSuggestions.map((course) => (
-                            <div
-                              key={course.id || course._id || course.courseCode}
-                              onClick={() => handleSelectCourse(course)}
-                              className="p-3 hover:bg-[#FEF9C3]/50 cursor-pointer transition-colors flex items-center justify-between gap-2 group"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-black text-xs sm:text-sm text-[#D97706] group-hover:text-[#B45309]">
-                                    {course.courseCode}
-                                  </span>
-                                  {course.credits && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#E0F2FE] text-[#0369A1]">
-                                      {course.credits} Credits
-                                    </span>
-                                  )}
-                                  {course.category && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#FEF3C7] text-[#92400E]">
-                                      {course.category}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-[#17233C] font-bold truncate mt-0.5">
-                                  {course.courseName}
-                                </p>
-                              </div>
-                              <Plus className="w-4 h-4 text-[#D97706] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                          ))
-                        ) : (
-                          <div className="p-3 text-center text-xs text-[#6E7587]">
-                            No courses found matching "{courseQuery}".
+                    {/* Autocomplete Dropdown List - Positioned directly below input with top-full */}
+                    <AnimatePresence>
+                      {isCourseDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute z-50 left-0 right-0 top-full mt-1.5 max-h-72 overflow-y-auto bg-white rounded-2xl border border-[#F4E3D8] shadow-2xl divide-y divide-[#F4E3D8]/60"
+                        >
+                          {/* Quick Shortcut Pills */}
+                          <div className="p-2 bg-[#FFFBEB] flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-[#FDE68A]/60">
+                            <span className="text-[10px] font-bold text-[#92400E] shrink-0 pl-1">Quick:</span>
+                            {['CSE', 'DSA', 'OOP', 'DBMS', 'OS', 'Math', 'Electives'].map((pill) => (
+                              <button
+                                key={pill}
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setCourseQuery(pill === 'All' ? '' : pill);
+                                  setSelectedCourse(null);
+                                  setCourseSuggestions(filterCourses(pill === 'All' ? '' : pill, 30));
+                                  if (courseInputRef.current) courseInputRef.current.focus();
+                                }}
+                                className="px-2 py-0.5 rounded-lg bg-white hover:bg-[#FEF9C3] text-[10px] font-bold text-[#B45309] border border-[#FDE68A] shrink-0 transition-colors shadow-2xs cursor-pointer"
+                              >
+                                {pill}
+                              </button>
+                            ))}
                           </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+
+                          {courseSuggestions.length > 0 ? (
+                            courseSuggestions.map((course) => (
+                              <div
+                                key={course.id || course._id || course.courseCode}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleSelectCourse(course);
+                                }}
+                                onClick={() => handleSelectCourse(course)}
+                                className="p-3 hover:bg-[#FEF9C3]/60 active:bg-[#FEF08A] cursor-pointer transition-colors flex items-center justify-between gap-2 group"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-black text-xs sm:text-sm text-[#D97706] group-hover:text-[#B45309]">
+                                      {course.courseCode}
+                                    </span>
+                                    {course.credits && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#E0F2FE] text-[#0369A1]">
+                                        {course.credits} Credits
+                                      </span>
+                                    )}
+                                    {course.category && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#FEF3C7] text-[#92400E]">
+                                        {course.category}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-[#17233C] font-bold truncate mt-0.5">
+                                    {course.courseName}
+                                  </p>
+                                </div>
+                                <Plus className="w-4 h-4 text-[#D97706] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-4 text-center text-xs text-[#6E7587]">
+                              No courses found matching "{courseQuery}".
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
 
                   {/* Selected Course Confirmation Card (Displayed after selection) */}
                   {selectedCourse && (
