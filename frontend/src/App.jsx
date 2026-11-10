@@ -1,10 +1,11 @@
-import React, { Component, useEffect } from 'react';
+import React, { Component, useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useUser } from './context/FirebaseAuthContext';
 import { AnimatePresence } from 'framer-motion';
 
 import { setTokenGetter, getProfile, saveProfile } from './lib/api';
 import { AuthProfileProvider, useAuthProfile } from './context/AuthProfileContext';
+import StartupVideoIntro from './components/ui/StartupVideoIntro';
 
 // Pages
 import OnboardingPage from './pages/OnboardingPage';
@@ -244,89 +245,147 @@ function GuestFriendlyRoute({ children }) {
   return children;
 }
 
+// In-memory fallback tracking so intro plays once per app launch session
+let hasIntroPlayedSession = false;
+try {
+  hasIntroPlayedSession = sessionStorage.getItem('helpu_startup_intro_played') === 'true';
+} catch {
+  // ignore
+}
+
+function AppShell() {
+  const { isLoaded, isSignedIn } = useUser();
+  const [introCompleted, setIntroCompleted] = useState(() => hasIntroPlayedSession);
+
+  // If user is already authenticated once auth resolves, skip intro immediately
+  useEffect(() => {
+    if (isLoaded && isSignedIn && !introCompleted) {
+      try {
+        sessionStorage.setItem('helpu_startup_intro_played', 'true');
+      } catch {}
+      hasIntroPlayedSession = true;
+      setIntroCompleted(true);
+    }
+  }, [isLoaded, isSignedIn, introCompleted]);
+
+  const handleIntroComplete = useCallback(() => {
+    try {
+      sessionStorage.setItem('helpu_startup_intro_played', 'true');
+    } catch {}
+    hasIntroPlayedSession = true;
+    setIntroCompleted(true);
+  }, []);
+
+  // Show intro only for logged-out guests on startup if not yet played this session
+  const shouldPlayIntro = isLoaded && !isSignedIn && !introCompleted;
+
+  // While Firebase Auth is initializing on initial launch, show signature cream branding
+  if (!isLoaded && !hasIntroPlayedSession) {
+    return (
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#FFF8F3] select-none">
+        <img
+          src="/logo.png"
+          alt="Helpu"
+          className="h-10 sm:h-12 w-auto object-contain select-none"
+          draggable="false"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {shouldPlayIntro && (
+        <StartupVideoIntro onComplete={handleIntroComplete} />
+      )}
+      <MobileBridgeInitializer />
+      <OfflineBanner />
+      <InstallPwaPrompt />
+      <InAppNotificationBanner />
+      <TokenInjector />
+      <Routes>
+      {/* Public Landing & Authentication */}
+      <Route path="/" element={<OnboardingPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/login" element={<AuthPage initialMode="signIn" />} />
+      <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
+      <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
+      <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
+      <Route path="/oauth-callback" element={<Navigate to="/slotmate" replace />} />
+      <Route path="/callback" element={<Navigate to="/slotmate" replace />} />
+
+      {/* WhatsApp / Student Profile Onboarding (Guest-Friendly) */}
+      <Route path="/whatsapp-setup" element={<GuestFriendlyRoute><WhatsAppOnboardingPage /></GuestFriendlyRoute>} />
+
+      {/* Guest-Friendly Exploration & Form Pages */}
+      <Route path="/home" element={<GuestFriendlyRoute><HomePage /></GuestFriendlyRoute>} />
+      <Route path="/rides" element={<Navigate to="/rides/offer" replace />} />
+      <Route path="/rides/offer" element={<GuestFriendlyRoute><OfferRidePage /></GuestFriendlyRoute>} />
+      <Route path="/rides/request" element={<GuestFriendlyRoute><OfferRidePage /></GuestFriendlyRoute>} />
+      <Route path="/rides/:id" element={<GuestFriendlyRoute><RideDetailsPage /></GuestFriendlyRoute>} />
+      <Route path="/slotmate" element={<GuestFriendlyRoute><SlotFriendHomePage /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/create" element={<GuestFriendlyRoute><CreateSlotPostPage /></GuestFriendlyRoute>} />
+      <Route path="/slot-friend" element={<GuestFriendlyRoute><SlotFriendHomePage /></GuestFriendlyRoute>} />
+      <Route path="/slot-friend/create" element={<GuestFriendlyRoute><CreateSlotPostPage /></GuestFriendlyRoute>} />
+      <Route path="/match" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
+      <Route path="/matches" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
+      <Route path="/match/my" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
+      <Route path="/match/explore" element={<GuestFriendlyRoute><MatchPage /></GuestFriendlyRoute>} />
+      <Route path="/match/preferences" element={<GuestFriendlyRoute><MatchPreferencesPage /></GuestFriendlyRoute>} />
+      <Route path="/match/success" element={<GuestFriendlyRoute><MatchSuccessPage /></GuestFriendlyRoute>} />
+      <Route path="/match/:id" element={<GuestFriendlyRoute><MatchDetailsPage /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/matches" element={<GuestFriendlyRoute><SlotMatchesPage /></GuestFriendlyRoute>} />
+      <Route path="/slot-friend/matches" element={<GuestFriendlyRoute><SlotMatchesPage /></GuestFriendlyRoute>} />
+
+      {/* Strictly Protected User Features */}
+      <Route path="/book/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
+      <Route path="/bookings" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
+      <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
+      <Route path="/confirmed-rides" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
+      <Route path="/rides/confirmed" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
+      <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
+      <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
+      <Route path="/profile" element={<GuestFriendlyRoute><ProfilePage /></GuestFriendlyRoute>} />
+      <Route path="/shared-rides" element={<GuestFriendlyRoute><SharedRidesPage /></GuestFriendlyRoute>} />
+      <Route path="/groups" element={<ProtectedRoute><Navigate to="/shared-rides" replace /></ProtectedRoute>} />
+      <Route path="/groups/:groupId" element={<ProtectedRoute><GroupDetailsPage /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+      <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
+
+      {/* Posts, Help & About dedicated pages */}
+      <Route path="/posts" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+      <Route path="/my-rides" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+      <Route path="/rides/my" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+      <Route path="/community" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
+      <Route path="/help" element={<ProtectedRoute><GetHelpPage /></ProtectedRoute>} />
+      <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
+      <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
+      <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
+
+      {/* SlotMate Protected Match & Notification Pages */}
+      <Route path="/slotmate/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
+      <Route path="/slotmate/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
+      <Route path="/slotmate/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
+      <Route path="/slotmate/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
+
+      <Route path="/slot-friend/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
+      <Route path="/slot-friend/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
+      <Route path="/slot-friend/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
+      <Route path="/slot-friend/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <AuthProfileProvider>
         <SlotFriendProvider>
-          <MobileBridgeInitializer />
-          <OfflineBanner />
-          <InstallPwaPrompt />
-          <InAppNotificationBanner />
-          <TokenInjector />
-          <Routes>
-          {/* Public Landing & Authentication */}
-          <Route path="/" element={<OnboardingPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/login" element={<AuthPage initialMode="signIn" />} />
-          <Route path="/signup" element={<AuthPage initialMode="signUp" />} />
-          <Route path="/sign-in/*" element={<AuthPage initialMode="signIn" />} />
-          <Route path="/sign-up/*" element={<AuthPage initialMode="signUp" />} />
-          <Route path="/oauth-callback" element={<Navigate to="/slotmate" replace />} />
-          <Route path="/callback" element={<Navigate to="/slotmate" replace />} />
-
-          {/* WhatsApp / Student Profile Onboarding (Guest-Friendly) */}
-          <Route path="/whatsapp-setup" element={<GuestFriendlyRoute><WhatsAppOnboardingPage /></GuestFriendlyRoute>} />
-
-          {/* Guest-Friendly Exploration & Form Pages */}
-          <Route path="/home" element={<GuestFriendlyRoute><HomePage /></GuestFriendlyRoute>} />
-          <Route path="/rides" element={<Navigate to="/rides/offer" replace />} />
-          <Route path="/rides/offer" element={<GuestFriendlyRoute><OfferRidePage /></GuestFriendlyRoute>} />
-          <Route path="/rides/request" element={<GuestFriendlyRoute><OfferRidePage /></GuestFriendlyRoute>} />
-          <Route path="/rides/:id" element={<GuestFriendlyRoute><RideDetailsPage /></GuestFriendlyRoute>} />
-          <Route path="/slotmate" element={<GuestFriendlyRoute><SlotFriendHomePage /></GuestFriendlyRoute>} />
-          <Route path="/slotmate/create" element={<GuestFriendlyRoute><CreateSlotPostPage /></GuestFriendlyRoute>} />
-          <Route path="/slot-friend" element={<GuestFriendlyRoute><SlotFriendHomePage /></GuestFriendlyRoute>} />
-          <Route path="/slot-friend/create" element={<GuestFriendlyRoute><CreateSlotPostPage /></GuestFriendlyRoute>} />
-          <Route path="/match" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
-          <Route path="/matches" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
-          <Route path="/match/my" element={<GuestFriendlyRoute><MyMatchesPage /></GuestFriendlyRoute>} />
-          <Route path="/match/explore" element={<GuestFriendlyRoute><MatchPage /></GuestFriendlyRoute>} />
-          <Route path="/match/preferences" element={<GuestFriendlyRoute><MatchPreferencesPage /></GuestFriendlyRoute>} />
-          <Route path="/match/success" element={<GuestFriendlyRoute><MatchSuccessPage /></GuestFriendlyRoute>} />
-          <Route path="/match/:id" element={<GuestFriendlyRoute><MatchDetailsPage /></GuestFriendlyRoute>} />
-          <Route path="/slotmate/matches" element={<GuestFriendlyRoute><SlotMatchesPage /></GuestFriendlyRoute>} />
-          <Route path="/slot-friend/matches" element={<GuestFriendlyRoute><SlotMatchesPage /></GuestFriendlyRoute>} />
-
-          {/* Strictly Protected User Features */}
-          <Route path="/book/:id" element={<ProtectedRoute><RideDetailsPage /></ProtectedRoute>} />
-          <Route path="/bookings" element={<ProtectedRoute><Navigate to="/posts" replace /></ProtectedRoute>} />
-          <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailsPage /></ProtectedRoute>} />
-          <Route path="/confirmed-rides" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
-          <Route path="/rides/confirmed" element={<ProtectedRoute><ConfirmedRidesPage /></ProtectedRoute>} />
-          <Route path="/chat" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
-          <Route path="/chat/:id" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
-          <Route path="/profile" element={<GuestFriendlyRoute><ProfilePage /></GuestFriendlyRoute>} />
-          <Route path="/shared-rides" element={<GuestFriendlyRoute><SharedRidesPage /></GuestFriendlyRoute>} />
-          <Route path="/groups" element={<ProtectedRoute><Navigate to="/shared-rides" replace /></ProtectedRoute>} />
-          <Route path="/groups/:groupId" element={<ProtectedRoute><GroupDetailsPage /></ProtectedRoute>} />
-          <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-          <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
-
-          {/* Posts, Help & About dedicated pages */}
-          <Route path="/posts" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
-          <Route path="/my-rides" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
-          <Route path="/rides/my" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
-          <Route path="/community" element={<ProtectedRoute><MyPostsPage /></ProtectedRoute>} />
-          <Route path="/help" element={<ProtectedRoute><GetHelpPage /></ProtectedRoute>} />
-          <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
-          <Route path="/saved" element={<ProtectedRoute><StaticInfoPage title="Saved Rides" subtitle="You haven't bookmarked any rides yet. Save frequent trips for quick booking!" icon="❤️" /></ProtectedRoute>} />
-          <Route path="/support" element={<ProtectedRoute><StaticInfoPage title="Help & Support" subtitle="Have questions or feedback? Our 24/7 campus support team is here to assist you." icon="💬" /></ProtectedRoute>} />
-
-          {/* SlotMate Protected Match & Notification Pages */}
-          <Route path="/slotmate/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
-          <Route path="/slotmate/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
-          <Route path="/slotmate/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
-          <Route path="/slotmate/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
-
-          <Route path="/slot-friend/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
-          <Route path="/slot-friend/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
-          <Route path="/slot-friend/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
-          <Route path="/slot-friend/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
-
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          <AppShell />
         </SlotFriendProvider>
       </AuthProfileProvider>
     </ErrorBoundary>
