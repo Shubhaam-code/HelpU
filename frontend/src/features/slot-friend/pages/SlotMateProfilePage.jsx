@@ -162,17 +162,17 @@ export default function SlotMateProfilePage() {
         <div className="relative w-full rounded-[26px] sm:rounded-[30px] overflow-hidden bg-white border border-[#F4E3D8] shadow-xs">
           
           {/* Panoramic Top Campus Illustration Banner */}
-          <div className="relative w-full aspect-[2.4/1] min-h-[145px] max-h-[210px] overflow-hidden bg-[#FEF9C3]">
+          <div className="relative w-full aspect-[2.2/1] min-h-[160px] max-h-[230px] overflow-hidden bg-[#FEF9C3]">
             <img
               src="/profile-campus-footer.png"
               alt="SlotMate Campus Life"
-              className="w-full h-full object-cover object-top select-none pointer-events-none"
+              className="w-full h-full object-cover object-[center_35%] select-none pointer-events-none"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
             />
             {/* Subtle soft gradient fade into the white profile card */}
-            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/95 via-white/40 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white/90 via-white/25 to-transparent pointer-events-none" />
           </div>
 
           {/* Profile Details Area: Avatar on Left + Student Info on Right */}
@@ -182,7 +182,7 @@ export default function SlotMateProfilePage() {
                 
                 {/* Circular Avatar on Left with Golden/Amber Border & Crown for Guest */}
                 <div className="flex items-start sm:items-end gap-3.5 sm:gap-4 min-w-0">
-                  <div className="relative -mt-12 min-[380px]:-mt-14 sm:-mt-16 shrink-0 z-10">
+                  <div className="relative -mt-8 min-[380px]:-mt-10 sm:-mt-12 shrink-0 z-10">
                     <div className="w-20 h-20 min-[380px]:w-24 min-[380px]:h-24 sm:w-28 sm:h-28 rounded-full border-4 border-[#F59E0B] shadow-md overflow-hidden bg-[#FFFBEB] flex items-center justify-center">
                       {isGuest ? (
                         <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-[#9CA3AF] stroke-[1.8]" />
@@ -400,32 +400,20 @@ export default function SlotMateProfilePage() {
         </div>
 
         {/* ======================================================================= */}
-        {/* 6. LOGOUT BUTTON FOR AUTHENTICATED USERS (HIDDEN FOR GUESTS)             */}
+        {/* 6. SIGN OUT BUTTON FOR AUTHENTICATED USERS (HIDDEN FOR GUESTS)            */}
         {/* ======================================================================= */}
         {!isGuest && (
-          <div className="pt-2 pb-2 flex flex-col items-center gap-2.5">
+          <div className="pt-2 pb-6 flex flex-col items-center gap-2.5">
             <button
               type="button"
               onClick={handleSignOut}
-              className="w-full max-w-xs py-2.5 px-6 rounded-full bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-98"
+              className="w-full max-w-sm py-3 px-6 rounded-full bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
             >
               <LogOut className="w-4 h-4 stroke-[2.4]" />
-              <span>Log Out</span>
+              <span>Sign Out</span>
             </button>
           </div>
         )}
-
-        {/* ======================================================================= */}
-        {/* 7. FOOTER DECORATIVE ILLUSTRATION (NO SIGN OUT / NO EXTRA SCROLL)         */}
-        {/* ======================================================================= */}
-        <div className="relative -mx-4 pt-3 pb-0 overflow-hidden select-none -mb-px">
-          <img
-            src="/profile-campus-footer.png"
-            alt="Helpu Campus Students Illustration"
-            className="w-full h-auto max-h-[240px] object-contain mx-auto block pointer-events-none"
-            loading="lazy"
-          />
-        </div>
 
       </main>
 

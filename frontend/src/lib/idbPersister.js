@@ -44,3 +44,4 @@ export function createIDBPersister(idbValidKey = 'reactQuery') {
     },
   };
 }
+

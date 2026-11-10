@@ -90,6 +90,18 @@ export default function ProfilePage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
 
+  // Handle Sign Out
+  const handleSignOut = async () => {
+    try {
+      if (signOut) {
+        await signOut();
+      }
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Sign Out error:', err);
+    }
+  };
+
   // Sync edit form with cached profile data
   useEffect(() => {
     if (cachedProfile) {
@@ -229,18 +241,18 @@ export default function ProfilePage() {
           className="bg-white rounded-[22px] sm:rounded-[28px] border border-[#F4E3D8] shadow-xs overflow-hidden"
         >
           {/* Campus Illustration Background Header */}
-          <div className="h-28 sm:h-36 lg:h-44 relative overflow-hidden bg-[#FEF9C3]">
+          <div className="h-36 sm:h-44 lg:h-52 relative overflow-hidden bg-[#FEF9C3]">
             <img 
               src="/profile-campus-footer.png"
               alt="Campus Life"
-              className="w-full h-full object-cover object-top select-none pointer-events-none"
+              className="w-full h-full object-cover object-[center_35%] select-none pointer-events-none"
             />
             {/* Subtle soft gradient fade into the white profile card */}
-            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/95 via-white/40 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white/90 via-white/25 to-transparent pointer-events-none" />
           </div>
 
           {/* Profile Content */}
-          <div className="px-4 sm:px-6 pb-4 sm:pb-5 -mt-8 sm:-mt-12 lg:-mt-14 relative z-10">
+          <div className="px-4 sm:px-6 pb-4 sm:pb-5 -mt-6 sm:-mt-10 lg:-mt-12 relative z-10">
             <div className="flex flex-col gap-3">
               
               {/* Avatar + Name Details Row */}
@@ -614,16 +626,20 @@ export default function ProfilePage() {
 
 
         {/* ========================================================================= */}
-        {/* 7. FOOTER DECORATIVE ILLUSTRATION (NO SIGN OUT / NO EXTRA SCROLL)         */}
+        {/* 7. SIGN OUT BUTTON FOR AUTHENTICATED USERS                                 */}
         {/* ========================================================================= */}
-        <div className="relative -mx-4 sm:-mx-5 lg:-mx-6 pt-3 pb-0 overflow-hidden select-none -mb-px">
-          <img
-            src="/profile-campus-footer.png"
-            alt="Helpu Campus Students Illustration"
-            className="w-full h-auto max-h-[260px] object-contain mx-auto block pointer-events-none"
-            loading="lazy"
-          />
-        </div>
+        {!isGuest && (
+          <div className="pt-2 pb-6 flex flex-col items-center">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="w-full max-w-sm py-3 px-6 rounded-full bg-white hover:bg-rose-50 active:scale-98 border border-rose-200 text-rose-600 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 stroke-[2.4]" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        )}
 
       </div>
 

@@ -15,7 +15,7 @@ import {
   Search, Check, Sparkles, ChevronDown, User,
   ShieldCheck, ArrowRight, IndianRupee,
   CheckCircle2, X, FileText, Car, CarTaxiFront,
-  Pencil, Trash2, Ban, RefreshCw, AlertCircle
+  Pencil, Trash2, Ban, RefreshCw, AlertCircle, Eye
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -202,6 +202,7 @@ export default function OfferRidePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isDraftRestored, setIsDraftRestored] = useState(false);
   const idempotencyKeyRef = useRef(null);
+  const isSubmittingRef = useRef(false);
 
   // Restore PoolMate guest draft on mount
   useEffect(() => {
@@ -299,6 +300,8 @@ export default function OfferRidePage() {
     }
 
     // 3. User is authenticated and verified: EXPLICIT CONFIRMATION SUBMISSION
+    if (loading || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -339,15 +342,29 @@ export default function OfferRidePage() {
         }
       };
 
-      const res = await createTravel(payload, options);
-      const createdPost = res.data?.data || res.data;
+      // Controlled retry with backoff for transient 503 or network glitches
+      let res;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          res = await createTravel(payload, options);
+          break;
+        } catch (callErr) {
+          if (callErr.response?.status === 503 && attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 750));
+            continue;
+          }
+          throw callErr;
+        }
+      }
+
+      const createdPost = res?.data?.data || res?.data;
       idempotencyKeyRef.current = null;
       clearPoolMateDraft();
       setIsDraftRestored(false);
       invalidateRideQueries();
 
       setCreatedSummary({
-        id: createdPost?._id,
+        id: createdPost?._id || createdPost?.id,
         type: isOffer ? 'offer' : 'request',
         source: fromLoc.trim(),
         destination: toLoc.trim(),
@@ -372,6 +389,7 @@ export default function OfferRidePage() {
       }
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -682,6 +700,17 @@ export default function OfferRidePage() {
 
                       {/* Action Bar */}
                       <div className="pt-2.5 border-t border-[#F4E3D8]/70 flex items-center justify-between gap-2">
+                        {/* Details Button */}
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/rides/${travel._id || travel.id}`)}
+                          className="py-2 px-3 bg-[#FFFBF8] hover:bg-[#FFF4ED] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                          title="View Details"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#8C93A4]" />
+                          <span>Details</span>
+                        </button>
+
                         {/* Primary Action: Find Matches */}
                         <button
                           type="button"
@@ -991,6 +1020,7 @@ export default function OfferRidePage() {
                     size="lg"
                     fullWidth={true}
                     isLoading={loading}
+                    disabled={loading}
                     leftIcon={activeTab === 'offer' ? <Car className="w-5 h-5" /> : <Search className="w-5 h-5" />}
                   >
                     {activeTab === 'offer' ? 'Publish Ride Offer →' : 'Publish Ride Request →'}

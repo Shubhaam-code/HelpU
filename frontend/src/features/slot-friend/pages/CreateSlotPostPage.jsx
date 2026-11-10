@@ -71,6 +71,7 @@ export default function CreateSlotPostPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isDraftRestored, setIsDraftRestored] = useState(false);
   const idempotencyKeyRef = useRef(null);
+  const isSubmittingRef = useRef(false);
 
   // Pre-populate if editing existing post
   useEffect(() => {
@@ -215,24 +216,9 @@ export default function CreateSlotPostPage() {
     e.preventDefault();
     setSubmitError('');
     if (!validate()) return;
+    if (isSubmitting || isSubmittingRef.current) return;
 
-    // 1. If user is entering details (initial creation), save draft and navigate to SlotMate Home
-    // Do not automatically publish or create a SlotMate post without explicit confirmation.
-    if (!isDraftRestored && !existingPost) {
-      saveSlotMateDraft({
-        courseId: selectedCourse?.id || selectedCourse?._id,
-        courseCode: selectedCourse?.courseCode || courseQuery.split(']')[0].replace('[', '').trim(),
-        courseName: selectedCourse?.courseName || '',
-        courseQuery,
-        slot: selectedSlot.trim(),
-        teacherName: teacherName.trim(),
-        notes: notes.trim()
-      }, '/slotmate');
-      navigate('/slotmate', { replace: true });
-      return;
-    }
-
-    // 2. If guest attempting to publish, save draft and prompt Google authentication
+    // 1. If guest attempting to publish, save draft and prompt Google authentication
     if (!isSignedIn) {
       saveSlotMateDraft({
         courseId: selectedCourse?.id || selectedCourse?._id,
@@ -247,7 +233,7 @@ export default function CreateSlotPostPage() {
       return;
     }
 
-    // 3. If authenticated but missing WhatsApp setup, preserve draft & route to onboarding
+    // 2. If authenticated but missing WhatsApp setup, preserve draft & route to onboarding
     if (!hasWhatsApp) {
       saveSlotMateDraft({
         courseId: selectedCourse?.id || selectedCourse?._id,
@@ -262,7 +248,8 @@ export default function CreateSlotPostPage() {
       return;
     }
 
-    // 4. User is authenticated and verified: EXPLICIT CONFIRMATION SUBMISSION
+    // 3. User is authenticated and verified: DIRECT BACKEND PUBLICATION
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       const payload = {
@@ -284,32 +271,39 @@ export default function CreateSlotPostPage() {
         }
       };
 
-      if (existingPost) {
-        const res = await updatePost(existingPost.id || existingPost._id, payload);
-        const savedPost = res?.post || {
-          ...existingPost,
-          ...payload
-        };
-        idempotencyKeyRef.current = null;
-        clearSlotMateDraft();
-        setIsDraftRestored(false);
-        setCreatedPostData(savedPost);
-        setShowSuccessModal(true);
-      } else {
-        const res = await createPost(payload, options);
-        const savedPost = res?.post || {
-          _id: payload.courseId,
-          courseCode: payload.courseCode,
-          courseName: selectedCourse?.courseName || '',
-          slot: payload.slot,
-          teacherName: payload.teacherName
-        };
-        idempotencyKeyRef.current = null;
-        clearSlotMateDraft();
-        setIsDraftRestored(false);
-        setCreatedPostData(savedPost);
-        setShowSuccessModal(true);
+      // Controlled retry with backoff for transient 503 or network glitches
+      let res;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (existingPost) {
+            res = await updatePost(existingPost.id || existingPost._id, payload);
+          } else {
+            res = await createPost(payload, options);
+          }
+          break;
+        } catch (callErr) {
+          if (callErr.response?.status === 503 && attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 750));
+            continue;
+          }
+          throw callErr;
+        }
       }
+
+      const savedPost = res?.post || {
+        _id: payload.courseId,
+        id: payload.courseId,
+        courseCode: payload.courseCode,
+        courseName: selectedCourse?.courseName || '',
+        slot: payload.slot,
+        teacherName: payload.teacherName
+      };
+
+      idempotencyKeyRef.current = null;
+      clearSlotMateDraft();
+      setIsDraftRestored(false);
+      setCreatedPostData(savedPost);
+      setShowSuccessModal(true);
     } catch (err) {
       if (err.response?.status === 409) {
         setSubmitError('A submission is currently being processed. Please wait a moment.');
@@ -321,6 +315,7 @@ export default function CreateSlotPostPage() {
       }
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 

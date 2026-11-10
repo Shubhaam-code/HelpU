@@ -160,13 +160,6 @@ export default function RideDetailsPage() {
   // 3. Computed calculations
   const isOffer = travel?.type === 'offer';
 
-  const isFulfilled = useMemo(() => {
-    if (isOffer || !travel) return false;
-    const hasConfirmedInReceived = postReceivedBookings?.some(b => ['accepted', 'confirmed', 'completed'].includes(b.status));
-    const hasConfirmedInMy = myBookings?.some(b => ['accepted', 'confirmed', 'completed'].includes(b.status) && (b.travelId?._id === travel._id || b.travelId === travel._id));
-    return Boolean(travel.isFulfilled || (travel.bookedSeats || 0) >= 1 || travel.status === 'completed' || hasConfirmedInReceived || hasConfirmedInMy);
-  }, [isOffer, travel, postReceivedBookings, myBookings]);
-
   const pricePerSeat = useMemo(() => {
     return typeof travel?.pricePerSeat === 'number' && travel.pricePerSeat >= 0
       ? travel.pricePerSeat
@@ -205,6 +198,22 @@ export default function RideDetailsPage() {
     const currentUserId = user?.id;
     return Boolean(currentUserId && travel.userId === currentUserId);
   }, [travel, user]);
+
+  // Bookings received on this post (if owner)
+  const postReceivedBookings = useMemo(() => {
+    if (!isOwnRide || !receivedBookings.length) return [];
+    return receivedBookings.filter((b) => {
+      const bTravelId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
+      return String(bTravelId) === String(id);
+    });
+  }, [isOwnRide, receivedBookings, id]);
+
+  const isFulfilled = useMemo(() => {
+    if (isOffer || !travel) return false;
+    const hasConfirmedInReceived = postReceivedBookings?.some(b => ['accepted', 'confirmed', 'completed'].includes(b.status));
+    const hasConfirmedInMy = myBookings?.some(b => ['accepted', 'confirmed', 'completed'].includes(b.status) && (b.travelId?._id === travel._id || b.travelId === travel._id));
+    return Boolean(travel.isFulfilled || (travel.bookedSeats || 0) >= 1 || travel.status === 'completed' || hasConfirmedInReceived || hasConfirmedInMy);
+  }, [isOffer, travel, postReceivedBookings, myBookings]);
 
   // Check if current user has an active booking for this travel post
   const myActiveBooking = useMemo(() => {
@@ -250,15 +259,6 @@ export default function RideDetailsPage() {
   const isFull = useMemo(() => {
     return isOffer && maxAvailableSeats < 1 && !isConfirmed && !isPending;
   }, [isOffer, maxAvailableSeats, isConfirmed, isPending]);
-
-  // Bookings received on this post (if owner)
-  const postReceivedBookings = useMemo(() => {
-    if (!isOwnRide || !receivedBookings.length) return [];
-    return receivedBookings.filter((b) => {
-      const bTravelId = typeof b.travelId === 'object' ? b.travelId?._id : b.travelId;
-      return String(bTravelId) === String(id);
-    });
-  }, [isOwnRide, receivedBookings, id]);
 
   // Date and Time formatting
   const formattedDate = useMemo(() => {
@@ -523,7 +523,7 @@ export default function RideDetailsPage() {
         {/* Navigation Breadcrumb / Go Back Link */}
         <div className="mb-6 flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/rides/offer')}
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer group"
           >
             <div className="w-7 h-7 rounded-full bg-white border border-[#F4E3D8] flex items-center justify-center group-hover:border-[#FF572E] group-hover:text-[#FF572E] shadow-2xs transition-all">

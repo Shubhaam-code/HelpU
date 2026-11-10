@@ -765,7 +765,7 @@ export default function MyPostsPage() {
                     {/* View Details */}
                     <button
                       type="button"
-                      onClick={() => navigate(`/rides/${travel._id}`)}
+                      onClick={() => navigate(`/rides/${travel._id || travel.id}`)}
                       className="flex-1 py-2.5 px-3 bg-[#FFFBF8] hover:bg-[#FFF4ED] border border-[#F4E3D8] hover:border-[#FF572E]/40 text-[#17233C] font-bold text-xs rounded-xl shadow-2xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
                       title="View Details"
                     >

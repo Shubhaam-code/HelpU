@@ -197,16 +197,18 @@ export const getMyTravels = () => apiClient.get('/api/travels/my');
 export const getUserMatches = () => apiClient.get('/api/travels/user/matches');
 export const createTravel = (data, options = {}) => apiClient.post('/api/travels', data, options);
 export const getTravelById = (id) => {
-  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+  const cleanId = String(id || '').trim();
+  if (!cleanId || !/^[0-9a-fA-F]{24}$/.test(cleanId)) {
     return Promise.reject(new Error('Invalid travel ID format'));
   }
-  return apiClient.get(`/api/travels/${id}`);
+  return apiClient.get(`/api/travels/${cleanId}`);
 };
 export const getTravelMatches = (id) => {
-  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+  const cleanId = String(id || '').trim();
+  if (!cleanId || !/^[0-9a-fA-F]{24}$/.test(cleanId)) {
     return Promise.reject(new Error('Invalid travel ID format'));
   }
-  return apiClient.get(`/api/travels/${id}/matches`);
+  return apiClient.get(`/api/travels/${cleanId}/matches`);
 };
 export const updateTravelStatus = (id, status) => {
   if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {

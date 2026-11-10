@@ -51,6 +51,10 @@ export function requireIdempotency(options = { required: true }) {
     // Check if Redis is connected and ready
     const isRedisReady = redis && (redis.status === 'ready' || redis.status === 'connect');
     if (!isRedisReady) {
+      if (!isRequired) {
+        console.warn('[Idempotency] Redis unavailable on optional idempotency route. Bypassing lock safely.');
+        return next();
+      }
       return res.status(503).json({
         success: false,
         message: 'Service temporarily unavailable: Idempotency verification requires active cache service. Please try again shortly.'
@@ -164,6 +168,10 @@ export function requireIdempotency(options = { required: true }) {
       return next();
     } catch (redisErr) {
       console.error('[Idempotency] Redis error during key processing:', redisErr.message);
+      if (!isRequired) {
+        console.warn('[Idempotency] Bypassing lock on optional idempotency route after Redis error.');
+        return next();
+      }
       return res.status(503).json({
         success: false,
         message: 'Service temporarily unavailable: Cache error during idempotency check. Please try again shortly.'
