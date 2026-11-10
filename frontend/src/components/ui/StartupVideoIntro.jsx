@@ -3,13 +3,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 /**
  * Premium 5-Second Startup Intro Video for Helpu (Logged-out users only)
  *
- * Requirements Met:
- * - Plays bundled local video: /videos/helpu-intro.mp4 (offline / airplane mode ready)
- * - Muted, autoplay, playsInline for instant zero-gesture playback on Android WebView
- * - Background matched to Helpu signature cream (#FFF8F3) to eliminate black bars and flashes
- * - Auto-advances at 5.0 seconds with smooth 300ms cross-fade transition
- * - Graceful fallback on ended or error events
- * - Proper hardware decoder cleanup on unmount (pause + remove src + load)
+ * FIX v2:
+ * - object-cover fills the full screen with NO white gaps top/bottom
+ * - muted is REMOVED so Android WebView plays video audio natively
+ *   (requires setMediaPlaybackRequiresUserGesture(false) in MainActivity, already set)
+ * - Wrapper covers inset-0 with NO safe-area padding so video touches screen edges
+ * - Skip button positioned using safe-area-inset-top so it stays below status bar
  */
 export default function StartupVideoIntro({ onComplete }) {
   const [fading, setFading] = useState(false);
@@ -45,7 +44,8 @@ export default function StartupVideoIntro({ onComplete }) {
     // Explicit play() trigger for WebView environments
     if (videoRef.current) {
       videoRef.current.play?.().catch(() => {
-        // Autoplay restrictions or format issues fallback gracefully
+        // Autoplay restrictions or format issues — finish gracefully
+        finish();
       });
     }
 
@@ -58,39 +58,36 @@ export default function StartupVideoIntro({ onComplete }) {
     <div
       role="dialog"
       aria-label="Helpu Welcome Intro"
-      className={`fixed inset-0 z-[99999] flex items-center justify-center bg-[#FFF8F3] select-none transition-opacity duration-300 ease-out ${
+      className={`fixed inset-0 z-[99999] select-none transition-opacity duration-300 ease-out ${
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
-      style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}
+      style={{ backgroundColor: '#EFD7A2' /* matches video background corner color */ }}
     >
-      <div className="relative w-full h-full max-w-md mx-auto flex items-center justify-center overflow-hidden">
-        <video
-          ref={videoRef}
-          src="/videos/helpu-intro.mp4"
-          autoPlay
-          muted
-          playsInline
-          webkit-playsinline="true"
-          preload="auto"
-          onEnded={finish}
-          onError={finish}
-          className="w-full h-full object-contain pointer-events-none"
-          style={{ backgroundColor: '#FFF8F3' }}
-        />
+      {/* Video fills screen edge-to-edge with object-cover — eliminates white/cream bars */}
+      <video
+        ref={videoRef}
+        src="/videos/helpu-intro.mp4"
+        autoPlay
+        playsInline
+        webkit-playsinline="true"
+        preload="auto"
+        onEnded={finish}
+        onError={finish}
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        style={{ backgroundColor: '#EFD7A2' }}
+      />
 
-        {/* Minimal elegant Skip pill */}
-        <button
-          type="button"
-          onClick={finish}
-          aria-label="Skip Intro"
-          className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-white/75 backdrop-blur-md text-[#17233C]/80 text-xs font-bold border border-black/5 shadow-2xs hover:bg-white active:scale-95 transition-all"
-        >
-          Skip
-        </button>
-      </div>
+      {/* Skip button — positioned below system status bar using safe-area-inset-top */}
+      <button
+        type="button"
+        onClick={finish}
+        aria-label="Skip Intro"
+        className="absolute right-4 z-10 px-3 py-1.5 rounded-full bg-white/70 backdrop-blur-md text-[#17233C]/80 text-xs font-bold border border-black/5 shadow active:scale-95 transition-all"
+        style={{ top: 'calc(env(safe-area-inset-top, 12px) + 8px)' }}
+      >
+        Skip
+      </button>
     </div>
   );
 }
+

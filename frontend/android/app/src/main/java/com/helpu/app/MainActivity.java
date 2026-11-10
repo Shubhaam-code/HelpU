@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+
 import android.view.Window;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -43,6 +44,25 @@ public class MainActivity extends BridgeActivity {
         configureSystemWindowBars();
         createNotificationChannel();
         requestNotificationPermissionIfNeeded();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Apply WebView audio settings after the Capacitor bridge is fully initialized.
+        // getBridge() is null during onCreate but guaranteed non-null by onResume.
+        configureWebViewAudioSettings();
+    }
+
+    private void configureWebViewAudioSettings() {
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+                Log.i(TAG, "[HelpuApp] MediaPlaybackRequiresUserGesture=false applied — video audio autoplay enabled.");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "[HelpuApp] Could not configure WebView audio settings", e);
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {
