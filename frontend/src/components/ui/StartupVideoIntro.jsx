@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { hideNativeSplashScreen } from '../../mobile/mobileBridge';
 
 /**
  * Premium Startup Intro Video for Helpu (Logged-out users only)
@@ -38,6 +39,11 @@ export default function StartupVideoIntro({ onComplete }) {
   }, [onComplete]);
 
   useEffect(() => {
+    // Reveal native splash as soon as intro is mounted and preparing playback
+    const readyTimer = setTimeout(() => {
+      hideNativeSplashScreen(180);
+    }, 80);
+
     // Safety fallback timer: 8000ms (video is 6.29s — gives buffer for slow decode)
     const fallbackTimer = setTimeout(() => {
       finish();
@@ -57,10 +63,15 @@ export default function StartupVideoIntro({ onComplete }) {
     }
 
     return () => {
+      clearTimeout(readyTimer);
       clearTimeout(fallbackTimer);
       clearTimeout(revealFallbackTimer);
     };
   }, [finish]);
+
+  const handleMediaReady = useCallback(() => {
+    hideNativeSplashScreen(180);
+  }, []);
 
   return (
     <div
@@ -76,6 +87,7 @@ export default function StartupVideoIntro({ onComplete }) {
         src="/videos/helpu-intro-poster.jpg"
         alt=""
         aria-hidden="true"
+        onLoad={handleMediaReady}
         className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-200 ${
           isVideoPlaying ? 'opacity-0' : 'opacity-100'
         }`}
@@ -95,7 +107,11 @@ export default function StartupVideoIntro({ onComplete }) {
         controls={false}
         preload="auto"
         tabIndex={-1}
-        onPlaying={() => setIsVideoPlaying(true)}
+        onLoadedData={handleMediaReady}
+        onPlaying={() => {
+          setIsVideoPlaying(true);
+          handleMediaReady();
+        }}
         onEnded={finish}
         onError={finish}
         className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-150 ${

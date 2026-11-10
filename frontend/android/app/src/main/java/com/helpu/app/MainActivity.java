@@ -35,7 +35,15 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Install AndroidX SplashScreen before super.onCreate to cleanly manage launch window transition
+        androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
+
         super.onCreate(savedInstanceState);
+
+        // Explicitly transition Activity theme to standard AppTheme.NoActionBar so window
+        // background is immediately solid #FFF8F3 and NEVER flashes any launch splash on background resume
+        setTheme(R.style.AppTheme_NoActionBar);
+
         Log.i(TAG, "==================================================");
         Log.i(TAG, ">>> [HelpuApp] Native Android MainActivity started! <<<");
         Log.i(TAG, "Package: " + getPackageName());

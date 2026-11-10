@@ -11,6 +11,22 @@ import { initPushNotifications } from './pushNotifications';
  */
 export const isNativeApp = () => Capacitor.isNativePlatform();
 
+let splashHidden = false;
+
+/**
+ * Safely dismiss Capacitor's native splash screen once the target UI or intro video
+ * is confirmed ready to draw. Prevents blank frames or premature logo flashes.
+ */
+export function hideNativeSplashScreen(fadeOutDuration = 200) {
+  if (!isNativeApp() || splashHidden) return;
+  splashHidden = true;
+  try {
+    SplashScreen.hide({ fadeOutDuration }).catch(() => {});
+  } catch (err) {
+    console.warn('[Helpu Native] SplashScreen hide notice:', err);
+  }
+}
+
 /**
  * Initialize Mobile Native Behaviors (StatusBar, Keyboard, Splash, Back Button)
  * Safe to call on web/PWA — will gracefully no-op.
@@ -32,12 +48,12 @@ export function initMobileNativeBridge({ navigate }) {
     console.warn('[Helpu Native] StatusBar init warning:', err);
   }
 
-  // 2. Hide Splash Screen smoothly once UI is mounted
-  try {
-    SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {});
-  } catch (err) {
-    console.warn('[Helpu Native] SplashScreen hide warning:', err);
-  }
+  // 2. Safety fallback for splash screen:
+  // Splash is explicitly hidden when either the video intro (guest) or main app (logged-in)
+  // is ready. This safety timeout guarantees the splash is never stuck if auth/network stalls.
+  const safetySplashTimer = setTimeout(() => {
+    hideNativeSplashScreen(200);
+  }, 2500);
 
   // 3. Android Hardware Back Button listener
   let backListenerRemove = null;
@@ -142,6 +158,7 @@ export function initMobileNativeBridge({ navigate }) {
   }
 
   return () => {
+    clearTimeout(safetySplashTimer);
     if (backListenerRemove) backListenerRemove();
     if (kbShowRemove) kbShowRemove();
     if (kbHideRemove) kbHideRemove();

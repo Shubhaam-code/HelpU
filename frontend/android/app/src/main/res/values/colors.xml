@@ -3,5 +3,6 @@
     <color name="colorPrimary">#FF572E</color>
     <color name="colorPrimaryDark">#E04018</color>
     <color name="colorAccent">#FF572E</color>
+    <color name="splashBackground">#EFD7A2</color>
+    <color name="creamBackground">#FFF8F3</color>
 </resources>
-

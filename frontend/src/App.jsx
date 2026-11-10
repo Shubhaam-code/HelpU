@@ -49,7 +49,7 @@ import {
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
 import { InAppNotificationBanner } from './components/ui/InAppNotificationBanner';
-import { initMobileNativeBridge } from './mobile/mobileBridge';
+import { initMobileNativeBridge, hideNativeSplashScreen } from './mobile/mobileBridge';
 import { syncDeviceTokenWithBackend, unregisterDeviceTokenFromBackend } from './mobile/pushNotifications';
 import { useNetworkSync } from './hooks/useNetworkSync';
 
@@ -265,6 +265,14 @@ function AppShell() {
       } catch {}
       hasIntroPlayedSession = true;
       setIntroCompleted(true);
+      hideNativeSplashScreen(200);
+    }
+  }, [isLoaded, isSignedIn, introCompleted]);
+
+  // If user is already past intro (or returning from auth), ensure native splash is dismissed
+  useEffect(() => {
+    if (isLoaded && (isSignedIn || introCompleted)) {
+      hideNativeSplashScreen(200);
     }
   }, [isLoaded, isSignedIn, introCompleted]);
 
@@ -274,20 +282,26 @@ function AppShell() {
     } catch {}
     hasIntroPlayedSession = true;
     setIntroCompleted(true);
+    hideNativeSplashScreen(200);
   }, []);
 
   // Show intro only for logged-out guests on startup if not yet played this session
   const shouldPlayIntro = isLoaded && !isSignedIn && !introCompleted;
 
-  // While Firebase Auth is initializing on initial launch, show signature cream branding
+  // While Firebase Auth is initializing on initial launch, display matching #EFD7A2 poster
+  // so there is zero transition flash of a logo or white screen when the native splash cross-fades
   if (!isLoaded && !hasIntroPlayedSession) {
     return (
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#FFF8F3] select-none">
+      <div 
+        className="fixed inset-0 z-[99999] flex items-center justify-center select-none"
+        style={{ backgroundColor: '#EFD7A2' }}
+      >
         <img
-          src="/logo.png"
-          alt="Helpu"
-          className="h-10 sm:h-12 w-auto object-contain select-none"
-          draggable="false"
+          src="/videos/helpu-intro-poster.jpg"
+          alt=""
+          aria-hidden="true"
+          className="w-full h-full object-cover pointer-events-none"
+          style={{ backgroundColor: '#EFD7A2' }}
         />
       </div>
     );
