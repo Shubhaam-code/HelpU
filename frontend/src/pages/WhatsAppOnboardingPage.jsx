@@ -209,17 +209,13 @@ export default function WhatsAppOnboardingPage() {
 
         {/* Top Header: Logo */}
         <header className="flex items-center justify-between py-1">
-          <div className="flex items-center gap-2 select-none">
+          <div className="flex items-center select-none">
             <img 
               src="/logo.png" 
-              alt="HelpU" 
+              alt="Helpu" 
               className="h-8 w-auto object-contain"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            <div className="flex items-center">
-              <span className="font-black text-xl tracking-tight text-[#17233C]">Help</span>
-              <span className="font-black text-xl tracking-tight text-[#FF572E]">u</span>
-            </div>
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#D97706] text-xs font-black shadow-2xs">
