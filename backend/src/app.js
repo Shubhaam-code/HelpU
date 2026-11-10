@@ -11,6 +11,7 @@ import communityRoutes from './routes/community.routes.js';
 import helpRoutes from './routes/help.routes.js';
 import groupRoutes from './routes/group.routes.js';
 import slotmateRoutes from './routes/slotmate.routes.js';
+import facultyRoutes from './routes/faculty.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,5 +44,6 @@ app.use('/api/community', communityRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/slotmate', slotmateRoutes);
+app.use('/api/faculty', facultyRoutes);
 
 export default app;
