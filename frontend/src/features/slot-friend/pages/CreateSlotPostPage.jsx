@@ -591,27 +591,6 @@ export default function CreateSlotPostPage() {
                           transition={{ duration: 0.15 }}
                           className="absolute z-50 left-0 right-0 top-full mt-1.5 max-h-72 overflow-y-auto bg-white rounded-2xl border border-[#F4E3D8] shadow-2xl divide-y divide-[#F4E3D8]/60"
                         >
-                          {/* Quick Shortcut Pills */}
-                          <div className="p-2 bg-[#FFFBEB] flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-[#FDE68A]/60">
-                            <span className="text-[10px] font-bold text-[#92400E] shrink-0 pl-1">Quick:</span>
-                            {['CSE', 'DSA', 'OOP', 'DBMS', 'OS', 'Math', 'Electives'].map((pill) => (
-                              <button
-                                key={pill}
-                                type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setCourseQuery(pill === 'All' ? '' : pill);
-                                  setSelectedCourse(null);
-                                  setCourseSuggestions(filterCourses(pill === 'All' ? '' : pill, 30));
-                                  if (courseInputRef.current) courseInputRef.current.focus();
-                                }}
-                                className="px-2 py-0.5 rounded-lg bg-white hover:bg-[#FEF9C3] text-[10px] font-bold text-[#B45309] border border-[#FDE68A] shrink-0 transition-colors shadow-2xs cursor-pointer"
-                              >
-                                {pill}
-                              </button>
-                            ))}
-                          </div>
-
                           {courseSuggestions.length > 0 ? (
                             courseSuggestions.map((course) => (
                               <div

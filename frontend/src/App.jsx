@@ -42,7 +42,9 @@ import {
   SlotMatchesPage, 
   SlotStudentProfilePage,
   SlotMateProfilePage,
-  SlotMateNotificationsPage
+  SlotMateNotificationsPage,
+  FacultySearchPage,
+  FacultyDetailsPage
 } from './features/slot-friend';
 
 // PWA Utilities & Banners
@@ -381,6 +383,14 @@ function AppShell() {
       <Route path="/slotmate/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />
       <Route path="/slotmate/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
       <Route path="/slotmate/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
+
+      {/* SlotMate Faculty Search & Review Pages */}
+      <Route path="/slotmate/faculty" element={<GuestFriendlyRoute><FacultySearchPage /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/faculty/:id" element={<GuestFriendlyRoute><FacultyDetailsPage /></GuestFriendlyRoute>} />
+      <Route path="/faculty" element={<Navigate to="/slotmate/faculty" replace />} />
+      <Route path="/faculty/:id" element={<Navigate to="/slotmate/faculty/:id" replace />} />
+      <Route path="/slot-friend/faculty" element={<Navigate to="/slotmate/faculty" replace />} />
+      <Route path="/slot-friend/faculty/:id" element={<Navigate to="/slotmate/faculty/:id" replace />} />
 
       <Route path="/slot-friend/my-posts" element={<Navigate to="/slotmate/matches" replace />} />
       <Route path="/slot-friend/notifications" element={<ProtectedRoute><SlotMateNotificationsPage /></ProtectedRoute>} />

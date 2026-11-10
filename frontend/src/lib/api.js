@@ -336,5 +336,17 @@ export const getPostMatches = (postId) => apiClient.get(`/api/slotmate/posts/${p
 export const getSlotMatchDetails = (matchId) => apiClient.get(`/api/slotmate/matches/${matchId}`);
 export const deleteSlotPost = (postId) => apiClient.delete(`/api/slotmate/posts/${postId}`);
 
+// ── Faculty Search & Reviews ────────────────────────────────────────────────
+export const searchFaculty = (q = '', limit = 10) =>
+  apiClient.get('/api/faculty/search', { params: { q, limit } });
+export const listFaculty = (limit = 20) =>
+  apiClient.get('/api/faculty', { params: { limit } });
+export const getFacultyById = (id) =>
+  apiClient.get(`/api/faculty/${id}`);
+export const getFacultyReviews = (id, page = 1, limit = 10) =>
+  apiClient.get(`/api/faculty/${id}/reviews`, { params: { page, limit } });
+export const submitFacultyRating = (id, data) =>
+  apiClient.post(`/api/faculty/${id}/ratings`, data);
+
 export default apiClient;
 

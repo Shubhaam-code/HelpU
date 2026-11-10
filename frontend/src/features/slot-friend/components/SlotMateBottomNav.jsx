@@ -1,21 +1,21 @@
 import { useNavigate } from 'react-router-dom';
-import { Home, PlusCircle, Users, User } from 'lucide-react';
+import { Home, PlusCircle, Users, GraduationCap } from 'lucide-react';
 
 /**
  * 4-Item SlotMate Bottom Navigation:
  * 1. Home      -> /slotmate
  * 2. Post      -> /slotmate/create
  * 3. Match     -> /slotmate/matches
- * 4. Profile   -> /slotmate/profile (Active: soft yellow pill #FEF08A + orange text)
+ * 4. Faculty   -> /slotmate/faculty (Active: soft yellow pill #FEF08A + orange text)
  */
-export function SlotMateBottomNav({ active = 'profile' }) {
+export function SlotMateBottomNav({ active = 'home' }) {
   const navigate = useNavigate();
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home, path: '/slotmate' },
     { id: 'post', label: 'Post', icon: PlusCircle, path: '/slotmate/create' },
     { id: 'match', label: 'Matches', icon: Users, path: '/slotmate/matches' },
-    { id: 'profile', label: 'Profile', icon: User, path: '/slotmate/profile' },
+    { id: 'faculty', label: 'Faculty', icon: GraduationCap, path: '/slotmate/faculty' },
   ];
 
   return (
@@ -25,7 +25,10 @@ export function SlotMateBottomNav({ active = 'profile' }) {
     >
       <div className="flex items-center justify-around px-2 py-0.5 max-w-lg mx-auto">
         {navItems.map((item) => {
-          const isActive = active === item.id || (item.id === 'match' && active === 'matches');
+          const isActive =
+            active === item.id ||
+            (item.id === 'match' && active === 'matches') ||
+            (item.id === 'faculty' && (active === 'faculty' || active === 'faculty-details'));
           const Icon = item.icon;
 
           return (

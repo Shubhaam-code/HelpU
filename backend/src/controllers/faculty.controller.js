@@ -1,5 +1,37 @@
-import { searchFaculty, getFacultyById, getFacultyReviews } from '../services/faculty.service.js';
+import {
+  searchFaculty,
+  listFaculty,
+  getFacultyById,
+  getFacultyReviews,
+  submitFacultyRating
+} from '../services/faculty.service.js';
 import mongoose from 'mongoose';
+
+// ─── GET /api/faculty?limit=20 ───────────────────────────────────────────────
+
+/**
+ * List top faculty members (initial listing for discovery).
+ * Query param: limit (default 20, max 50)
+ */
+export async function listFacultyHandler(req, res) {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const results = await listFaculty(limit);
+
+    return res.status(200).json({
+      success: true,
+      count: results.length,
+      data: results
+    });
+  } catch (error) {
+    console.error('[Faculty] List error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to list faculty',
+      error: error.message
+    });
+  }
+}
 
 // ─── GET /api/faculty/search?q=vij ───────────────────────────────────────────
 
@@ -54,7 +86,8 @@ export async function getFacultyDetailsHandler(req, res) {
       });
     }
 
-    const faculty = await getFacultyById(id.trim());
+    const studentId = req.userId || null;
+    const faculty = await getFacultyById(id.trim(), studentId);
 
     if (!faculty) {
       return res.status(404).json({
@@ -72,6 +105,56 @@ export async function getFacultyDetailsHandler(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve faculty details',
+      error: error.message
+    });
+  }
+}
+
+// ─── POST /api/faculty/:id/ratings ───────────────────────────────────────────
+
+/**
+ * Submit or update a student rating for a faculty member.
+ * Requires authenticated student (via requireAuth).
+ */
+export async function submitFacultyRatingHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const studentId = req.userId || req.student?.clerkId || req.firebaseUid;
+
+    if (!studentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Authentication required to submit rating'
+      });
+    }
+
+    const {
+      teachingRating,
+      evaluationRating,
+      behaviourRating,
+      internalsRating
+    } = req.body;
+
+    const result = await submitFacultyRating({
+      idOrFacultyId: id,
+      studentId,
+      teachingRating,
+      evaluationRating,
+      behaviourRating,
+      internalsRating
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Rating submitted successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('[Faculty] Submit rating error:', error);
+    const statusCode = error.status || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to submit rating',
       error: error.message
     });
   }
