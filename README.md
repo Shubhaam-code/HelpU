@@ -2,13 +2,14 @@
 
 [![React 19](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Bundler-Vite%208-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Capacitor 8](https://img.shields.io/badge/Mobile-Capacitor%208%20Android-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+[![Firebase Auth](https://img.shields.io/badge/Auth-Firebase%20%2B%20Google-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20Express-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![MongoDB](https://img.shields.io/badge/Database-MongoDB%20Mongoose-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![PWA Ready](https://img.shields.io/badge/PWA-Installable%20App-FF572E?logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
-[![Authentication](https://img.shields.io/badge/Auth-Clerk-6C47FF?logo=clerk&logoColor=white)](https://clerk.com/)
 
-> **Helpu** is a dedicated campus ride-sharing and peer travel network built specifically for university students. It empowers students to offer rides, request seats, discover compatible co-travellers on identical routes, coordinate pickups via WhatsApp, and split fuel costs transparently with zero commission fees.
+> **Helpu** is an all-in-one university mobility and academic companion platform built for university students. It empowers students to offer rides, request seats, discover compatible co-travellers on identical routes, share course timetables via **SlotMate**, coordinate directly via WhatsApp, and split costs transparently with zero commission fees.
 
 ---
 
@@ -17,31 +18,30 @@
 - [1. Project Overview](#1-project-overview)
 - [2. Problem Statement](#2-problem-statement)
 - [3. Key Features](#3-key-features)
-- [4. How Helpu Works](#4-how-helpu-works)
-- [5. Tech Stack](#5-tech-stack)
-- [6. Project Architecture](#6-project-architecture)
+- [4. Platform Architecture & Modules](#4-platform-architecture--modules)
+  - [PoolMate (Campus Carpooling)](#poolmate-campus-carpooling)
+  - [SlotMate (Academic Timetable Matching)](#slotmate-academic-timetable-matching)
+  - [Guest-First Exploration](#guest-first-exploration)
+  - [Startup Intro Experience](#startup-intro-experience)
+- [5. Mobile & Native Android Integration](#5-mobile--native-android-integration)
+- [6. Tech Stack](#6-tech-stack)
 - [7. Folder Structure](#7-folder-structure)
 - [8. Installation and Setup](#8-installation-and-setup)
 - [9. Environment Variables](#9-environment-variables)
-- [10. API Overview](#10-api-overview)
-- [11. Database Models Overview](#11-database-models-overview)
-- [12. Authentication and Authorization](#12-authentication-and-authorization)
-- [13. Ride Matching Logic](#13-ride-matching-logic)
-- [14. Booking and Cancellation Flow](#14-booking-and-cancellation-flow)
-- [15. Progressive Web App (PWA)](#15-progressive-web-app-pwa)
-- [16. Screenshots](#16-screenshots)
-- [17. Deployment Instructions](#17-deployment-instructions)
-- [18. Future Improvements](#18-future-improvements)
-- [19. Contributing Guidelines](#19-contributing-guidelines)
-- [20. License](#20-license)
+- [10. Android APK Build & Deployment](#10-android-apk-build--deployment)
+- [11. Authentication & Security Flow](#11-authentication--security-flow)
+- [12. Ride Matching Engine](#12-ride-matching-engine)
+- [13. Push Notifications Pipeline](#13-push-notifications-pipeline)
+- [14. Contributing Guidelines](#14-contributing-guidelines)
+- [15. License](#15-license)
 
 ---
 
 ## 1. Project Overview
 
-University campuses often suffer from limited public transit connectivity to central hubs such as railway stations, airports, shopping centers, and bus terminals. **Helpu** bridges this gap by creating an exclusive student-to-student mobility network.
+University campuses often suffer from limited public transit connectivity to central hubs such as railway stations, airports, shopping centers, and bus terminals. **Helpu** bridges this gap by creating an exclusive student-to-student mobility network alongside academic peer pairing.
 
-Whether you are driving your car or scooter to the city and have empty seats, or you are looking to share a cab with peers heading home for the weekend, Helpu intelligently evaluates your travel date, route, and departure window to connect you with verified peers.
+Whether you are driving your car or two-wheeler to the city and have empty seats, looking to share a cab with peers heading home for the weekend, or finding batchmates with identical course slots, Helpu intelligently evaluates your travel and timetable data to connect you with verified peers.
 
 ---
 
@@ -49,120 +49,73 @@ Whether you are driving your car or scooter to the city and have empty seats, or
 
 1. **Exorbitant Travel Expenses:** Cabs to transit hubs (e.g., Bhopal Junction, Rani Kamlapati, Raja Bhoj Airport) are expensive for solo students.
 2. **Chaotic WhatsApp Groups:** Students flood informal chat groups with ad-hoc messages that are quickly buried and lack structured search, filters, or tracking.
-3. **Safety & Identity Risks:** Travelling with strangers off public platforms poses safety concerns without verified university identity.
+3. **Safety & Identity Risks:** Travelling with unverified strangers poses safety concerns.
 4. **Asymmetric Travel Direction:** Traditional chat groups result in accidental pairing of students traveling in opposite directions (e.g., Campus ➔ Station vs. Station ➔ Campus).
+5. **Academic Isolation:** Students struggle to find peers taking the exact same courses, professors, and class timetable slots.
 
 ---
 
 ## 3. Key Features
 
-- 🚘 **Offer Rides:** Post journey details, vehicle model, departure time, seat count, and seat price.
-- 📍 **Passenger Requests:** Post a request when you need a ride to a specific campus or city destination.
+- 🚘 **Offer Rides (PoolMate):** Post journey details, vehicle model, departure time, seat count, and seat price.
+- 📍 **Passenger Requests:** Post a ride request when you need a ride to a specific campus or city destination.
 - 🎯 **Rule-Based Smart Matching:** Automatically pair compatible offers and requests on identical routes, dates, and departure windows.
-- 🛡️ **Verified Student Profiles:** Campus identity authentication through Clerk, university domain validation, and custom student avatars.
+- 📚 **SlotMate (Slot Friend):** Match with classmates based on course codes, subject names, course slots, and faculty members.
+- 🎬 **Premium Startup Video Intro:** Seamless H.264 offline-bundled startup animation with audio autoplay, first-frame poster preload, and automatic auth bypass for logged-in users.
+- 🛡️ **Verified Student Profiles:** Campus identity authentication through Firebase Auth & Google Sign-In, university registration number verification, and WhatsApp onboarding.
 - 💬 **Direct WhatsApp Coordination:** Once a seat request is confirmed, riders can connect instantly on WhatsApp with one click.
-- 🔔 **Real-Time Notification Pipeline:** Outbox event processor with in-app notifications and scheduled ride reminders.
-- 📱 **Progressive Web App (PWA):** Installable on Android, iOS, and desktop with standalone display, custom splash loader, and offline fallbacks.
-- 🤝 **Peer Community & Help Board:** Dedicated campus feed for sharing quick updates and asking for assistance.
+- 🔔 **Custom Native Android Chimes:** High-importance notifications channel (`helpu_alerts_v3`) with bundled custom `.wav` chime.
+- 📱 **Native Android APK & PWA:** Android APK built via Capacitor 8 with edge-to-edge display and gesture navigation, plus installable PWA for web browsers.
 
 ---
 
-## 4. How Helpu Works
+## 4. Platform Architecture & Modules
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Driver as Student A (Driver)
-    actor Passenger as Student B (Passenger)
-    participant Client as Helpu Web / PWA
-    participant Backend as Express API
-    participant DB as MongoDB
+### PoolMate (Campus Carpooling)
+- Multi-stop route calculation between university campus and transit hubs.
+- Automatic direction normalization (`vit bhopal`, `rkmp`, `bhopal junction`, `airport`).
+- Real-time seat inventory decrements on accepted booking requests.
+- Instant WhatsApp coordination deep links.
 
-    Driver->>Client: Post Ride Offer (Route, Date, Seats, Price)
-    Client->>Backend: POST /api/travels
-    Backend->>DB: Save Travel Document (status: active)
-    
-    Passenger->>Client: Search Rides or Post Request
-    Client->>Backend: GET /api/travels/user/matches
-    Backend->>Backend: Run normalizeLocation() & strict direction evaluation
-    Backend-->>Client: Return matching peer rides
-    
-    Passenger->>Client: Click "Book Seat" (e.g., 1 Seat)
-    Client->>Backend: POST /api/bookings
-    Backend->>DB: Create Booking (status: pending)
-    Backend->>Driver: Trigger Outbox Notification
-    
-    Driver->>Client: Review Requests -> Accept Booking
-    Client->>Backend: PATCH /api/bookings/:id/respond (action: accept)
-    Backend->>DB: Update Booking (status: accepted), Decrement Available Seats
-    Backend->>Passenger: Trigger Booking Accepted Notification
-    
-    Passenger->>Client: Click "Chat on WhatsApp"
-    Client->>Backend: GET /api/bookings/:id/whatsapp-details
-    Backend-->>Client: Verified Phone & Pre-filled WhatsApp Link
-    Client->>Passenger: Open WhatsApp & Coordinate Pickup!
-```
+### SlotMate (Academic Timetable Matching)
+- Search, filter, and match students taking identical course slots.
+- Subject-based theme tags and course-code indexing.
+- Direct messaging and peer connect for study groups and lab partners.
+
+### Guest-First Exploration
+- Allows prospective students and guests to explore ride listings, search routes, and browse course slots without initial login friction.
+- Form inputs are saved to draft storage; login is requested only at the final confirmation step with seamless return redirection.
+
+### Startup Intro Experience
+- **First-Time / Logged-Out Users:** Fullscreen 9:16 portrait video (`/videos/helpu-intro.mp4`) with fast-start `moov` atom relocation and stereo audio.
+- **First-Frame Poster Preload:** Uses static `helpu-intro-poster.jpg` overlay to eliminate native video play button flashes.
+- **Logged-In Users:** Instantly bypasses the intro straight to `/home` or `/whatsapp-setup` with zero delay.
+- **Session-Guarded:** Once played during an app session, it never replays on route changes or back-navigation.
 
 ---
 
-## 5. Tech Stack
+## 5. Mobile & Native Android Integration
 
-### Frontend
-- **Framework:** React 19 (`react`, `react-dom`)
-- **Build Tool:** Vite 8
-- **Routing:** React Router DOM v7
-- **Styling:** Tailwind CSS v4 (`@tailwindcss/vite`)
-- **Animations:** Framer Motion v14
-- **Icons:** Lucide React
-- **Authentication:** `@clerk/clerk-react`
-- **HTTP Client:** Axios (with request/response interceptors)
-- **PWA Capabilities:** Web App Manifest, Service Worker Cache API
+Helpu runs as a hybrid native application using **Capacitor 8**:
 
-### Backend
-- **Runtime:** Node.js (v18+)
-- **Framework:** Express.js
-- **Database ODM:** Mongoose (MongoDB)
-- **Authentication:** `@clerk/express` SDK
-- **Background Jobs:** Outbox Event Architecture & BullMQ / Redis reminder integration
-- **CORS:** Cross-Origin Resource Sharing middleware
-
-### Database & Cloud
-- **Database:** MongoDB Atlas
-- **Auth Provider:** Clerk Dev / Production Instance
-- **PWA Hosting:** Vercel / Netlify / Self-hosted static server
+- **System Window Bars:** Dark icons with warm cream `#FFF8F3` theme on Android status bar and navigation bar.
+- **Push Notification Channel:** `helpu_alerts_v3` with custom sound file `res/raw/helpu_notification_chime.wav`.
+- **Autoplay Permission:** Configured `setMediaPlaybackRequiresUserGesture(false)` in `MainActivity.java` so startup audio plays seamlessly without requiring a tap.
+- **Touch-Action Optimizations:** CSS `touch-action: pan-y` applied across all mobile scroll containers to guarantee smooth WebView swipe scrolling over illustrations and cards.
 
 ---
 
-## 6. Project Architecture
+## 6. Tech Stack
 
-```
-                    +------------------------------------------+
-                    |           Helpu Client / PWA             |
-                    | (React 19, Tailwind CSS v4, Service Wkr) |
-                    +--------------------+---------------------+
-                                         |
-                       HTTPS + Bearer JWT Token (Clerk)
-                                         |
-                                         v
-                    +--------------------+---------------------+
-                    |          Express REST API                |
-                    |  (Routes, Controllers, Clerk Middleware) |
-                    +----+---------------+---------------+-----+
-                         |               |               |
-                         v               v               v
-                +--------+---+   +-------+-------+   +---+--------+
-                | Matching   |   | Outbox Event  |   | Reminder   |
-                | Service    |   | Processor     |   | Service    |
-                +--------+---+   +-------+-------+   +---+--------+
-                         |               |               |
-                         +---------------+---------------+
-                                         |
-                                         v
-                         +---------------+---------------+
-                         |        MongoDB Atlas          |
-                         | (Students, Travels, Bookings) |
-                         +-------------------------------+
-```
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite 8, Tailwind CSS v4, Lucide Icons, Framer Motion |
+| **Mobile Runtime** | Capacitor 8 (Android Native Bridge, Push Notifications, Status Bar) |
+| **Authentication** | Firebase Authentication (Google OAuth & Email/Password) |
+| **State & Caching** | TanStack Query v5, IndexedDB (`idb-keyval`), React Context API |
+| **Backend** | Node.js, Express.js |
+| **Database** | MongoDB Atlas, Mongoose ODM |
+| **Phone Verification** | `libphonenumber-js` with international E.164 normalization |
 
 ---
 
@@ -172,42 +125,33 @@ sequenceDiagram
 Idea/
 ├── backend/
 │   ├── src/
-│   │   ├── config/             # Database connection & configurations
-│   │   ├── controllers/        # Booking, travel, student, and help controllers
-│   │   ├── jobs/               # Background notification jobs
-│   │   ├── middleware/         # Auth verification and input validation
-│   │   ├── models/             # Mongoose schemas (Student, Travel, Booking, etc.)
-│   │   ├── queues/             # BullMQ notification queue handlers
-│   │   ├── routes/             # REST API endpoint definitions
-│   │   ├── services/           # Matching engine, Outbox, and Reminders
-│   │   └── app.js              # Express app setup and middleware registration
-│   ├── server.js               # Server entry point & graceful shutdown hooks
-│   ├── package.json
-│   └── .env                    # Backend environment config (ignored)
+│   │   ├── controllers/      # Route controllers (travel, booking, slot, student)
+│   │   ├── models/           # Mongoose schemas (Travel, Booking, Student, SlotPost)
+│   │   ├── routes/           # Express API endpoints
+│   │   ├── services/         # Matching heuristics, notification dispatch
+│   │   └── middleware/       # Firebase token verification, validation
+│   └── package.json
 │
 ├── frontend/
+│   ├── android/              # Native Android Studio project (Capacitor)
+│   │   └── app/src/main/
+│   │       ├── java/com/helpu/app/MainActivity.java
+│   │       └── res/raw/helpu_notification_chime.wav
 │   ├── public/
-│   │   ├── manifest.webmanifest# PWA Web App Manifest
-│   │   ├── sw.js               # Service Worker implementation
-│   │   ├── offline.html        # Branded offline fallback page
-│   │   ├── pwa-192x192.png     # PWA standard app icon
-│   │   ├── pwa-512x512.png     # PWA splash icon
-│   │   ├── pwa-maskable-512x512.png # Adaptive maskable icon
-│   │   └── car.png, match.png  # Illustrations and brand assets
+│   │   ├── videos/           # Bundled startup MP4 video & poster
+│   │   ├── logo.png          # Official brand logo
+│   │   └── manifest.webmanifest
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── layout/         # Shell, DesktopNavbar, DesktopSidebar, BottomNav
-│   │   │   └── ui/             # Avatar, Modal, OfflineBanner, InstallPwaPrompt
-│   │   ├── lib/
-│   │   │   └── api.js          # Centralized Axios client & API methods
-│   │   ├── pages/              # Views (Home, OfferRide, MyMatches, MyPosts, etc.)
-│   │   ├── pwa/                # Service worker registrar and usePwaInstall hook
-│   │   ├── App.jsx             # Route definitions, guards, and PWA wrappers
-│   │   ├── index.css           # Tailwind v4 theme directives & safe area styles
-│   │   └── main.jsx            # React root & ClerkProvider initialization
-│   ├── index.html              # HTML shell with meta tags & splash loader
-│   ├── vite.config.js          # Vite configuration with Tailwind CSS v4
+│   │   ├── components/       # Reusable UI components & layouts
+│   │   │   └── ui/StartupVideoIntro.jsx
+│   │   ├── context/          # Firebase Auth, Profile & Slot Friend contexts
+│   │   ├── features/slot-friend/  # Complete SlotMate academic pairing module
+│   │   ├── lib/              # API clients, Firebase init, queryClient
+│   │   ├── mobile/           # Push notifications, Android status bar bridge
+│   │   ├── pages/            # Home, OfferRide, Match, WhatsAppOnboarding, etc.
+│   │   └── App.jsx           # App shell, session intro guard, route definitions
 │   └── package.json
+│
 └── README.md
 ```
 
@@ -216,329 +160,157 @@ Idea/
 ## 8. Installation and Setup
 
 ### Prerequisites
-- **Node.js:** v18.0.0 or higher
-- **npm** or **pnpm**
-- **MongoDB:** Local MongoDB instance or free MongoDB Atlas URI
-- **Clerk Account:** Free account at [clerk.com](https://clerk.com) for authentication credentials
+- **Node.js**: v18.0.0 or higher
+- **npm**: v9.0.0 or higher
+- **Android Studio & SDK**: (For compiling the Android APK)
+- **MongoDB**: Local instance or MongoDB Atlas cluster URI
 
-### Step 1: Clone the Repository
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/Shubhaam-code/HelpU.git
 cd HelpU
 ```
 
-### Step 2: Configure Backend
+### 2. Backend Setup
 ```bash
 cd backend
 npm install
-```
-Create a `.env` file in the `backend/` directory (see [Environment Variables](#9-environment-variables)).
-
-Start the backend development server:
-```bash
 npm run dev
-# Server will start on http://localhost:5000
 ```
 
-### Step 3: Configure Frontend
-In a new terminal window:
+### 3. Frontend Setup
 ```bash
 cd ../frontend
 npm install
-```
-Create a `.env` file in the `frontend/` directory:
-```env
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_key
-VITE_API_URL=http://localhost:5000
-```
-
-Start the frontend development server:
-```bash
 npm run dev
-# Frontend will run on http://localhost:5173
 ```
 
 ---
 
 ## 9. Environment Variables
 
-### Backend (`backend/.env.example`)
+### Frontend (`frontend/.env`)
 ```env
-# Server Port
+VITE_API_URL=http://localhost:5000/api
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+### Backend (`backend/.env`)
+```env
 PORT=5000
-
-# Database
-MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/helpu?retryWrites=true&w=majority
-
-# Clerk Authentication
-CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-
-# Optional Redis / BullMQ Settings (if using persistent queue)
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_USERNAME=
-REDIS_PASSWORD=
-REDIS_TLS=false
-```
-
-### Frontend (`frontend/.env.example`)
-```env
-# Clerk Authentication
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-
-# Backend API Base URL
-VITE_API_URL=http://localhost:5000
-```
-
-> ⚠️ **Important:** Never commit `.env` files containing real production secrets, passwords, or private keys to source control.
-
----
-
-## 10. API Overview
-
-All protected endpoints require an `Authorization: Bearer <JWT>` header obtained automatically via Clerk session tokens.
-
-### 🚗 Travels (`/api/travels`)
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/travels` | Protected | List active, non-expired travel offers and requests |
-| `POST` | `/api/travels` | Protected | Create a new ride offer or travel request |
-| `GET` | `/api/travels/my` | Protected | Get all active posts created by the current user |
-| `GET` | `/api/travels/user/matches` | Protected | Retrieve all matching rides across user's active posts |
-| `GET` | `/api/travels/:id` | Protected | Get single travel post details |
-| `GET` | `/api/travels/:id/matches` | Protected | Get compatible matching rides for a specific post |
-| `PATCH` | `/api/travels/:id/status` | Protected | Update post status (`active`, `completed`, `cancelled`) |
-
-### 🎟️ Bookings (`/api/bookings`)
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/bookings` | Protected | Request seats on an active ride offer post |
-| `GET` | `/api/bookings/my` | Protected | Get bookings initiated by the logged-in passenger |
-| `GET` | `/api/bookings/received` | Protected | Get seat requests received by the ride creator |
-| `GET` | `/api/bookings/:id` | Protected | Get single booking reservation details |
-| `PATCH` | `/api/bookings/:id/respond` | Protected | Accept or reject a pending seat request |
-| `PATCH` | `/api/bookings/:id/cancel` | Protected | Cancel a reservation and restore available seats |
-| `GET` | `/api/bookings/:id/whatsapp-details` | Protected | Retrieve driver/passenger phone for confirmed rides |
-
-### 👤 Student Profiles (`/api/students`)
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/students/profile` | Protected | Fetch current student profile from MongoDB |
-| `POST` | `/api/students/profile` | Protected | Create or synchronize student profile with Clerk |
-| `PUT` | `/api/students/profile` | Protected | Update phone, college, course, and avatar selection |
-
-### 🔔 Notifications (`/api/notifications`)
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/notifications` | Protected | Fetch user notifications with read status |
-| `GET` | `/api/notifications/unread-count` | Protected | Get live unread notification counter |
-| `PATCH` | `/api/notifications/:id/read` | Protected | Mark a single notification as read |
-| `PATCH` | `/api/notifications/read-all` | Protected | Mark all user notifications as read |
-
----
-
-## 11. Database Models Overview
-
-```mermaid
-erDiagram
-    STUDENT ||--o{ TRAVEL : creates
-    STUDENT ||--o{ BOOKING : requests
-    TRAVEL ||--o{ BOOKING : receives
-    STUDENT ||--o{ NOTIFICATION : receives
-
-    STUDENT {
-        string clerkId PK
-        string name
-        string email
-        string phone
-        string college
-        string course
-        string avatarId
-        string imageUrl
-    }
-
-    TRAVEL {
-        ObjectId _id PK
-        string userId FK
-        string type "offer | request"
-        string source
-        string destination
-        date travelDate
-        number departureTime "Minutes from midnight"
-        number seats
-        number bookedSeats
-        number pricePerSeat
-        string carModel
-        string status "active | completed | cancelled"
-        date expiresAt
-    }
-
-    BOOKING {
-        ObjectId _id PK
-        ObjectId travelId FK
-        string passengerId FK
-        string passengerName
-        number seatsBooked
-        number totalPrice
-        string status "pending | accepted | confirmed | rejected | cancelled"
-        date createdAt
-    }
-
-    NOTIFICATION {
-        ObjectId _id PK
-        string userId FK
-        string title
-        string message
-        string type
-        boolean read
-        date createdAt
-    }
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/helpu
+JWT_SECRET=your_jwt_secret
+FIREBASE_SERVICE_ACCOUNT_KEY=path_or_json_to_firebase_service_account
 ```
 
 ---
 
-## 12. Authentication and Authorization
+## 10. Android APK Build & Deployment
 
-Helpu leverages **Clerk** for zero-trust campus identity management:
+To compile and install the native Android APK directly on a connected device:
 
-1. **Client-Side Auth:** Users sign in using institutional emails or OAuth on `AuthPage.jsx`.
-2. **Token Injection:** Axios request interceptor attaches the fresh session JWT:
-   ```javascript
-   config.headers.Authorization = `Bearer ${await getToken()}`;
-   ```
-3. **Server-Side Verification:** Express routes pass through `clerkMiddleware()` and `requireAuth` to validate the cryptographic token signature and extract `req.userId`.
-4. **Auto-Synchronization:** When a student logs in, `TokenInjector` automatically synchronizes their Clerk profile picture, email, and full name with the MongoDB `Student` record.
+### 1. Build Frontend & Sync Capacitor
+```bash
+cd frontend
+npm run build
+npx cap sync android
+```
+
+### 2. Assemble Debug APK
+```bash
+cd android
+./gradlew assembleDebug
+```
+The compiled APK will be located at:
+`frontend/android/app/build/outputs/apk/debug/app-debug.apk`
+
+### 3. Install on USB-Connected Phone via ADB
+```bash
+adb devices
+adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk
+```
 
 ---
 
-## 13. Ride Matching Logic
+## 11. Authentication & Security Flow
+
+```
+User visits Helpu
+       │
+       ├── Logged in? ─────► Bypass intro ─────► Open /home or /whatsapp-setup
+       │
+       └── Guest? ─────────► Play 5s Intro ────► Open Landing Page (/)
+                                                    │
+                                                    ▼
+                                          Explore Rides / Slots
+                                                    │
+                                                    ▼
+                                            Login with Google
+                                                    │
+                                                    ▼
+                                       Student Verification (WhatsApp)
+                                                    │
+                                                    ▼
+                                            Confirmed Student Profile
+```
+
+1. **Client Authentication:** Firebase Authentication manages Google Sign-In tokens across Web and Capacitor native shell (`@capacitor-firebase/authentication`).
+2. **Backend Verification:** JWT tokens are validated against Firebase Admin SDK on all protected API routes.
+3. **Draft Preservation:** Guest selections and filters are persisted locally and automatically reconciled after onboarding completion.
+
+---
+
+## 12. Ride Matching Engine
 
 The matching service ([`matching.service.js`](file:///c:/Users/Shubham%20Narayan/Desktop/Idea/backend/src/services/matching.service.js)) implements strict heuristic rules:
 
-1. **Directional Equivalence:**
-   - Both locations are normalized using regex alias tables:
-     - `vit bhopal` ➔ Campus aliases (`vit`, `vitb`, `kothri`, `campus`)
-     - `bhopal junction` ➔ Main railway station
-     - `rani kamlapati` ➔ RKMP / Habibganj
-     - `bhopal airport` ➔ Raja Bhoj / Airport
-   - **Guard against opposite trips:** Campus ➔ Station will **never** match Station ➔ Campus.
+1. **Directional Equivalence:** Normalized aliases prevent accidental pairing of reverse trips (e.g., Campus ➔ Station will never match Station ➔ Campus).
 2. **Calendar Day Matching:** Both trips must fall on the exact same date in the `Asia/Kolkata` timezone.
-3. **Departure Window Flexibility:** Matches are evaluated against departure times within a flexible window of ±60 to 120 minutes.
-4. **Capacity Validation:** Candidate passenger request seats must not exceed the driver's available seats.
+3. **Flexible Departure Window:** Matches are evaluated within an adjustable ±60 to 120-minute departure window.
+4. **Capacity Validation:** Passenger requested seat count cannot exceed available driver seats.
 5. **Self-Exclusion:** A student's post is never matched against their own travel posts.
 
 ---
 
-## 14. Booking and Cancellation Flow
+## 13. Push Notifications Pipeline
 
-```
-[Passenger sends Booking Request]
-              │
-              ▼
-       (status: pending)
-              │
-       ┌──────┴──────┐
-       │             │ Driver Rejects
-Driver │             └───────────────► (status: rejected)
-Accepts│
-       ▼
-(status: accepted / confirmed)
-   • bookedSeats incremented atomically
-   • Driver & passenger receive confirmation
-   • Outbox triggers scheduled reminders
-              │
-       ┌──────┴──────┐
-       │             │ Driver or Passenger Cancels
-       ▼             └───────────────► (status: cancelled)
-Trip Completed                           • bookedSeats refunded atomically
-(status: completed)                      • Reminder jobs cleaned up
-```
+- Built with **Firebase Cloud Messaging (FCM)** and Capacitor Push Notifications.
+- Custom notification channel: `helpu_alerts_v3` with high importance and lockscreen visibility.
+- Custom sound chime bundled directly in `android/app/src/main/res/raw/helpu_notification_chime.wav`.
+- Instant foreground popup banner (`InAppNotificationBanner.jsx`) alerts users of incoming bookings, acceptances, and schedule changes in real time.
 
 ---
 
-## 15. Progressive Web App (PWA)
-
-Helpu is a modern, installable PWA that works seamlessly across mobile and desktop browsers:
-
-- **Installable Experience:** Supported on Google Chrome, Microsoft Edge, Android, and iOS Safari.
-- **Service Worker (`sw.js`):**
-  - Caches app shell, fonts, styles, and static illustrations.
-  - Implements a strict **network-only** bypass for all sensitive API endpoints, Clerk authentication, and mutation requests.
-- **Offline Fallback Page (`offline.html`):** When internet connectivity drops, users are presented with a clean retry UI.
-- **Native Loading Experience:** Inline HTML splash screen inside `index.html` renders instantly with pulsing brand logo while the React bundle hydrates.
-- **Edge-to-Edge Displays:** Safe area inset support (`safe-area-pb`, `safe-area-pt`) for modern mobile notches and gesture bars.
-
----
-
-## 16. Screenshots
-
-| Home & Campus Discover | Offer a Ride Layout |
-<img width="1910" height="886" alt="image" src="https://github.com/user-attachments/assets/90fafb63-1561-4a4d-88fe-189717266457" />
-
-| My Travel Matches | Student Profile & PWA Install |
-<img width="1881" height="897" alt="image" src="https://github.com/user-attachments/assets/0d156bce-5441-44ab-b346-1d8ac5dd16fb" />
-
----
-
-## 17. Deployment Instructions
-
-### Frontend (e.g., Vercel / Netlify)
-1. Push your repository to GitHub.
-2. Connect your repo to **Vercel** or **Netlify**.
-3. Set the Root Directory to `frontend`.
-4. Configure Build Command: `npm run build` and Output Directory: `dist`.
-5. Add Environment Variables:
-   - `VITE_CLERK_PUBLISHABLE_KEY`
-   - `VITE_API_URL` (points to your deployed backend domain)
-
-### Backend (e.g., Render / Railway / Fly.io)
-1. Deploy as a Web Service with Root Directory set to `backend`.
-2. Build Command: `npm install`
-3. Start Command: `npm start`
-4. Add Environment Variables (`PORT`, `MONGO_URI`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`).
-5. Ensure your MongoDB Atlas Network Access whitelist permits connections from your hosting IP (or `0.0.0.0/0`).
-
----
-
-## 18. Future Improvements
-
-- [ ] **Live Route Tracking:** Real-time geofenced pickup arrival indicators.
-- [ ] **Automated UPI Payment Split:** Direct integration with campus payment QR codes.
-- [ ] **Inter-College Expansion:** Multi-campus support with domain-specific verification.
-- [ ] **Luggage Compatibility Tag:** Indicate boot space (small backpack vs. large trolley).
-- [ ] **Push Notifications:** Web Push protocol for background ride alerts when the browser is closed.
-
----
-
-## 19. Contributing Guidelines
-
-Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+## 14. Contributing Guidelines
 
 1. Fork the Project.
 2. Create your Feature Branch:
    ```bash
-   git checkout -b feature/AmazingFeature
+   git checkout -b feature/NewFeature
    ```
 3. Commit your Changes:
    ```bash
-   git commit -m "feat: add AmazingFeature"
+   git commit -m "feat: add NewFeature"
    ```
 4. Push to the Branch:
    ```bash
-   git push origin feature/AmazingFeature
+   git push origin feature/NewFeature
    ```
 5. Open a Pull Request.
 
 ---
 
-## 20. License
+## 15. License
 
 Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for university campus mobility.</sub>
+  <sub>Built with ❤️ for university campus mobility & academic community.</sub>
 </div>
-
