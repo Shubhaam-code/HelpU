@@ -98,6 +98,11 @@ studentSchema.virtual('userId').get(function () {
   return this.clerkId;
 });
 
+// Virtual alias: fullName resolves to name for 100% bidirectional frontend compatibility
+studentSchema.virtual('fullName').get(function () {
+  return this.name;
+});
+
 // Guarantee that phone and whatsappNumber are always 100% synchronized in MongoDB
 function syncPhoneFields(obj) {
   if (!obj) return;

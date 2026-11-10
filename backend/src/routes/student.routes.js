@@ -70,7 +70,7 @@ async function handleSaveProfile(req, res) {
       });
     }
 
-    const { name, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio, gender, registrationNumber, branch, year } = req.body;
+    const { name, fullName, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio, gender, registrationNumber, branch, year } = req.body;
 
     // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
     const existing = await Student.findOne(
@@ -79,7 +79,12 @@ async function handleSaveProfile(req, res) {
         : { clerkId: canonicalUserId }
     );
 
-    const finalName = (name && typeof name === 'string' && name.trim()) ? name.trim() : existing?.name;
+    // Accept either name or fullName for 100% bidirectional compatibility between RideMate and SlotMate
+    const incomingName = (name && typeof name === 'string' && name.trim()) 
+      ? name.trim() 
+      : ((fullName && typeof fullName === 'string' && fullName.trim()) ? fullName.trim() : null);
+
+    const finalName = incomingName || existing?.name;
     const finalEmail = (email && typeof email === 'string' && email.trim()) ? email.trim().toLowerCase() : existing?.email;
 
     if (!finalName) {

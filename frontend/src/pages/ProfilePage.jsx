@@ -32,7 +32,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useFirebaseAuth();
-  const { setWhatsAppNumber: setContextWhatsAppNumber } = useAuthProfile();
+  const { setWhatsAppNumber: setContextWhatsAppNumber, refreshProfile } = useAuthProfile();
 
   const isGuest = !user;
 
@@ -147,8 +147,10 @@ export default function ProfilePage() {
     setSaveSuccess(false);
 
     try {
+      const cleanName = editName.trim() || user?.fullName || 'Campus Student';
       const payload = {
-        name: editName.trim() || user?.fullName || 'Campus Student',
+        name: cleanName,
+        fullName: cleanName,
         email: profile?.email || user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '',
         college: editCollege.trim(),
         course: editCourse.trim(),
@@ -185,6 +187,9 @@ export default function ProfilePage() {
       
       if (setContextWhatsAppNumber) {
         setContextWhatsAppNumber(payload.whatsappNumber || '');
+      }
+      if (refreshProfile) {
+        await refreshProfile().catch(() => {});
       }
 
       setSaveSuccess(true);

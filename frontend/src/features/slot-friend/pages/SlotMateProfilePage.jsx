@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Pencil, Check, CheckCircle2, 
@@ -10,6 +10,7 @@ import { useUserProfile } from '../../../hooks/useAppData';
 import { useAuthProfile } from '../../../context/AuthProfileContext';
 import { useSlotFriend } from '../context/SlotFriendContext';
 import { saveProfile } from '../../../lib/api';
+import { queryClient, QUERY_KEYS, invalidateProfileQueries } from '../../../lib/queryClient';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { getProfileDraft } from '../../../utils/guestDraft';
 
@@ -17,26 +18,27 @@ export default function SlotMateProfilePage() {
   const navigate = useNavigate();
   const { user, firebaseUser, signOut } = useFirebaseAuth();
   const { data: cachedProfile, refetch: refetchProfile } = useUserProfile();
-  const { setWhatsAppNumber: setContextWhatsAppNumber } = useAuthProfile();
+  const { setWhatsAppNumber: setContextWhatsAppNumber, refreshProfile } = useAuthProfile();
   const { myPosts = [], totalMatchesCount = 0, showToast } = useSlotFriend();
 
   const isGuest = !user;
 
   const profile = cachedProfile || null;
 
-  // Real display data matching reference UI
+  // Real display data matching reference UI - supports both name and fullName
   const displayName = isGuest
     ? 'Guest Mode'
-    : (profile?.fullName || user?.fullName || user?.displayName || 'Campus Student');
+    : (profile?.name || profile?.fullName || user?.fullName || user?.displayName || 'Campus Student');
   const displayEmail = isGuest
     ? 'Unverified'
     : (profile?.email || user?.email || user?.primaryEmailAddress?.emailAddress || '');
   const displayCollege = isGuest
     ? 'Unverified'
     : (profile?.college || profile?.university || user?.college || 'VIT, Bhopal');
+  const rawWhatsApp = profile?.whatsappNumber || profile?.phone || user?.phoneNumber || '';
   const displayWhatsApp = isGuest
     ? 'Unverified'
-    : (profile?.whatsappNumber || profile?.phone || user?.phoneNumber || 'Not added yet');
+    : (rawWhatsApp || 'Not added yet');
   
   // Real Google Profile Photo from authentication (or user's saved avatar)
   const googlePhoto = user?.imageUrl || firebaseUser?.photoURL || profile?.avatar || profile?.imageUrl || profile?.photoURL;
@@ -55,9 +57,18 @@ export default function SlotMateProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(displayName);
   const [editCollege, setEditCollege] = useState(displayCollege);
-  const [editWhatsApp, setEditWhatsApp] = useState(displayWhatsApp);
+  const [editWhatsApp, setEditWhatsApp] = useState(rawWhatsApp);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  // Keep edit form fields in sync when cached profile loads or updates from RideMate
+  useEffect(() => {
+    if (profile || user) {
+      setEditName(profile?.name || profile?.fullName || user?.fullName || '');
+      setEditCollege(profile?.college || profile?.university || 'VIT, Bhopal');
+      setEditWhatsApp(profile?.whatsappNumber || profile?.phone || '');
+    }
+  }, [profile, user]);
 
   // Handle Sign Out
   const handleSignOut = async () => {
@@ -73,9 +84,9 @@ export default function SlotMateProfilePage() {
 
   // Handle Opening Edit Modal
   const handleOpenEdit = () => {
-    setEditName(displayName);
-    setEditCollege(displayCollege);
-    setEditWhatsApp(displayWhatsApp);
+    setEditName(profile?.name || profile?.fullName || user?.fullName || '');
+    setEditCollege(profile?.college || profile?.university || 'VIT, Bhopal');
+    setEditWhatsApp(profile?.whatsappNumber || profile?.phone || '');
     setSaveError('');
     setIsEditing(true);
   };
@@ -83,12 +94,9 @@ export default function SlotMateProfilePage() {
   // Handle Save Profile
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!editName.trim()) {
+    const cleanName = editName.trim();
+    if (!cleanName) {
       setSaveError('Please enter your full name.');
-      return;
-    }
-    if (!editWhatsApp.trim()) {
-      setSaveError('Please enter your WhatsApp contact number.');
       return;
     }
 
@@ -96,18 +104,52 @@ export default function SlotMateProfilePage() {
     setSaveError('');
 
     try {
-      await saveProfile({
-        fullName: editName.trim(),
-        college: editCollege.trim(),
-        whatsappNumber: editWhatsApp.trim(),
-        phone: editWhatsApp.trim(),
-      });
+      const userEmail = profile?.email || user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || user?.email || '';
 
-      if (setContextWhatsAppNumber) {
-        setContextWhatsAppNumber(editWhatsApp.trim());
+      const payload = {
+        name: cleanName,
+        fullName: cleanName,
+        email: userEmail,
+        college: editCollege.trim() || 'VIT, Bhopal',
+        course: profile?.course || '',
+        registrationNumber: profile?.registrationNumber || '',
+        imageUrl: user?.imageUrl || profile?.imageUrl || ''
+      };
+
+      const rawNum = editWhatsApp.trim();
+      if (rawNum && rawNum !== 'Not added yet') {
+        const digits = rawNum.replace(/[^\d]/g, '');
+        if (digits.length >= 10) {
+          const canonical = digits.length === 10 ? `+91${digits}` : (rawNum.startsWith('+') ? rawNum : `+${digits}`);
+          payload.whatsappNumber = canonical;
+          payload.phone = canonical;
+          payload.whatsappCountryCode = 'IN';
+        } else {
+          setSaveError('Please enter a valid 10-digit WhatsApp number.');
+          setIsSaving(false);
+          return;
+        }
+      } else {
+        payload.whatsappNumber = profile?.whatsappNumber || profile?.phone || '';
+        payload.phone = profile?.phone || profile?.whatsappNumber || '';
+      }
+
+      const res = await saveProfile(payload);
+      const updated = res.data?.data || payload;
+
+      // 1. Immediately update TanStack Query cache so all views across Helpu & SlotMate reflect the new data
+      queryClient.setQueryData(QUERY_KEYS.profile(user?.id), updated);
+      invalidateProfileQueries();
+
+      // 2. Synchronize AuthProfileContext & local storage
+      if (setContextWhatsAppNumber && payload.whatsappNumber) {
+        setContextWhatsAppNumber(payload.whatsappNumber);
+      }
+      if (refreshProfile) {
+        await refreshProfile().catch(() => {});
       }
       if (refetchProfile) {
-        await refetchProfile();
+        await refetchProfile().catch(() => {});
       }
 
       if (showToast) {
@@ -116,14 +158,11 @@ export default function SlotMateProfilePage() {
       setIsEditing(false);
     } catch (err) {
       console.error('Error updating profile:', err);
-      // Fallback update locally so user experience is smooth
-      if (setContextWhatsAppNumber) {
-        setContextWhatsAppNumber(editWhatsApp.trim());
+      let errMsg = 'Failed to update profile. Please try again.';
+      if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
       }
-      if (showToast) {
-        showToast('Profile details saved locally.', 'info');
-      }
-      setIsEditing(false);
+      setSaveError(errMsg);
     } finally {
       setIsSaving(false);
     }
