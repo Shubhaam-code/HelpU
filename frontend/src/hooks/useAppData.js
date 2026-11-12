@@ -34,6 +34,7 @@ import {
   directJoinSharedRideGroup,
   leaveSharedRideGroup,
   getReceivedInvitations,
+  getSentGroupProposals,
   acceptGroupInvitation,
   rejectGroupInvitation,
   getGroupJoinRequests,
@@ -95,9 +96,11 @@ async function fetchUserMatchesPayload() {
   const res = await getUserMatches();
   const mData = res.data || {};
   const matches = Array.isArray(mData.data) ? mData.data : (Array.isArray(mData.matches) ? mData.matches : []);
+  const compatibleFinds = Array.isArray(mData.compatibleFinds) ? mData.compatibleFinds : [];
   return {
     matches,
-    hasPostedTravel: Boolean(mData.hasPostedTravel ?? (matches.length > 0 || (Array.isArray(mData.myTravels) && mData.myTravels.length > 0))),
+    compatibleFinds,
+    hasPostedTravel: Boolean(mData.hasPostedTravel ?? (matches.length > 0 || compatibleFinds.length > 0 || (Array.isArray(mData.myTravels) && mData.myTravels.length > 0))),
     myTravels: Array.isArray(mData.myTravels) ? mData.myTravels : []
   };
 }
@@ -133,13 +136,17 @@ export function useUserMatchesData() {
       if (Array.isArray(data)) {
         return {
           matches: data,
+          compatibleFinds: [],
           hasPostedTravel: data.length > 0,
           myTravels: []
         };
       }
+      const matches = Array.isArray(data?.matches) ? data.matches : [];
+      const compatibleFinds = Array.isArray(data?.compatibleFinds) ? data.compatibleFinds : [];
       return {
-        matches: Array.isArray(data?.matches) ? data.matches : [],
-        hasPostedTravel: Boolean(data?.hasPostedTravel ?? (Array.isArray(data?.matches) && data.matches.length > 0)),
+        matches,
+        compatibleFinds,
+        hasPostedTravel: Boolean(data?.hasPostedTravel ?? (matches.length > 0 || compatibleFinds.length > 0)),
         myTravels: Array.isArray(data?.myTravels) ? data.myTravels : []
       };
     },
@@ -397,7 +404,7 @@ export function useGroupJoinRequests(groupId, enabled = true) {
 }
 
 /**
- * Hook to get sent invitations for a group (Group Admin only).
+ * Hook to get sent invitations for a group (Confirmed Members).
  */
 export function useGroupSentInvites(groupId, enabled = true) {
   return useQuery({
@@ -414,7 +421,24 @@ export function useGroupSentInvites(groupId, enabled = true) {
 }
 
 /**
- * Hook to get compatible travel matches for an originating travel post.
+ * Hook to get group formation proposals sent by the current student.
+ */
+export function useSentGroupProposals(enabled = true) {
+  const { user } = useUser();
+  return useQuery({
+    queryKey: QUERY_KEYS.sentProposals(user?.id),
+    queryFn: async () => {
+      const res = await getSentGroupProposals();
+      const list = res.data?.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: Boolean(user?.id && enabled),
+    ...CACHE_DURATIONS.INVITATIONS
+  });
+}
+
+/**
+ * Hook to get compatible FIND student matches for an originating travel post (for group invites).
  */
 export function useOriginatingTravelMatches(travelId, enabled = true) {
   return useQuery({
@@ -422,7 +446,7 @@ export function useOriginatingTravelMatches(travelId, enabled = true) {
     queryFn: async () => {
       if (!travelId) return [];
       const res = await getTravelMatches(travelId);
-      const list = res.data?.data || [];
+      const list = res.data?.compatibleFinds || res.data?.data || [];
       return Array.isArray(list) ? list : [];
     },
     enabled: Boolean(travelId && enabled),
@@ -586,6 +610,7 @@ export function useDeleteTravelMutation(options = {}) {
     mutationFn: (travelId) => deleteTravel(travelId),
     onSuccess: (data, variables, context) => {
       invalidateRideQueries();
+      invalidateGroupQueries();
       options.onSuccess?.(data, variables, context);
     },
     onError: (error, variables, context) => {

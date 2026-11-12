@@ -63,7 +63,10 @@ export const QUERY_KEYS = {
   receivedBookings: (userId) => ['bookings', 'received', userId || 'current'],
   confirmedBookings: (userId) => ['bookings', 'confirmed', userId || 'current'],
   bookingDetail: (id) => ['bookings', 'detail', id || 'none'],
-  unreadCount: (userId) => ['notifications', 'unread-count', userId || 'current'],
+  unreadCount: (userId, moduleName) =>
+    moduleName
+      ? ['notifications', 'unread-count', userId || 'current', moduleName]
+      : ['notifications', 'unread-count', userId || 'current'],
   notifications: (params, userId) => ['notifications', 'list', params || {}, userId || 'current'],
   communityPosts: (params) => ['community', 'posts', params || {}],
   myGroups: (userId) => ['groups', 'my', userId || 'current'],
@@ -72,7 +75,8 @@ export const QUERY_KEYS = {
   groupDetails: (groupId) => ['groups', 'detail', groupId || 'none'],
   groupJoinRequests: (groupId) => ['groups', 'joinRequests', groupId || 'none'],
   groupInvites: (groupId) => ['groups', 'sentInvites', groupId || 'none'],
-  receivedInvitations: (userId) => ['groups', 'receivedInvites', userId || 'current']
+  receivedInvitations: (userId) => ['groups', 'receivedInvites', userId || 'current'],
+  sentProposals: (userId) => ['groups', 'sentProposals', userId || 'current']
 };
 
 export const queryKeys = QUERY_KEYS;
@@ -85,6 +89,9 @@ export function invalidateGroupQueries() {
   queryClient.invalidateQueries({ queryKey: ['groups'] });
   queryClient.invalidateQueries({ queryKey: ['travels', 'compatible-finds'] });
   queryClient.invalidateQueries({ queryKey: ['travels', 'matches'] });
+  queryClient.invalidateQueries({ queryKey: ['travels', 'detail'] });
+  queryClient.invalidateQueries({ queryKey: ['travels', 'list'] });
+  queryClient.invalidateQueries({ queryKey: ['notifications'] });
 }
 
 export function invalidateRideQueries() {
@@ -103,6 +110,10 @@ export function invalidateNotificationQueries() {
 
 export function invalidateProfileQueries() {
   queryClient.invalidateQueries({ queryKey: ['profile'] });
+  queryClient.invalidateQueries({ queryKey: ['travels'] });
+  queryClient.invalidateQueries({ queryKey: ['groups'] });
+  queryClient.invalidateQueries({ queryKey: ['bookings'] });
+  queryClient.invalidateQueries({ queryKey: ['notifications'] });
 }
 
 export function invalidateCommunityQueries() {
