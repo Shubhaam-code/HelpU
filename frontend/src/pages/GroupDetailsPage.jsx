@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CarTaxiFront,
@@ -8,6 +8,7 @@ import {
   Calendar,
   Clock,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   CheckCircle2,
   XCircle,
@@ -27,16 +28,22 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import {
   useUserProfile,
+  useMyTravels,
+  useMySharedRideGroups,
   useSharedRideGroupDetails,
   useGroupJoinRequests,
   useGroupSentInvites,
   useOriginatingTravelMatches
 } from '../hooks/useAppData';
 import {
+  createGroupJoinRequest,
+  acceptGroupInvitation,
+  rejectGroupInvitation,
   acceptStudentJoinRequest,
   rejectStudentJoinRequest,
   inviteStudentToGroup,
-  leaveSharedRideGroup
+  leaveSharedRideGroup,
+  updateGroupWhatsAppLink
 } from '../lib/api';
 import { invalidateGroupQueries } from '../lib/queryClient';
 import { formatMinutesToTime } from '../lib/utils';
@@ -55,13 +62,57 @@ function formatTravelDate(dateStr) {
 export default function GroupDetailsPage() {
   const { groupId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUser();
   const { data: profile } = useUserProfile();
+
+  const navigationState = location.state || {};
+
+  const handleBack = () => {
+    if (navigationState.fromPath) {
+      navigate(navigationState.fromPath, { state: navigationState.fromState });
+    } else if (navigationState.from === 'match') {
+      navigate('/matches', { state: navigationState.fromState });
+    } else if (navigationState.from === 'discover') {
+      navigate('/shared-rides?tab=discover', { state: navigationState.fromState });
+    } else if (navigationState.from === 'my-groups') {
+      navigate('/shared-rides?tab=my-groups', { state: navigationState.fromState });
+    } else if (navigationState.from === 'invitations') {
+      navigate('/shared-rides?tab=invitations', { state: navigationState.fromState });
+    } else if (navigationState.from === 'notifications') {
+      navigate('/notifications');
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/shared-rides');
+    }
+  };
+
+  const backLabel =
+    navigationState.fromLabel ||
+    (navigationState.from === 'match'
+      ? 'Back to Find Match'
+      : navigationState.from === 'discover'
+      ? 'Back to Discover Groups'
+      : navigationState.from === 'my-groups'
+      ? 'Back to My Groups'
+      : navigationState.from === 'invitations'
+      ? 'Back to Invitations'
+      : navigationState.from === 'notifications'
+      ? 'Back to Notifications'
+      : 'Back to Groups');
 
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error' | 'info', text: string }
   const [leaving, setLeaving] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [selectedJoinTravelId, setSelectedJoinTravelId] = useState('');
+  const [joinNote, setJoinNote] = useState('');
+  const [requestingJoin, setRequestingJoin] = useState(false);
+  const [respondingInvite, setRespondingInvite] = useState(false);
+  const [editingWhatsApp, setEditingWhatsApp] = useState(false);
+  const [whatsappLinkInput, setWhatsappLinkInput] = useState('');
+  const [savingWhatsApp, setSavingWhatsApp] = useState(false);
 
   // 1. Fetch live group details
   const {
@@ -71,33 +122,95 @@ export default function GroupDetailsPage() {
     refetch: refetchGroup
   } = useSharedRideGroupDetails(groupId);
 
+  const { data: rawUserTravels } = useMyTravels();
+  const userTravels = Array.isArray(rawUserTravels) ? rawUserTravels : [];
+
+  const { data: rawMyGroups } = useMySharedRideGroups();
+  const myGroups = Array.isArray(rawMyGroups) ? rawMyGroups : [];
+
   const isAdmin = Boolean(group && user?.id && group.adminId === user.id);
   const isConfirmedMember = Boolean(
     group && user?.id && Array.isArray(group.members) && group.members.some((m) => m.userId === user.id)
   );
+  const canManageRequests = Boolean(isAdmin || isConfirmedMember);
+  const isInactiveGroup = Boolean(
+    group && ['cancelled', 'empty', 'completed', 'expired'].includes(group.status)
+  );
+  const availableSpotsCount = group
+    ? Math.max(0, (group.targetCapacity || 0) - (group.confirmedMemberCount ?? group.members?.length ?? 0))
+    : 0;
+  const myPendingRequest = group?.myPendingRequest || null;
 
-  // 2. Fetch admin join requests & sent invites only if user is group admin
+  const activeFindPosts = useMemo(() => {
+    const now = new Date();
+    return userTravels.filter((t) => {
+      const isFind = t.type === 'request';
+      const isActive = t.status === 'active';
+      const isUnexpired = !t.expiresAt || new Date(t.expiresAt) > now;
+      return isFind && isActive && isUnexpired;
+    });
+  }, [userTravels]);
+
+  const sortedJoinCandidatePosts = useMemo(() => {
+    if (!group) return activeFindPosts;
+    const norm = (val) => String(val || '').trim().toLowerCase();
+    const gSrc = norm(group.source);
+    const gDst = norm(group.destination);
+    const gDate = group.travelDate ? new Date(group.travelDate).toISOString().slice(0, 10) : '';
+    return [...activeFindPosts].sort((a, b) => {
+      const aMatch =
+        norm(a.source) === gSrc &&
+        norm(a.destination) === gDst &&
+        (!gDate || (a.travelDate && new Date(a.travelDate).toISOString().slice(0, 10) === gDate));
+      const bMatch =
+        norm(b.source) === gSrc &&
+        norm(b.destination) === gDst &&
+        (!gDate || (b.travelDate && new Date(b.travelDate).toISOString().slice(0, 10) === gDate));
+      return Number(bMatch) - Number(aMatch);
+    });
+  }, [activeFindPosts, group]);
+
+  useEffect(() => {
+    if (sortedJoinCandidatePosts.length === 0) {
+      setSelectedJoinTravelId('');
+      return;
+    }
+    if (!selectedJoinTravelId || !sortedJoinCandidatePosts.some((p) => p._id === selectedJoinTravelId)) {
+      setSelectedJoinTravelId(sortedJoinCandidatePosts[0]._id);
+    }
+  }, [sortedJoinCandidatePosts, selectedJoinTravelId]);
+
+  const activeOtherGroup = useMemo(() => {
+    if (!group) return null;
+    return (
+      myGroups.find(
+        (g) => String(g._id) !== String(group._id) && (g.status === 'open' || g.status === 'full')
+      ) || null
+    );
+  }, [myGroups, group]);
+
+  // 2. Fetch join requests & sent invites - any confirmed member or admin can view/approve/reject (BUG 7)
   const {
     data: rawJoinRequests,
     isLoading: requestsLoading,
     refetch: refetchRequests
-  } = useGroupJoinRequests(groupId, isAdmin);
+  } = useGroupJoinRequests(groupId, canManageRequests);
   const joinRequests = Array.isArray(rawJoinRequests) ? rawJoinRequests : [];
 
   const {
     data: rawSentInvites,
     isLoading: invitesLoading,
     refetch: refetchInvites
-  } = useGroupSentInvites(groupId, isAdmin);
+  } = useGroupSentInvites(groupId, canManageRequests);
   const sentInvites = Array.isArray(rawSentInvites) ? rawSentInvites : [];
 
-  // 3. Fetch candidate compatible travel matches for admin invite panel
+  // 3. Fetch candidate compatible travel matches for member/admin invite panel
   const originatingTravelId = group?.originatingTravelId?._id || group?.originatingTravelId;
   const {
     data: rawTravelMatches,
     isLoading: matchesLoading,
     refetch: refetchMatches
-  } = useOriginatingTravelMatches(originatingTravelId, isAdmin);
+  } = useOriginatingTravelMatches(originatingTravelId, canManageRequests);
   const travelMatches = Array.isArray(rawTravelMatches) ? rawTravelMatches : [];
 
   // Separate confirmed members
@@ -114,6 +227,59 @@ export default function GroupDetailsPage() {
     setTimeout(() => {
       setFeedback((prev) => (prev?.text === text ? null : prev));
     }, 5000);
+  };
+
+  // Non-member requests to join this group using a compatible FIND post
+  const handleRequestToJoin = async (e) => {
+    e.preventDefault();
+    if (!group?._id || !selectedJoinTravelId) return;
+    setRequestingJoin(true);
+    try {
+      await createGroupJoinRequest(group._id, {
+        travelId: selectedJoinTravelId,
+        message: joinNote.trim() || undefined
+      });
+      invalidateGroupQueries();
+      refetchGroup();
+      setJoinNote('');
+      showFeedback('success', 'Join request sent to the group organizer! You will be notified once reviewed.');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to send join request.');
+    } finally {
+      setRequestingJoin(false);
+    }
+  };
+
+  // Invited student accepts group invitation right on Group Details
+  const handleAcceptMyInvite = async () => {
+    if (!myPendingRequest?._id) return;
+    setRespondingInvite(true);
+    try {
+      await acceptGroupInvitation(myPendingRequest._id);
+      invalidateGroupQueries();
+      refetchGroup();
+      showFeedback('success', 'Invitation accepted! You are now a confirmed member of this group.');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to accept invitation.');
+    } finally {
+      setRespondingInvite(false);
+    }
+  };
+
+  // Invited student declines group invitation right on Group Details
+  const handleRejectMyInvite = async () => {
+    if (!myPendingRequest?._id) return;
+    setRespondingInvite(true);
+    try {
+      await rejectGroupInvitation(myPendingRequest._id);
+      invalidateGroupQueries();
+      refetchGroup();
+      showFeedback('info', 'Invitation declined.');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to decline invitation.');
+    } finally {
+      setRespondingInvite(false);
+    }
   };
 
   // Admin accepts student join request
@@ -182,6 +348,51 @@ export default function GroupDetailsPage() {
     }
   };
 
+  // WhatsApp link management handlers
+  const handleStartEditWhatsApp = () => {
+    setWhatsappLinkInput(group?.whatsappGroupUrl || '');
+    setEditingWhatsApp(true);
+  };
+
+  const handleCancelEditWhatsApp = () => {
+    setEditingWhatsApp(false);
+    setWhatsappLinkInput('');
+  };
+
+  const handleSaveWhatsAppLink = async () => {
+    if (!groupId) return;
+    setSavingWhatsApp(true);
+    try {
+      await updateGroupWhatsAppLink(groupId, { whatsappGroupUrl: whatsappLinkInput.trim() || null });
+      invalidateGroupQueries();
+      refetchGroup();
+      setEditingWhatsApp(false);
+      showFeedback('success', whatsappLinkInput.trim() ? 'WhatsApp group link updated!' : 'WhatsApp group link removed.');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to update WhatsApp link.');
+    } finally {
+      setSavingWhatsApp(false);
+    }
+  };
+
+  const handleContactMemberOnWhatsApp = (member) => {
+    const phone = member.student?.whatsappNumber || member.student?.phone;
+    if (!phone || !phone.trim()) {
+      showFeedback('info', 'Phone number not available for this member.');
+      return;
+    }
+    // Remove all non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      showFeedback('info', 'Invalid phone number for this member.');
+      return;
+    }
+    // Create WhatsApp deep link with pre-filled message
+    const message = encodeURIComponent(`Hi! We are in the same Helpu ride group. Let's coordinate our trip.`);
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${message}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <ResponsiveShell
       hideSidebarOnDesktop={true}
@@ -189,12 +400,26 @@ export default function GroupDetailsPage() {
       customMobileHeader={
         <AppHeader
           title="Group Details"
-          backTo="/shared-rides"
+          backTo={handleBack}
           avatarId={profile?.avatarId}
         />
       }
     >
       <div className="w-full max-w-xl lg:max-w-5xl mx-auto px-3.5 sm:px-6 lg:px-8 pt-2 pb-8 sm:pt-4 sm:pb-12 space-y-4 sm:space-y-6">
+        
+        {/* Desktop Back Navigation Bar */}
+        <div className="hidden sm:flex items-center justify-between pt-1">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#6E7587] hover:text-[#17233C] transition-colors cursor-pointer group"
+          >
+            <span className="p-1 rounded-lg bg-white border border-[#F4E3D8] group-hover:border-[#FF572E] text-[#17233C] transition-colors shadow-2xs">
+              <ArrowLeft className="w-4 h-4" />
+            </span>
+            <span>{backLabel}</span>
+          </button>
+        </div>
         
         {/* Loading skeleton */}
         {groupLoading ? (
@@ -258,16 +483,24 @@ export default function GroupDetailsPage() {
               )}
             </AnimatePresence>
 
-            {/* Cancelled Group Alert Banner */}
-            {group.status === 'cancelled' && (
+            {/* Inactive Group Status Alert Banner */}
+            {isInactiveGroup && (
               <div className="bg-rose-50 border border-rose-200 rounded-[22px] p-4 sm:p-5 flex items-start gap-3.5 text-rose-800 shadow-xs">
                 <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="font-black text-sm sm:text-base text-rose-900">
-                    This Shared Ride Group Has Been Cancelled
+                    {group.status === 'empty'
+                      ? 'This Shared Ride Group Is Now Empty'
+                      : group.status === 'expired'
+                      ? 'This Shared Ride Group Has Expired'
+                      : group.status === 'completed'
+                      ? 'This Shared Ride Group Is Completed'
+                      : 'This Shared Ride Group Has Been Cancelled'}
                   </h4>
                   <p className="text-xs sm:text-[13px] text-rose-700 leading-relaxed">
-                    All members have departed from this group. New student joins and member coordination are closed.
+                    {group.status === 'empty'
+                      ? 'All members left this group, so it has been closed and removed from ride discovery.'
+                      : 'New student joins and member coordination are closed for this group.'}
                   </p>
                 </div>
               </div>
@@ -301,7 +534,7 @@ export default function GroupDetailsPage() {
 
                 <div className="flex items-center gap-2">
                   <StatusBadge status={group.status} />
-                  {group.status !== 'cancelled' && (isAdmin || isConfirmedMember) && (
+                  {!isInactiveGroup && (isAdmin || isConfirmedMember) && (
                     <button
                       type="button"
                       disabled={leaving}
@@ -375,8 +608,8 @@ export default function GroupDetailsPage() {
             {/* ========================================================================= */}
             {/* 3. WHATSAPP GROUP SECTION (CONFIRMED MEMBERS ONLY)                        */}
             {/* ========================================================================= */}
-            {group.status !== 'cancelled' && (isAdmin || isConfirmedMember) && (
-              <div className="bg-white rounded-[22px] sm:rounded-[26px] border border-[#F4E3D8] shadow-xs p-5 space-y-3">
+            {!isInactiveGroup && (isAdmin || isConfirmedMember) && (
+              <div className="bg-white rounded-[22px] sm:rounded-[26px] border border-[#F4E3D8] shadow-xs p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
@@ -384,17 +617,74 @@ export default function GroupDetailsPage() {
                     </div>
                     <div>
                       <h3 className="font-black text-sm sm:text-base text-[#17233C]">
-                        WhatsApp Coordination Group
+                        WhatsApp Coordination
                       </h3>
                       <p className="text-[11px] text-[#8C93A4]">
-                        Private link visible only to confirmed members of this ride group.
+                        Coordinate rides and communicate with your group members
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {group.whatsappGroupUrl ? (
-                  <div className="pt-1">
+                {/* WhatsApp Group Link Section */}
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-[#17233C] uppercase tracking-wider">
+                      Group Chat Link
+                    </h4>
+                    {isAdmin && !editingWhatsApp && (
+                      <button
+                        type="button"
+                        onClick={handleStartEditWhatsApp}
+                        className="text-xs font-bold text-[#FF572E] hover:text-[#E64A22] transition-colors cursor-pointer"
+                      >
+                        {group.whatsappGroupUrl ? 'Edit Link' : 'Add Link'}
+                      </button>
+                    )}
+                  </div>
+
+                  {editingWhatsApp ? (
+                    <div className="space-y-3 p-3 bg-[#FFFDFB] rounded-xl border border-[#F4E3D8]">
+                      <input
+                        type="url"
+                        value={whatsappLinkInput}
+                        onChange={(e) => setWhatsappLinkInput(e.target.value)}
+                        placeholder="https://chat.whatsapp.com/..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-white text-xs text-[#17233C] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#FF572E]"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={savingWhatsApp}
+                          onClick={handleSaveWhatsAppLink}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          {savingWhatsApp ? 'Saving...' : 'Save Link'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingWhatsApp}
+                          onClick={handleCancelEditWhatsApp}
+                          className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#17233C] text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        {group.whatsappGroupUrl && (
+                          <button
+                            type="button"
+                            disabled={savingWhatsApp}
+                            onClick={() => {
+                              setWhatsappLinkInput('');
+                              handleSaveWhatsAppLink();
+                            }}
+                            className="ml-auto px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            Remove Link
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : group.whatsappGroupUrl ? (
                     <a
                       href={group.whatsappGroupUrl}
                       target="_blank"
@@ -402,13 +692,239 @@ export default function GroupDetailsPage() {
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      <span>Join WhatsApp Group</span>
+                      <span>Open WhatsApp Group</span>
                     </a>
+                  ) : (
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs text-[#6E7587]">
+                      {isAdmin ? 'Click "Add Link" above to set up a WhatsApp group for coordination.' : 'WhatsApp group link not yet added by the admin.'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Individual Member Contact Buttons */}
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="text-xs font-black text-[#17233C] uppercase tracking-wider">
+                    Contact Members Individually
+                  </h4>
+                  <div className="space-y-2">
+                    {confirmedMembersList
+                      .filter((member) => !member.isMe && member.userId !== user?.id)
+                      .map((member) => {
+                        const hasPhone = Boolean(member.student?.whatsappNumber || member.student?.phone);
+                        return (
+                          <div
+                            key={member._id || member.userId}
+                            className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Avatar
+                                src={member.student?.imageUrl}
+                                name={member.student?.name || 'Member'}
+                                size={32}
+                                className="border border-[#F4E3D8] shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-xs text-[#17233C] truncate">
+                                    {member.student?.name || 'Member'}
+                                  </span>
+                                  {member.student?.isVerified && (
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  )}
+                                  {(member.role === 'admin' || member.userId === group?.adminId) && (
+                                    <span className="text-[9px] font-black text-[#FF572E] uppercase tracking-wider">
+                                      Admin
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {hasPhone ? (
+                              <button
+                                type="button"
+                                onClick={() => handleContactMemberOnWhatsApp(member)}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-[#8C93A4] font-semibold shrink-0">
+                                WhatsApp not added
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                  {confirmedMembersList.filter(m => !m.isMe && m.userId !== user?.id).length === 0 && (
+                    <p className="text-xs text-[#6E7587] text-center py-2">
+                      No other members to contact yet
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* 3B. NON-MEMBER JOIN REQUEST / INVITATION RESPONSE SECTION                 */}
+            {/* ========================================================================= */}
+            {!isAdmin && !isConfirmedMember && !isInactiveGroup && (
+              <div className="bg-white rounded-[22px] sm:rounded-[26px] border border-[#F4E3D8] shadow-xs p-5 sm:p-6 space-y-4">
+                {activeOtherGroup ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                          Already in Another Active Group
+                        </h3>
+                        <p className="text-xs sm:text-[13px] text-[#6E7587] leading-relaxed">
+                          You are currently a member of <span className="font-bold text-[#17233C]">{activeOtherGroup.source} → {activeOtherGroup.destination}</span>. Leave your current active group before joining or requesting to join another group.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/groups/${activeOtherGroup._id}`)}
+                      className="px-4 py-2.5 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black shadow-xs transition-all cursor-pointer"
+                    >
+                      Go to My Active Group →
+                    </button>
+                  </div>
+                ) : myPendingRequest?.type === 'invite' && myPendingRequest?.status === 'pending' ? (
+                  <div className="space-y-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                          You Have Been Invited to Join This Group
+                        </h3>
+                        <p className="text-xs text-[#6E7587]">
+                          Accepting confirms your seat ({availableSpotsCount} {availableSpotsCount === 1 ? 'seat' : 'seats'} currently available).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        disabled={respondingInvite || availableSpotsCount <= 0}
+                        onClick={handleAcceptMyInvite}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {respondingInvite ? 'Processing...' : 'Accept & Join Group'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={respondingInvite}
+                        onClick={handleRejectMyInvite}
+                        className="px-4 py-2.5 rounded-xl bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        Decline Invite
+                      </button>
+                    </div>
+                  </div>
+                ) : myPendingRequest?.type === 'join_request' && myPendingRequest?.status === 'pending' ? (
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-2xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                        Join Request Pending Approval
+                      </h3>
+                      <p className="text-xs text-[#6E7587] leading-relaxed">
+                        Your request has been sent to {group.admin?.name || 'the group organizer'}. Once approved, you will be added as a confirmed member and gain access to group coordination.
+                      </p>
+                    </div>
+                  </div>
+                ) : group.status === 'full' || availableSpotsCount <= 0 ? (
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-2xl bg-gray-100 border border-gray-200 text-gray-600 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                        Group Is Currently Full
+                      </h3>
+                      <p className="text-xs text-[#6E7587]">
+                        All {group.targetCapacity} seats in this shared group are already filled.
+                      </p>
+                    </div>
+                  </div>
+                ) : activeFindPosts.length === 0 ? (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                        Post a Compatible Ride Request to Join
+                      </h3>
+                      <p className="text-xs text-[#6E7587] mt-1 leading-relaxed">
+                        You need an active FIND ride request for this route and date before requesting to join a shared group.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/rides/offer?type=request')}
+                      className="px-4 py-2.5 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black shadow-xs transition-all cursor-pointer"
+                    >
+                      Post FIND Request →
+                    </button>
                   </div>
                 ) : (
-                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs text-[#6E7587]">
-                    WhatsApp group link was not provided when the group was created.
-                  </div>
+                  <form onSubmit={handleRequestToJoin} className="space-y-4">
+                    <div>
+                      <h3 className="font-black text-sm sm:text-base text-[#17233C]">
+                        Request to Join This Shared Group
+                      </h3>
+                      <p className="text-xs text-[#6E7587] mt-0.5">
+                        Select your compatible FIND ride request and send a join request to the organizer ({availableSpotsCount} {availableSpotsCount === 1 ? 'seat' : 'seats'} left).
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-[#17233C]">
+                        Your Active FIND Ride Request
+                      </label>
+                      <select
+                        value={selectedJoinTravelId}
+                        onChange={(e) => setSelectedJoinTravelId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFDFB] text-xs sm:text-sm font-semibold text-[#17233C] focus:outline-none focus:border-[#FF572E]"
+                      >
+                        {sortedJoinCandidatePosts.map((post) => (
+                          <option key={post._id} value={post._id}>
+                            {post.source} → {post.destination} ({formatTravelDate(post.travelDate)}, {formatMinutesToTime(post.departureTime)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-[#17233C]">
+                        Message to Organizer (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={200}
+                        value={joinNote}
+                        onChange={(e) => setJoinNote(e.target.value)}
+                        placeholder="e.g., Travelling with 1 cabin bag, ready near Gate 2"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#F4E3D8] bg-[#FFFDFB] text-xs text-[#17233C] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#FF572E]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={requestingJoin || !selectedJoinTravelId}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-black shadow-md shadow-[#FF572E]/20 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{requestingJoin ? 'Sending Request...' : 'Request to Join Group'}</span>
+                    </button>
+                  </form>
                 )}
               </div>
             )}
@@ -494,9 +1010,9 @@ export default function GroupDetailsPage() {
             </div>
 
             {/* ========================================================================= */}
-            {/* 5. ADMIN MANAGEMENT PANEL (VISIBLE ONLY TO GROUP ADMIN)                   */}
+            {/* 5. GROUP MANAGEMENT PANEL (VISIBLE TO CONFIRMED MEMBERS & ADMIN)          */}
             {/* ========================================================================= */}
-            {isAdmin && (
+            {canManageRequests && !isInactiveGroup && (
               <div className="space-y-4">
                 
                 {/* 5A. PENDING STUDENT JOIN REQUESTS */}
@@ -509,7 +1025,7 @@ export default function GroupDetailsPage() {
                       </h3>
                     </div>
                     <span className="text-xs text-[#8C93A4] font-semibold">
-                      Requires your approval
+                      Requires group member approval
                     </span>
                   </div>
 
@@ -585,10 +1101,26 @@ export default function GroupDetailsPage() {
                     </p>
                     <div className="space-y-2 pt-1">
                       {pendingSentInvites.map((inv) => (
-                        <div key={inv._id} className="p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs flex items-center justify-between">
-                          <span className="font-semibold text-[#17233C]">Student ID: {inv.requesterId}</span>
-                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            Awaiting Student Response
+                        <div key={inv._id} className="p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Avatar
+                              src={inv.recipient?.imageUrl || inv.requester?.imageUrl}
+                              name={inv.recipient?.name || inv.requester?.name || inv.recipientName || inv.requesterName || 'Student'}
+                              className="w-7 h-7 text-[10px] shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <span className="font-semibold text-[#17233C] block truncate">
+                                {inv.recipient?.name || inv.requester?.name || inv.recipientName || inv.requesterName || 'Student'}
+                              </span>
+                              {(inv.recipient?.college || inv.requester?.college) && (
+                                <span className="text-[10px] text-[#8C93A4] block truncate">
+                                  {inv.recipient?.college || inv.requester?.college}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 shrink-0">
+                            Awaiting Response
                           </span>
                         </div>
                       ))}

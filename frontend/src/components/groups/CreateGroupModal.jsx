@@ -45,7 +45,7 @@ export function CreateGroupModal({ isOpen, onClose, userTravels = [] }) {
   }, [userTravels]);
 
   const [selectedTravelId, setSelectedTravelId] = useState(() => eligibleFindPosts[0]?._id || '');
-  const [targetCapacity, setTargetCapacity] = useState('');
+  const [targetCapacity, setTargetCapacity] = useState('4');
   const [actualCabCapacity, setActualCabCapacity] = useState('');
   const [whatsappGroupUrl, setWhatsappGroupUrl] = useState('');
   const [notes, setNotes] = useState('');
@@ -72,8 +72,8 @@ export function CreateGroupModal({ isOpen, onClose, userTravels = [] }) {
     }
 
     const parsedTarget = Number(targetCapacity);
-    if (!targetCapacity || isNaN(parsedTarget) || !Number.isInteger(parsedTarget) || parsedTarget < 1) {
-      setErrorMsg('Target capacity is required and must be a positive integer (e.g. 3, 4, 6).');
+    if (!targetCapacity || isNaN(parsedTarget) || !Number.isInteger(parsedTarget) || parsedTarget < 2 || parsedTarget > 6) {
+      setErrorMsg('Target capacity must be between 2 and 6 total members.');
       return;
     }
 
@@ -213,23 +213,32 @@ export function CreateGroupModal({ isOpen, onClose, userTravels = [] }) {
             )}
           </div>
 
-          {/* 2. TARGET CAPACITY */}
+          {/* 2. GROUP SIZE */}
           <div>
-            <label className="block text-xs font-black uppercase tracking-wider text-[#17233C] mb-1">
-              Target Capacity (Passengers) <span className="text-[#FF572E]">*</span>
+            <label className="block text-xs font-black uppercase tracking-wider text-[#17233C] mb-1.5">
+              Group Size (Total Members) <span className="text-[#FF572E]">*</span>
             </label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={targetCapacity}
-              onChange={(e) => setTargetCapacity(e.target.value)}
-              placeholder="e.g. 4"
-              className="w-full text-xs sm:text-sm font-bold bg-[#FFFDFB] text-[#17233C] border border-[#F4E3D8] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF572E]/40"
-              required
-            />
-            <p className="text-[11px] text-[#6E7587] mt-1">
-              Planned total number of student passengers to travel together (excluding the driver). Once this number is reached, the group status automatically transitions to full.
+            <div className="flex items-center gap-1.5">
+              {[2, 3, 4, 5, 6].map((size) => {
+                const isSelected = Number(targetCapacity) === size;
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setTargetCapacity(String(size))}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#FF572E] text-white border-[#FF572E] shadow-xs'
+                        : 'bg-[#FFFDFB] text-[#17233C] border-[#F4E3D8] hover:border-[#FF572E]/50'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-[#6E7587] mt-1.5">
+              Total student passengers planned for this group (2 to 6). Remaining seats are automatically offered in Matches until the group is full.
             </p>
           </div>
 
