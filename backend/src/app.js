@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { isDatabaseReady, getDatabaseState } from './config/db.js';
 import authRoutes from './routes/auth.routes.js';
 import studentRoutes from './routes/student.routes.js';
 import travelRoutes from './routes/travel.routes.js';
@@ -32,6 +33,19 @@ app.get('/', (req, res) => {
     success: true,
     message: 'CampusPool API is running'
   });
+});
+
+// Database readiness guard: fail fast with 503 instead of buffering for 10s
+// and returning an opaque 500 when MongoDB is not connected.
+app.use('/api', (req, res, next) => {
+  if (!isDatabaseReady()) {
+    return res.status(503).json({
+      success: false,
+      message: 'Service temporarily unavailable: database is not connected yet. Please try again in a moment.',
+      databaseState: getDatabaseState()
+    });
+  }
+  next();
 });
 
 // Routes
