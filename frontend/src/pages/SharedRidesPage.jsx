@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CarTaxiFront,
@@ -23,7 +23,8 @@ import {
   Check,
   Zap,
   Car,
-  Send
+  Send,
+  XCircle
 } from 'lucide-react';
 import { useUser } from '../context/FirebaseAuthContext';
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -46,9 +47,10 @@ import {
   acceptGroupInvitation,
   rejectGroupInvitation,
   createGroupFromFindMatch,
-  directJoinSharedRideGroup,
   leaveSharedRideGroup,
-  getGroupInvites
+  getGroupInvites,
+  getSentGroupProposals,
+  withdrawInvitation
 } from '../lib/api';
 import { invalidateGroupQueries } from '../lib/queryClient';
 import { formatMinutesToTime } from '../lib/utils';
@@ -69,6 +71,7 @@ function formatTravelDate(dateStr) {
 
 export default function SharedRidesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUser();
   const { data: profile } = useUserProfile();
   const { data: rawUserTravels, isLoading: travelsLoading, refetch: refetchTravels } = useMyTravels();
@@ -80,10 +83,9 @@ export default function SharedRidesPage() {
   const { data: rawReceivedInvites, isLoading: invitesLoading, refetch: refetchInvitations } = useReceivedGroupInvitations();
   const receivedInvitations = Array.isArray(rawReceivedInvites) ? rawReceivedInvites : [];
 
-  const [activeTab, setActiveTab] = useState('discover'); // 'discover' | 'my-groups' | 'invitations'
+  const [activeTab, setActiveTab] = useState('discover'); // 'discover' | 'my-groups' | 'sent-invitations' | 'received-invitations'
   const [selectedTravelId, setSelectedTravelId] = useState(null);
   const [requestingGroupId, setRequestingGroupId] = useState(null);
-  const [joiningGroupId, setJoiningGroupId] = useState(null);
   const [leavingGroupId, setLeavingGroupId] = useState(null);
   const [actingInviteId, setActingInviteId] = useState(null);
   const [feedbackMsg, setFeedbackMsg] = useState(null); // { type: 'success' | 'error' | 'info', text: string }
@@ -92,11 +94,14 @@ export default function SharedRidesPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [creatingMatchGroupId, setCreatingMatchGroupId] = useState(null);
-  const [confirmJoinGroup, setConfirmJoinGroup] = useState(null);
+  const [groupSizeModalPeer, setGroupSizeModalPeer] = useState(null);
+  const [selectedGroupSize, setSelectedGroupSize] = useState(4);
+  const [groupModalError, setGroupModalError] = useState(null);
   const [confirmLeaveGroup, setConfirmLeaveGroup] = useState(null);
   const [sentInvitations, setSentInvitations] = useState([]);
   const [loadingSentInvites, setLoadingSentInvites] = useState(false);
-  const [invitationsSubTab, setInvitationsSubTab] = useState('received'); // 'received' | 'sent'
+  const [withdrawingInviteId, setWithdrawingInviteId] = useState(null);
+  const [confirmWithdrawInvite, setConfirmWithdrawInvite] = useState(null);
 
   // Active unexpired FIND posts created by this student
   const activeFindPosts = useMemo(() => {
@@ -122,6 +127,7 @@ export default function SharedRidesPage() {
     data: rawDiscoveredGroups,
     isLoading: discoverLoading,
     isFetching: isFetchingDiscover,
+    error: discoverError,
     refetch: refetchDiscover
   } = useDiscoverSharedRideGroups(currentTravelId);
   const discoveredGroups = Array.isArray(rawDiscoveredGroups) ? rawDiscoveredGroups : [];
@@ -133,6 +139,33 @@ export default function SharedRidesPage() {
     refetch: refetchCompatibleFinds
   } = useCompatibleFinds(currentTravelId);
   const compatibleFinds = Array.isArray(rawCompatibleFinds) ? rawCompatibleFinds : [];
+
+  // Existing active group membership (One Active Group Per Student rule)
+  const activeMemberGroup = useMemo(() => {
+    return myGroups.find((g) => g.status === 'open' || g.status === 'full') || null;
+  }, [myGroups]);
+
+  // Sync ?createFromTravelId=...&peerTravelId=... from RideDetailsPage deep-link
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const createFromId = params.get('createFromTravelId');
+    const peerTravelId = params.get('peerTravelId');
+
+    if (createFromId && activeFindPosts.some((p) => p._id === createFromId)) {
+      setSelectedTravelId(createFromId);
+    }
+
+    if (peerTravelId && compatibleFinds.length > 0 && currentTravelId) {
+      const targetPeer = compatibleFinds.find((p) => p._id === peerTravelId);
+      if (targetPeer) {
+        setActiveTab('discover');
+        setSelectedGroupSize(4);
+        setGroupModalError(null);
+        setGroupSizeModalPeer(targetPeer);
+        navigate('/shared-rides', { replace: true });
+      }
+    }
+  }, [location.search, activeFindPosts, compatibleFinds, currentTravelId, navigate]);
 
   // Auto-dismiss toast feedback after 5 seconds
   const showFeedback = (type, text) => {
@@ -149,32 +182,39 @@ export default function SharedRidesPage() {
     );
   }, [myGroups, user?.id]);
 
-  // Fetch sent invitations for all groups where current user is admin
+  // Fetch sent invitations AND formation proposals
   const fetchSentInvitations = useCallback(async () => {
-    if (adminGroups.length === 0) {
-      setSentInvitations([]);
-      return;
-    }
     setLoadingSentInvites(true);
     try {
-      const results = await Promise.allSettled(
-        adminGroups.map(async (g) => {
-          const res = await getGroupInvites(g._id);
-          const list = res.data?.data || res.data?.invites || [];
-          return list.map((inv) => ({
-            ...inv,
-            groupId: g._id,
-            groupRoute: `${g.source} → ${g.destination}`,
-            groupDate: g.travelDate,
-            groupTime: g.departureTime,
-            groupAdminName: g.admin?.name || 'You'
-          }));
-        })
-      );
-      const flattened = results
-        .filter((r) => r.status === 'fulfilled')
-        .flatMap((r) => r.value || []);
-      setSentInvitations(flattened);
+      // Fetch formation proposals sent by current user
+      const proposalsRes = await getSentGroupProposals();
+      const proposals = proposalsRes.data?.data || [];
+
+      // Fetch invitations for groups where user is admin
+      let groupInvites = [];
+      if (adminGroups.length > 0) {
+        const results = await Promise.allSettled(
+          adminGroups.map(async (g) => {
+            const res = await getGroupInvites(g._id);
+            const list = res.data?.data || res.data?.invites || [];
+            return list.map((inv) => ({
+              ...inv,
+              groupId: g._id,
+              groupRoute: `${g.source} → ${g.destination}`,
+              groupDate: g.travelDate,
+              groupTime: g.departureTime,
+              groupAdminName: g.admin?.name || 'You'
+            }));
+          })
+        );
+        groupInvites = results
+          .filter((r) => r.status === 'fulfilled')
+          .flatMap((r) => r.value || []);
+      }
+
+      // Combine both: formation proposals + group invitations
+      const combined = [...proposals, ...groupInvites];
+      setSentInvitations(combined);
     } catch (err) {
       console.error('Error fetching sent invites:', err);
     } finally {
@@ -183,7 +223,7 @@ export default function SharedRidesPage() {
   }, [adminGroups]);
 
   useEffect(() => {
-    if (activeTab === 'invitations') {
+    if (activeTab === 'sent-invitations' || activeTab === 'received-invitations') {
       fetchSentInvitations();
     }
   }, [activeTab, fetchSentInvitations]);
@@ -208,64 +248,50 @@ export default function SharedRidesPage() {
     }
   };
 
-  // Handle Initiating a Shared Ride Group with a compatible peer student
-  const handleCreateGroupWithPeer = async (peerTravel) => {
+  // Open Group Size selector modal before creating a Shared Ride Group with a peer
+  const handleCreateGroupWithPeer = (peerTravel) => {
     if (!user) {
       setShowAuthModal(true);
       return;
     }
     if (!currentTravelId || !peerTravel?._id) return;
+    setSelectedGroupSize(4);
+    setGroupModalError(null);
+    setGroupSizeModalPeer(peerTravel);
+  };
+
+  // Confirm initiating a Shared Ride Group with the chosen group size
+  const handleConfirmCreateGroupWithPeer = async () => {
+    if (!currentTravelId || !groupSizeModalPeer?._id) return;
+    const peerTravel = groupSizeModalPeer;
     setCreatingMatchGroupId(peerTravel._id);
+    setGroupModalError(null);
     try {
       const res = await createGroupFromFindMatch({
         originatingTravelId: currentTravelId,
-        candidateTravelId: peerTravel._id
+        candidateTravelId: peerTravel._id,
+        targetCapacity: selectedGroupSize
       });
       invalidateGroupQueries();
       refetchDiscover();
       refetchMyGroups();
       refetchCompatibleFinds();
+      setGroupSizeModalPeer(null);
       const group = res.data?.data?.group || res.data?.group;
       if (group?._id) {
-        showFeedback('success', 'Shared Ride Group created and invitation sent!');
-        navigate(`/groups/${group._id}`);
+        showFeedback('success', 'Shared Ride Group created!');
+        navigate(`/groups/${group._id}`, {
+          state: { from: 'discover', fromLabel: 'Back to Discover Groups' }
+        });
+      } else {
+        showFeedback('success', 'Group formation proposal sent! Awaiting student response.');
       }
     } catch (err) {
-      showFeedback('error', err.response?.data?.message || 'Failed to create group proposal.');
+      const message = err.response?.data?.message || 'Failed to create group proposal.';
+      setGroupModalError(message);
+      showFeedback('error', message);
     } finally {
       setCreatingMatchGroupId(null);
-    }
-  };
-
-  // Handle direct join into an open Shared Ride Group
-  const handleDirectJoin = async (group) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    if (!currentTravelId) {
-      showFeedback('error', 'Please create or select an active FIND ride post first.');
-      return;
-    }
-
-    if (group.availableSpots <= 0) {
-      showFeedback('error', 'This group has already reached its capacity.');
-      return;
-    }
-
-    setJoiningGroupId(group._id);
-    try {
-      await directJoinSharedRideGroup(group._id, { travelId: currentTravelId });
-      invalidateGroupQueries();
-      refetchDiscover();
-      refetchMyGroups();
-      showFeedback('success', 'Successfully joined the group! You are now a confirmed member.');
-      navigate(`/groups/${group._id}`);
-    } catch (err) {
-      const message = err.response?.data?.message || err.message;
-      showFeedback('error', message || 'Failed to join group. Please try again.');
-    } finally {
-      setJoiningGroupId(null);
     }
   };
 
@@ -331,19 +357,22 @@ export default function SharedRidesPage() {
     }
   };
 
-  // Handle Accept received invitation
+  // Handle Accept received invitation / formation proposal
   const handleAcceptInvite = async (invitation) => {
     setActingInviteId(invitation._id);
     try {
-      await acceptGroupInvitation(invitation._id);
+      const res = await acceptGroupInvitation(invitation._id);
       invalidateGroupQueries();
       refetchInvitations();
       refetchMyGroups();
       refetchDiscover();
+      fetchSentInvitations(); // Refresh sent invitations for the sender
       showFeedback('success', 'Invitation accepted! You are now a confirmed group member.');
-      const targetGroupId = invitation.groupId?._id || invitation.groupId;
+      const targetGroupId = res?.data?.data?.group?._id || res?.data?.group?._id || invitation.groupId?._id || invitation.groupId;
       if (targetGroupId) {
-        navigate(`/groups/${targetGroupId}`);
+        navigate(`/groups/${targetGroupId}`, {
+          state: { from: 'invitations', fromLabel: 'Back to Invitations' }
+        });
       }
     } catch (err) {
       showFeedback('error', err.response?.data?.message || 'Failed to accept invitation.');
@@ -359,11 +388,34 @@ export default function SharedRidesPage() {
       await rejectGroupInvitation(invitation._id);
       invalidateGroupQueries();
       refetchInvitations();
+      fetchSentInvitations(); // Refresh sent invitations for the sender
       showFeedback('info', 'Invitation declined.');
     } catch (err) {
       showFeedback('error', err.response?.data?.message || 'Failed to decline invitation.');
     } finally {
       setActingInviteId(null);
+    }
+  };
+
+  // Handle Withdraw sent invitation (sender cancels)
+  const handleWithdrawInvite = async (invitation) => {
+    if (!confirmWithdrawInvite) {
+      setConfirmWithdrawInvite(invitation);
+      return;
+    }
+    
+    setWithdrawingInviteId(invitation._id);
+    try {
+      await withdrawInvitation(invitation._id);
+      invalidateGroupQueries();
+      refetchInvitations();
+      fetchSentInvitations();
+      setConfirmWithdrawInvite(null);
+      showFeedback('info', 'Invitation withdrawn successfully.');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to withdraw invitation.');
+    } finally {
+      setWithdrawingInviteId(null);
     }
   };
 
@@ -528,16 +580,39 @@ export default function SharedRidesPage() {
               </span>
             </button>
 
-            {/* Invitations Tab */}
+            {/* Sent Invitations Tab */}
             <button
-              onClick={() => setActiveTab('invitations')}
+              onClick={() => setActiveTab('sent-invitations')}
               className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                activeTab === 'invitations'
+                activeTab === 'sent-invitations'
                   ? 'bg-[#FF572E] text-white shadow-md shadow-[#FF572E]/25 scale-[1.01]'
                   : 'bg-white text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F4] border border-[#F4E3D8] shadow-2xs'
               }`}
             >
-              <span>Invitations</span>
+              <Send className="w-4 h-4" />
+              <span>Sent</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${
+                  activeTab === 'sent-invitations'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[#FFF2EA] text-[#FF572E]'
+                }`}
+              >
+                {sentInvitations.length}
+              </span>
+            </button>
+
+            {/* Received Invitations Tab */}
+            <button
+              onClick={() => setActiveTab('received-invitations')}
+              className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                activeTab === 'received-invitations'
+                  ? 'bg-[#FF572E] text-white shadow-md shadow-[#FF572E]/25 scale-[1.01]'
+                  : 'bg-white text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F4] border border-[#F4E3D8] shadow-2xs'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              <span>Received</span>
               {receivedInvitations.length > 0 ? (
                 <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white animate-pulse shadow-xs">
                   {receivedInvitations.length}
@@ -545,7 +620,7 @@ export default function SharedRidesPage() {
               ) : (
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${
-                    activeTab === 'invitations'
+                    activeTab === 'received-invitations'
                       ? 'bg-white/20 text-white'
                       : 'bg-[#FFF2EA] text-[#FF572E]'
                   }`}
@@ -737,19 +812,35 @@ export default function SharedRidesPage() {
             )}
 
             {/* Discovered Groups List */}
-            {discoverLoading || travelsLoading ? (
+            {(discoverLoading || travelsLoading || (isFetchingDiscover && discoveredGroups.length === 0)) ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="h-48 bg-white/70 rounded-[24px] animate-pulse border border-[#F4E3D8]" />
                 ))}
               </div>
+            ) : discoverError ? (
+              <div className="bg-white rounded-[28px] border border-rose-200 p-8 text-center space-y-3 shadow-xs">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="font-black text-[#17233C] text-base sm:text-lg">
+                  Unable to load compatible groups
+                </h3>
+                <p className="text-xs sm:text-sm text-[#6E7587] max-w-md mx-auto">
+                  {discoverError?.response?.data?.message || discoverError?.message || 'Please check your connection and try again.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => refetchDiscover()}
+                  className="px-5 py-2.5 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black rounded-full shadow-xs cursor-pointer"
+                >
+                  Retry Discovery
+                </button>
+              </div>
             ) : discoveredGroups.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                 {discoveredGroups.map((group) => {
-                  const isRequesting = requestingGroupId === group._id;
-                  const isJoining = joiningGroupId === group._id;
-                  const hasRequested = requestedGroupIds.has(group._id);
-                  const isFull = group.availableSpots <= 0;
+                  const previewMembers = Array.isArray(group.membersPreview) ? group.membersPreview : [];
 
                   return (
                     <motion.div
@@ -831,9 +922,29 @@ export default function SharedRidesPage() {
                             />
                           </div>
                         </div>
+
+                        {/* Members Preview */}
+                        {previewMembers.length > 0 && (
+                          <div className="flex items-center gap-2 pt-1.5">
+                            <div className="flex -space-x-2">
+                              {previewMembers.slice(0, 4).map((m, idx) => (
+                                <Avatar
+                                  key={m.userId || idx}
+                                  src={m.imageUrl}
+                                  name={m.name || 'Member'}
+                                  size={24}
+                                  className="ring-2 ring-white"
+                                />
+                              ))}
+                            </div>
+                            <span className="text-[11px] font-semibold text-[#6E7587] truncate">
+                              {previewMembers.map((m) => m.name?.split(' ')[0]).filter(Boolean).join(', ')}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Bottom Action: Direct Join */}
+                      {/* Bottom Action: Inspect Group Details before Requesting to Join */}
                       <div className="pt-3.5 border-t border-gray-100 flex items-center justify-between gap-3">
                         <span className="text-[11px] font-semibold text-[#8C93A4]">
                           Target: {group.targetCapacity} passengers
@@ -841,46 +952,66 @@ export default function SharedRidesPage() {
 
                         <button
                           type="button"
-                          disabled={isJoining || isFull || !currentTravelId}
-                          onClick={() => setConfirmJoinGroup(group)}
-                          className={`px-4 sm:px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-95 ${
-                            isFull
-                              ? 'bg-rose-50 text-rose-500 border border-rose-200 cursor-not-allowed'
-                              : 'bg-[#FF572E] hover:bg-[#E64A22] text-white shadow-md shadow-[#FF572E]/20'
-                          }`}
+                          onClick={() => navigate(`/groups/${group._id}`, {
+                            state: { from: 'discover', fromLabel: 'Back to Discover Groups' }
+                          })}
+                          className="px-4 sm:px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-95 bg-[#FF572E] hover:bg-[#E64A22] text-white shadow-md shadow-[#FF572E]/20"
                         >
-                          {isJoining ? (
-                            <>
-                              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Joining...</span>
-                            </>
-                          ) : isFull ? (
-                            <span>Group Full</span>
-                          ) : (
-                            <>
-                              <CarTaxiFront className="w-3.5 h-3.5" />
-                              <span>Join Group</span>
-                            </>
-                          )}
+                          <span>View Group Details</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </motion.div>
                   );
                 })}
               </div>
-            ) : (
-              /* Enhanced Empty state when active FIND post has 0 matches */
+            ) : activeMemberGroup ? (
               activeFindPosts.length > 0 && (
+                <div className="bg-white rounded-[28px] sm:rounded-[32px] border border-[#F4E3D8] p-8 sm:p-10 text-center space-y-4 shadow-xs">
+                  <div className="w-16 h-16 rounded-3xl bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center mx-auto shadow-sm">
+                    <Users className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-[#17233C] text-lg sm:text-xl">
+                      You are already in an active Shared Ride Group
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#6E7587] max-w-md mx-auto leading-relaxed mt-1.5">
+                      Each student can belong to only one active group at a time. Open your active group ({activeMemberGroup.source} → {activeMemberGroup.destination}) or leave it to discover other groups.
+                    </p>
+                  </div>
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/groups/${activeMemberGroup._id}`, {
+                        state: { from: 'discover', fromLabel: 'Back to Discover Groups' }
+                      })}
+                      className="px-6 py-3 bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs sm:text-sm font-black rounded-full shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer active:scale-95"
+                    >
+                      Open My Active Group →
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('my-groups')}
+                      className="px-5 py-3 bg-white hover:bg-[#FFF8F4] border border-[#F4E3D8] text-[#17233C] text-xs sm:text-sm font-bold rounded-full shadow-2xs transition-all cursor-pointer"
+                    >
+                      View My Groups
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              /* BUG 1 FIX: Enhanced Empty state only when BOTH groups AND compatible students are empty */
+              activeFindPosts.length > 0 && discoveredGroups.length === 0 && compatibleFinds.length === 0 && (
                 <div className="bg-white rounded-[28px] sm:rounded-[32px] border border-[#F4E3D8] p-8 sm:p-12 text-center space-y-4 shadow-xs">
                   <div className="w-16 h-16 rounded-3xl bg-[#FFF0E6] text-[#FF572E] flex items-center justify-center mx-auto shadow-sm">
                     <CarTaxiFront className="w-8 h-8" />
                   </div>
                   <div>
                     <h3 className="font-black text-[#17233C] text-lg sm:text-xl">
-                      No shared rides found yet.
+                      No compatible groups or students found yet
                     </h3>
                     <p className="text-xs sm:text-sm text-[#6E7587] max-w-md mx-auto leading-relaxed mt-1.5">
-                      We couldn't find any open groups matching your route ({selectedPostObj?.source} → {selectedPostObj?.destination}) on {formatTravelDate(selectedPostObj?.travelDate)}. Check back soon or create your own group!
+                      We couldn't find any open groups or compatible students matching your route ({selectedPostObj?.source} → {selectedPostObj?.destination}) on {formatTravelDate(selectedPostObj?.travelDate)}. Check back soon or create your own group!
                     </p>
                   </div>
                   <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
@@ -925,7 +1056,9 @@ export default function SharedRidesPage() {
                       key={group._id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      onClick={() => navigate(`/groups/${group._id}`)}
+                      onClick={() => navigate(`/groups/${group._id}`, {
+                        state: { from: 'my-groups', fromLabel: 'Back to My Groups' }
+                      })}
                       className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-md transition-all duration-200 p-5 sm:p-6 flex flex-col justify-between cursor-pointer group shadow-xs"
                     >
                       {/* Top Badges */}
@@ -1017,53 +1150,118 @@ export default function SharedRidesPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 6. INVITATIONS TAB CONTENT (RECEIVED & SENT INVITATIONS)                  */}
+        {/* 6. INVITATIONS TAB CONTENT (RECEIVED & SENT INVITATIONS SUB-TABS)        */}
         {/* ========================================================================= */}
-        {activeTab === 'invitations' && (
+        {activeTab === 'sent-invitations' && (
           <div className="space-y-4">
-            {/* Sub-tab navigation */}
-            <div className="flex items-center gap-2 pb-1">
-              <button
-                type="button"
-                onClick={() => setInvitationsSubTab('received')}
-                className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                  invitationsSubTab === 'received'
-                    ? 'bg-[#17233C] text-white shadow-2xs'
-                    : 'bg-white text-[#6E7587] hover:text-[#17233C] border border-[#F4E3D8]'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Received Invitations</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  invitationsSubTab === 'received' ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#6E7587]'
-                }`}>
-                  {receivedInvitations.length}
-                </span>
-              </button>
+            {/* A. SENT INVITATIONS TAB */}
+            {loadingSentInvites ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-44 bg-white/70 rounded-[24px] animate-pulse border border-[#F4E3D8]" />
+                ))}
+              </div>
+            ) : sentInvitations.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                {sentInvitations.map((inv) => {
+                  const recipientName = inv.recipientName || inv.recipient?.name || inv.requester?.name || 'Student';
+                  const recipientAvatar = inv.recipient?.imageUrl || inv.requester?.imageUrl;
+                  const groupObj = inv.groupId || {};
 
-              <button
-                type="button"
-                onClick={() => setInvitationsSubTab('sent')}
-                className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                  invitationsSubTab === 'sent'
-                    ? 'bg-[#17233C] text-white shadow-2xs'
-                    : 'bg-white text-[#6E7587] hover:text-[#17233C] border border-[#F4E3D8]'
-                }`}
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Sent Invitations</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                  invitationsSubTab === 'sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#6E7587]'
-                }`}>
-                  {sentInvitations.length}
-                </span>
-              </button>
-            </div>
+                  return (
+                    <motion.div
+                      key={inv._id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-md transition-all duration-200 p-5 sm:p-6 flex flex-col justify-between shadow-xs"
+                    >
+                      {/* Top Bar: Recipient Info */}
+                      <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-gray-100">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar
+                            src={recipientAvatar}
+                            name={recipientName}
+                            size={40}
+                            className="border border-[#F4E3D8] shadow-2xs shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-sm text-[#17233C] truncate">
+                                {recipientName}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-[#6E7587]">
+                              Invitation sent
+                            </span>
+                          </div>
+                        </div>
 
-            {/* A. RECEIVED INVITATIONS SUB-TAB */}
-            {invitationsSubTab === 'received' && (
-              <>
-                {invitesLoading ? (
+                        <span className="px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-800 text-[10px] font-black uppercase tracking-wider">
+                          Pending
+                        </span>
+                      </div>
+
+                      {/* Route Details */}
+                      <div className="py-4 space-y-2.5">
+                        <div className="flex items-center gap-2 font-black text-base sm:text-lg text-[#17233C]">
+                          <span className="truncate">{groupObj.source || inv.source || 'Campus'}</span>
+                          <ArrowRight className="w-4 h-4 text-[#FF572E] shrink-0" strokeWidth={2.5} />
+                          <span className="truncate">{groupObj.destination || inv.destination || 'Destination'}</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-[#6E7587] font-semibold">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF9F5] border border-[#FDE3D3]">
+                            <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
+                            <span>{formatTravelDate(groupObj.travelDate || inv.travelDate)}</span>
+                          </div>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFF9F5] border border-[#FDE3D3]">
+                            <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
+                            <span>{formatMinutesToTime(groupObj.departureTime || inv.departureTime)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Action: Withdraw Button */}
+                      <div className="pt-3.5 border-t border-gray-100 flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmWithdrawInvite(inv)}
+                          className="px-4 py-2 rounded-full text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Withdraw</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white rounded-[28px] sm:rounded-[32px] border border-[#F4E3D8] p-8 sm:p-12 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 rounded-3xl bg-[#FFF9F5] text-[#FF572E] flex items-center justify-center mx-auto shadow-sm">
+                  <Send className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="font-black text-[#17233C] text-lg sm:text-xl">
+                    No invitations sent yet
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#6E7587] max-w-md mx-auto leading-relaxed mt-1.5">
+                    {adminGroups.length > 0
+                      ? 'You can invite compatible students directly from your Group Details page.'
+                      : 'Create a shared ride group as an organizer to start inviting fellow campus students.'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 7. RECEIVED INVITATIONS TAB CONTENT                                      */}
+        {/* ========================================================================= */}
+        {activeTab === 'received-invitations' && (
+          <div className="space-y-4">
+            {invitesLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2].map((i) => (
                   <div key={i} className="h-44 bg-white/70 rounded-[24px] animate-pulse border border-[#F4E3D8]" />
@@ -1186,193 +1384,10 @@ export default function SharedRidesPage() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
-
-        {/* B. SENT INVITATIONS SUB-TAB (ADMIN) */}
-        {invitationsSubTab === 'sent' && (
-          <>
-            {loadingSentInvites ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="h-44 bg-white/70 rounded-[24px] animate-pulse border border-[#F4E3D8]" />
-                ))}
-              </div>
-            ) : sentInvitations.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                {sentInvitations.map((inv) => (
-                  <motion.div
-                    key={inv._id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#F4E3D8] hover:border-[#FF572E]/40 hover:shadow-md transition-all duration-200 p-5 sm:p-6 flex flex-col justify-between shadow-xs"
-                  >
-                    {/* Top Bar: Recipient & Status */}
-                    <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                      <div className="min-w-0">
-                        <span className="text-[10.5px] font-bold text-[#8C93A4] uppercase tracking-wider block">
-                          Invited Student
-                        </span>
-                        <span className="font-extrabold text-sm text-[#17233C] truncate block">
-                          {inv.requesterName || `Student ID: ${String(inv.requesterId || '').slice(-6)}`}
-                        </span>
-                      </div>
-                      <StatusBadge status={inv.status || 'pending'} />
-                    </div>
-
-                    {/* Route Details */}
-                    <div className="py-3.5 space-y-2">
-                      <div className="font-black text-sm sm:text-base text-[#17233C] truncate">
-                        {inv.groupRoute}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-[#6E7587]">
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
-                          <span>{formatTravelDate(inv.groupDate)}</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
-                          <span>{formatMinutesToTime(inv.groupTime)}</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Bottom Info: Group Details Link */}
-                    <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                      <span className="text-[#8C93A4]">
-                        Sent {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'recently'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/groups/${inv.groupId}`)}
-                        className="font-bold text-[#FF572E] hover:text-[#E64A22] cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <span>View Group</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-[28px] sm:rounded-[32px] border border-[#F4E3D8] p-8 sm:p-12 text-center space-y-4 shadow-xs">
-                <div className="w-16 h-16 rounded-3xl bg-[#FFF9F5] text-[#FF572E] flex items-center justify-center mx-auto shadow-sm">
-                  <Send className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="font-black text-[#17233C] text-lg sm:text-xl">
-                    No invitations sent yet
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[#6E7587] max-w-md mx-auto leading-relaxed mt-1.5">
-                    {adminGroups.length > 0
-                      ? 'You can invite compatible students directly from your Group Details page.'
-                      : 'Create a shared ride group as an organizer to start inviting fellow campus students.'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    )}
 
   </div>
-
-  {/* Join Confirmation Dialog */}
-  <Modal
-    isOpen={Boolean(confirmJoinGroup)}
-    onClose={() => setConfirmJoinGroup(null)}
-    title="Confirm Group Join"
-    subtitle="Review ride details before joining this active shared group"
-    actions={
-      confirmJoinGroup ? (
-        <div className="grid grid-cols-2 gap-3 w-full">
-          <button
-            type="button"
-            onClick={() => setConfirmJoinGroup(null)}
-            className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold transition-all cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={joiningGroupId === confirmJoinGroup._id}
-            onClick={() => {
-              const grp = confirmJoinGroup;
-              setConfirmJoinGroup(null);
-              handleDirectJoin(grp);
-            }}
-            className="py-2.5 px-4 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black shadow-md shadow-[#FF572E]/25 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
-          >
-            {joiningGroupId === confirmJoinGroup._id ? (
-              <>
-                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Joining...</span>
-              </>
-            ) : (
-              <span>Confirm & Join</span>
-            )}
-          </button>
-        </div>
-      ) : null
-    }
-  >
-    {confirmJoinGroup && (
-      <div className="space-y-3">
-        <p className="text-xs text-[#6E7587]">
-          You are about to directly join this active Shared Ride Group. Please review the trip details below:
-        </p>
-
-        {/* Details Box */}
-        <div className="bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8] space-y-3 text-xs">
-          {/* Route */}
-          <div className="flex items-center gap-2 font-black text-sm text-[#17233C]">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] shrink-0" />
-            <span className="truncate">{confirmJoinGroup.source}</span>
-            <span className="text-[#FF572E]">→</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF572E] shrink-0" />
-            <span className="truncate">{confirmJoinGroup.destination}</span>
-          </div>
-
-          {/* Date & Departure */}
-          <div className="flex items-center justify-between text-[#6E7587] pt-2 border-t border-[#F4E3D8]/60">
-            <div className="flex items-center gap-1.5 font-medium">
-              <Calendar className="w-3.5 h-3.5 text-[#FF572E]" />
-              <span>{formatTravelDate(confirmJoinGroup.travelDate)}</span>
-            </div>
-            <div className="flex items-center gap-1.5 font-bold text-[#17233C]">
-              <Clock className="w-3.5 h-3.5 text-[#FF572E]" />
-              <span>{formatMinutesToTime(confirmJoinGroup.departureTime)}</span>
-            </div>
-          </div>
-
-          {/* Admin & Members */}
-          <div className="flex items-center justify-between text-[#6E7587] pt-2 border-t border-[#F4E3D8]/60">
-            <div>
-              <span className="text-[11px] block">Group Admin:</span>
-              <span className="font-extrabold text-[#17233C] text-xs">
-                {confirmJoinGroup.admin?.name || 'Group Organizer'}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-[11px] block">Confirmed Members:</span>
-              <span className="font-extrabold text-[#17233C] text-xs">
-                {confirmJoinGroup.confirmedMemberCount || confirmJoinGroup.members?.length || 1} / {confirmJoinGroup.targetCapacity || 4}
-              </span>
-            </div>
-          </div>
-
-          {/* Available Spots */}
-          <div className="pt-2 border-t border-[#F4E3D8]/60 flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-[#6E7587]">Available Spots:</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-xs">
-              {confirmJoinGroup.availableSpots ?? Math.max(0, (confirmJoinGroup.targetCapacity || 4) - (confirmJoinGroup.confirmedMemberCount || confirmJoinGroup.members?.length || 1))} spots left
-            </span>
-          </div>
-        </div>
-      </div>
-    )}
-  </Modal>
 
   {/* Leave Group Confirmation Dialog */}
   <Modal
@@ -1430,6 +1445,85 @@ export default function SharedRidesPage() {
     )}
   </Modal>
 
+  {/* Withdraw Invitation Confirmation Dialog */}
+  <Modal
+    isOpen={Boolean(confirmWithdrawInvite)}
+    onClose={() => setConfirmWithdrawInvite(null)}
+    title="Withdraw Invitation"
+    subtitle="Are you sure you want to withdraw this invitation?"
+    actions={
+      confirmWithdrawInvite ? (
+        <div className="grid grid-cols-2 gap-3 w-full">
+          <button
+            type="button"
+            onClick={() => setConfirmWithdrawInvite(null)}
+            className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={withdrawingInviteId === confirmWithdrawInvite._id}
+            onClick={() => handleWithdrawInvite(confirmWithdrawInvite)}
+            className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            {withdrawingInviteId === confirmWithdrawInvite._id ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Withdrawing...</span>
+              </>
+            ) : (
+              'Confirm & Withdraw'
+            )}
+          </button>
+        </div>
+      ) : null
+    }
+  >
+    {confirmWithdrawInvite && (
+      <div className="space-y-3.5">
+        <div className="bg-[#FFFBF8] rounded-2xl p-4 border border-[#F4E3D8] space-y-2.5 text-xs">
+          <div className="flex items-center gap-3">
+            <Avatar
+              src={confirmWithdrawInvite.recipient?.imageUrl || confirmWithdrawInvite.requester?.imageUrl}
+              name={confirmWithdrawInvite.recipientName || confirmWithdrawInvite.recipient?.name || 'Student'}
+              size={36}
+              className="border border-[#F4E3D8] shadow-2xs shrink-0"
+            />
+            <div>
+              <div className="font-black text-sm text-[#17233C]">
+                {confirmWithdrawInvite.recipientName || confirmWithdrawInvite.recipient?.name || 'Student'}
+              </div>
+              <div className="text-[11px] text-[#6E7587] font-semibold">Invitation recipient</div>
+            </div>
+          </div>
+          <div className="pt-2 border-t border-[#F4E3D8]">
+            <div className="flex items-center gap-2 font-black text-sm text-[#17233C]">
+              <span>{confirmWithdrawInvite.source || confirmWithdrawInvite.groupId?.source || 'Campus'}</span>
+              <span className="text-[#FF572E]">→</span>
+              <span>{confirmWithdrawInvite.destination || confirmWithdrawInvite.groupId?.destination || 'Destination'}</span>
+            </div>
+            <div className="flex items-center gap-3 text-[#6E7587] text-[11px] mt-1">
+              <span>{formatTravelDate(confirmWithdrawInvite.travelDate || confirmWithdrawInvite.groupId?.travelDate)}</span>
+              <span>•</span>
+              <span>{formatMinutesToTime(confirmWithdrawInvite.departureTime || confirmWithdrawInvite.groupId?.departureTime)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
+          <div className="font-bold flex items-center gap-1.5 text-blue-800">
+            <Info className="w-4 h-4 text-blue-700 shrink-0" />
+            <span>This action cannot be undone</span>
+          </div>
+          <p className="text-[11.5px] leading-relaxed">
+            The invitation will be permanently removed from the recipient's pending invitations. You can send a new invitation later if needed.
+          </p>
+        </div>
+      </div>
+    )}
+  </Modal>
+
       {/* Create Group Modal */}
       <CreateGroupModal
         isOpen={showCreateModal}
@@ -1446,6 +1540,90 @@ export default function SharedRidesPage() {
         title="Sign In to Manage Groups"
         subtitle="Sign in with your campus account to create and join shared ride groups with peers."
       />
+
+      {/* Choose Group Size Modal */}
+      <Modal
+        isOpen={!!groupSizeModalPeer}
+        onClose={() => {
+          if (!creatingMatchGroupId) {
+            setGroupSizeModalPeer(null);
+            setGroupModalError(null);
+          }
+        }}
+        title="Choose Group Size"
+        maxWidth="max-w-sm"
+        actions={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <button
+              type="button"
+              disabled={Boolean(creatingMatchGroupId)}
+              onClick={() => {
+                setGroupSizeModalPeer(null);
+                setGroupModalError(null);
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-[#6E7587] bg-white border border-[#F4E3D8] hover:bg-[#FFF9F6] cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(creatingMatchGroupId)}
+              onClick={handleConfirmCreateGroupWithPeer}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black bg-[#FF572E] hover:bg-[#E84720] text-white shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              {creatingMatchGroupId ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>{`Create Group (${selectedGroupSize})`}</span>
+              )}
+            </button>
+          </div>
+        }
+      >
+        {groupSizeModalPeer && (
+          <div className="space-y-4">
+            <p className="text-xs text-[#6E7587] leading-relaxed">
+              Choose total group size with <span className="font-bold text-[#17233C]">{groupSizeModalPeer.student?.name || 'this student'}</span>. Remaining empty seats are offered automatically in Matches.
+            </p>
+            <div>
+              <span className="block text-[11px] font-black uppercase tracking-wider text-[#17233C] mb-2">
+                Group Size (Total Members)
+              </span>
+              <div className="grid grid-cols-5 gap-2">
+                {[2, 3, 4, 5, 6].map((size) => {
+                  const active = selectedGroupSize === size;
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      disabled={Boolean(creatingMatchGroupId)}
+                      onClick={() => {
+                        setSelectedGroupSize(size);
+                        setGroupModalError(null);
+                      }}
+                      className={`py-2.5 rounded-xl text-sm font-black border transition-all cursor-pointer disabled:opacity-60 ${
+                        active
+                          ? 'bg-[#FF572E] text-white border-[#FF572E] shadow-xs'
+                          : 'bg-[#FFFDFB] text-[#17233C] border-[#F4E3D8] hover:border-[#FF572E]/50'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {groupModalError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">
+                {groupModalError}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </ResponsiveShell>
   );
 }

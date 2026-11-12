@@ -228,6 +228,12 @@ export const updateTravel = (id, data) => {
   }
   return apiClient.put(`/api/travels/${id}`, data);
 };
+export const checkTravelGroupStatus = async (id) => {
+  if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return Promise.reject(new Error('Invalid travel ID format'));
+  }
+  return apiClient.get(`/api/travels/${id}/group-status`);
+};
 export const deleteTravel = async (id) => {
   if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
     return Promise.reject(new Error('Invalid travel ID format'));
@@ -274,9 +280,11 @@ export const getNotifications = (params) => apiClient.get('/api/notifications', 
 export const getUnreadCount = (params) => apiClient.get('/api/notifications/unread-count', { params });
 export const markRead = (id) => apiClient.patch(`/api/notifications/${id}/read`);
 export const markAllRead = (params) => apiClient.patch('/api/notifications/read-all', null, { params });
+export const deleteNotification = (id) => apiClient.delete(`/api/notifications/${id}`);
 export const getSlotMateNotifications = (params) => apiClient.get('/api/slotmate/notifications', { params });
 export const getSlotMateUnreadCount = () => apiClient.get('/api/slotmate/notifications/unread-count');
 export const markAllSlotMateRead = () => apiClient.patch('/api/slotmate/notifications/read-all');
+export const deleteSlotMateNotification = (id) => apiClient.delete(`/api/slotmate/notifications/${id}`);
 export const registerFcmToken = (token, platform = 'android') =>
   apiClient.post('/api/notifications/fcm-token', { token, platform });
 export const unregisterFcmToken = (token) =>
@@ -317,14 +325,26 @@ export const getGroupInvites = (groupId) =>
   apiClient.get(`/api/groups/${groupId}/invites`);
 export const getReceivedInvitations = () =>
   apiClient.get('/api/groups/invitations/received');
+export const getSentGroupProposals = () =>
+  apiClient.get('/api/groups/proposals/sent');
 export const acceptGroupInvitation = (requestId) =>
   apiClient.post(`/api/groups/invitations/${requestId}/accept`);
 export const rejectGroupInvitation = (requestId) =>
   apiClient.post(`/api/groups/invitations/${requestId}/reject`);
+export const withdrawInvitation = (requestId) =>
+  apiClient.post(`/api/groups/invitations/${requestId}/withdraw`);
+export const acceptGroupProposal = (requestId) =>
+  apiClient.post(`/api/groups/proposals/${requestId}/accept`);
+export const rejectGroupProposal = (requestId) =>
+  apiClient.post(`/api/groups/proposals/${requestId}/reject`);
 export const directJoinSharedRideGroup = (groupId, data) =>
   apiClient.post(`/api/groups/${groupId}/join`, data);
 export const leaveSharedRideGroup = (groupId) =>
   apiClient.post(`/api/groups/${groupId}/leave`);
+
+// BUG 4 FIX: WhatsApp group link management
+export const updateGroupWhatsAppLink = (groupId, data) =>
+  apiClient.put(`/api/groups/${groupId}/whatsapp`, data);
 
 // ── SlotMate ─────────────────────────────────────────────────────────────────
 export const searchCourses = (q = '', limit = 200) => apiClient.get('/api/slotmate/courses', { params: { q, limit } });

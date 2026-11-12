@@ -5,7 +5,19 @@ import Travel from '../models/Travel.js';
 import Student from '../models/Student.js';
 import { createOutboxEvent, triggerOutboxSweep } from '../services/outbox.service.js';
 import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
-import { isSameDirection, isSameCalendarDay, isDepartureTimeCompatible, areFindPostsCompatible, findCompatibleGroupsForFindPost } from '../services/matching.service.js';
+import { isSameDirection, isSameCalendarDay, isDepartureTimeCompatible, areFindPostsCompatible, findCompatibleGroupsForFindPost, buildPairUserKey, buildGroupDisplayName } from '../services/matching.service.js';
+import { getCandidateUserIds, isSameUserId, resolveStudentProfilesMap, getStudentFromMap, resolveSingleStudent, formatSafePublicStudent } from '../utils/studentProfileResolver.js';
+
+function isConfirmedGroupMember(group, userId) {
+  if (!group || !userId || !Array.isArray(group.members)) return false;
+  return group.members.some((m) => isSameUserId(m.userId, userId));
+}
+
+function isGroupAdmin(group, userId) {
+  if (!group || !userId) return false;
+  if (isSameUserId(group.adminId, userId)) return true;
+  return Array.isArray(group.members) && group.members.some((m) => isSameUserId(m.userId, userId) && m.role === 'admin');
+}
 
 /**
  * Helper: commits a transaction session with retry support for UnknownTransactionCommitResult.
@@ -88,6 +100,68 @@ export async function runInTransaction(callback) {
   }
 }
 
+const ONE_ACTIVE_GROUP_MESSAGE =
+  'You are already a member of another active group. Leave your current group before joining or creating another group.';
+
+function isMemberUniqueConflict(err) {
+  return (
+    err?.code === 11000 &&
+    Boolean(
+      (err.keyPattern && err.keyPattern['members.userId']) ||
+      err.message?.includes('members.userId')
+    )
+  );
+}
+
+/**
+ * Finds any currently active ('open' or 'full', non-empty, unexpired) group where userId is a member.
+ * Lazily reconciles empty (0 members) -> 'empty' and expired -> 'expired' groups so stale records do not block users.
+ */
+async function findActiveGroupForStudent(userId, { excludeGroupId = null, session = null } = {}) {
+  if (!userId) return null;
+  const now = new Date();
+  const variants = getCandidateUserIds(userId);
+  const query = {
+    status: { $in: ['open', 'full'] },
+    'members.userId': { $in: variants.length > 0 ? variants : [userId] }
+  };
+  if (excludeGroupId) {
+    query._id = { $ne: excludeGroupId };
+  }
+
+  const candidates = await (session
+    ? SharedRideGroup.find(query).session(session)
+    : SharedRideGroup.find(query));
+
+  for (const g of candidates) {
+    if (!Array.isArray(g.members) || g.members.length === 0) {
+      g.status = 'empty';
+      await g.save(session ? { session } : {});
+      continue;
+    }
+    if (g.expiresAt && new Date(g.expiresAt) <= now) {
+      g.status = 'expired';
+      await g.save(session ? { session } : {});
+      continue;
+    }
+    return g;
+  }
+
+  return null;
+}
+
+/**
+ * Cancels all pending join requests/invites for a group (e.g., when it becomes empty).
+ */
+async function cancelPendingRequestsForGroup(groupId, session = null) {
+  if (!groupId) return;
+  await GroupJoinRequest.updateMany(
+    { groupId, status: 'pending' },
+    { $set: { status: 'cancelled' } },
+    session ? { session } : {}
+  );
+}
+
 /**
  * @route   POST /api/groups
  * @desc    Create a Shared Ride Group from an active FIND (request) post
@@ -99,11 +173,13 @@ export async function createSharedRideGroup(req, res) {
       originatingTravelId,
       travelId,
       targetCapacity,
+      groupSize,
       actualCabCapacity,
       notes,
       whatsappGroupUrl
     } = req.body;
 
+    const rawTargetCapacity = targetCapacity ?? groupSize;
     const rawTravelId = originatingTravelId || travelId;
     const adminId = req.userId;
 
@@ -119,20 +195,21 @@ export async function createSharedRideGroup(req, res) {
       return createGroupFromFindMatch(req, res);
     }
 
-    // 1. Validate targetCapacity (must be a positive integer)
+    // 1. Validate targetCapacity / groupSize (must be integer between 2 and 6)
     if (
-      targetCapacity === undefined ||
-      targetCapacity === null ||
-      isNaN(Number(targetCapacity)) ||
-      !Number.isInteger(Number(targetCapacity)) ||
-      Number(targetCapacity) < 1
+      rawTargetCapacity === undefined ||
+      rawTargetCapacity === null ||
+      isNaN(Number(rawTargetCapacity)) ||
+      !Number.isInteger(Number(rawTargetCapacity)) ||
+      Number(rawTargetCapacity) < 2 ||
+      Number(rawTargetCapacity) > 6
     ) {
       return res.status(400).json({
         success: false,
-        message: 'targetCapacity is required and must be a positive integer of at least 1'
+        message: 'Group size (targetCapacity) is required and must be an integer between 2 and 6'
       });
     }
-    const parsedTargetCapacity = Number(targetCapacity);
+    const parsedTargetCapacity = Number(rawTargetCapacity);
 
     // 2. Validate optional actualCabCapacity (positive integer or null)
     let parsedCabCapacity = null;
@@ -219,7 +296,17 @@ export async function createSharedRideGroup(req, res) {
       });
     }
 
-    // 10. Check if an active group already exists for this FIND post
+    // 10a. Enforce One Active Group Per Student rule
+    const existingStudentActiveGroup = await findActiveGroupForStudent(adminId);
+    if (existingStudentActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE,
+        data: { existingGroupId: existingStudentActiveGroup._id }
+      });
+    }
+
+    // 10b. Check if an active group already exists for this FIND post
     const existingActiveGroup = await SharedRideGroup.findOne({
       originatingTravelId: travel._id,
       status: { $in: ['open', 'full'] }
@@ -235,6 +322,15 @@ export async function createSharedRideGroup(req, res) {
 
     // 11. Create SharedRideGroup inside transaction
     const createdGroup = await runInTransaction(async (session) => {
+      // Re-verify one-active-group-per-student inside session
+      const txStudentGroup = await findActiveGroupForStudent(adminId, { session });
+      if (txStudentGroup) {
+        const activeErr = new Error(ONE_ACTIVE_GROUP_MESSAGE);
+        activeErr.statusCode = 409;
+        activeErr.existingGroupId = txStudentGroup._id;
+        throw activeErr;
+      }
+
       // Re-verify inside session to protect against race conditions
       const query = {
         originatingTravelId: travel._id,
@@ -292,10 +388,16 @@ export async function createSharedRideGroup(req, res) {
       data: createdGroup
     });
   } catch (err) {
+    if (isMemberUniqueConflict(err)) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE
+      });
+    }
     if (err.statusCode === 409 || err.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: 'An active shared ride group already exists for this FIND post',
+        message: err.message || 'An active shared ride group already exists for this FIND post',
         data: err.existingGroupId ? { existingGroupId: err.existingGroupId } : undefined
       });
     }
@@ -446,8 +548,14 @@ export async function createJoinRequest(req, res) {
       });
     }
 
-    // 5. Check available capacity
+    // 5. Check group non-empty & available capacity
     const currentMemberCount = Array.isArray(group.members) ? group.members.length : 0;
+    if (currentMemberCount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot join an empty group'
+      });
+    }
     if (currentMemberCount >= group.targetCapacity) {
       return res.status(400).json({
         success: false,
@@ -455,7 +563,7 @@ export async function createJoinRequest(req, res) {
       });
     }
 
-    // 6. Prevent group admin or existing members from requesting
+    // 6. Prevent group admin, existing members, or students in another active group
     if (group.adminId === requesterId) {
       return res.status(400).json({
         success: false,
@@ -468,6 +576,15 @@ export async function createJoinRequest(req, res) {
       return res.status(400).json({
         success: false,
         message: 'You are already a member of this group'
+      });
+    }
+
+    const existingStudentActiveGroup = await findActiveGroupForStudent(requesterId, { excludeGroupId: group._id });
+    if (existingStudentActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE,
+        data: { existingGroupId: existingStudentActiveGroup._id }
       });
     }
 
@@ -566,6 +683,14 @@ export async function createJoinRequest(req, res) {
     const joinRequest = await runInTransaction(async (session) => {
       const txNow = new Date();
 
+      const txActiveGroup = await findActiveGroupForStudent(requesterId, { excludeGroupId: group._id, session });
+      if (txActiveGroup) {
+        const activeErr = new Error(ONE_ACTIVE_GROUP_MESSAGE);
+        activeErr.statusCode = 409;
+        activeErr.existingGroupId = txActiveGroup._id;
+        throw activeErr;
+      }
+
       // Atomically reconcile any expired pending requests for this user and group
       // so they transition to 'expired' and release the partial unique index
       await GroupJoinRequest.updateMany(
@@ -617,30 +742,43 @@ export async function createJoinRequest(req, res) {
       );
 
       // Fetch requester student record for friendly notification message
-      const requesterStudentQuery = Student.findOne({ clerkId: requesterId });
-      const requesterStudent = session ? await requesterStudentQuery.session(session) : await requesterStudentQuery;
+      const requesterStudent = await resolveSingleStudent(requesterId, { session });
       const requesterName = requesterStudent?.name || 'A student';
 
-      // Create outbox event notifying the group admin
-      await createOutboxEvent(
-        {
-          eventType: NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_RECEIVED,
-          recipientId: group.adminId,
-          relatedTravelId: travel._id,
-          payload: {
-            groupId: group._id,
-            requestId: newRequest._id,
-            requesterId,
-            requesterName,
-            source: group.source,
-            destination: group.destination,
-            travelDate: group.travelDate,
-            departureTime: group.departureTime,
-            targetCapacity: group.targetCapacity
-          }
-        },
-        session
-      );
+      // Notify ALL confirmed group members so any member can review and approve (BUG 7)
+      const memberRecipients = [];
+      const seenMemberIds = new Set();
+      for (const m of group.members || []) {
+        if (m?.userId && !isSameUserId(m.userId, requesterId) && !seenMemberIds.has(m.userId)) {
+          seenMemberIds.add(m.userId);
+          memberRecipients.push(m.userId);
+        }
+      }
+      if (memberRecipients.length === 0 && group.adminId) {
+        memberRecipients.push(group.adminId);
+      }
+
+      for (const memberRecipientId of memberRecipients) {
+        await createOutboxEvent(
+          {
+            eventId: `join_req_${newRequest._id}_${memberRecipientId}`,
+            eventType: NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_RECEIVED,
+            recipientId: memberRecipientId,
+            relatedTravelId: travel._id,
+            payload: {
+              groupId: group._id,
+              requestId: newRequest._id,
+              requesterName,
+              source: group.source,
+              destination: group.destination,
+              travelDate: group.travelDate,
+              departureTime: group.departureTime,
+              targetCapacity: group.targetCapacity
+            }
+          },
+          session
+        );
+      }
 
       return newRequest;
     });
@@ -661,8 +799,10 @@ export async function createJoinRequest(req, res) {
     if (err.statusCode === 409 || err.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: 'A pending join request or invitation already exists for this group',
-        data: err.existingRequestId ? { existingRequestId: err.existingRequestId } : undefined
+        message: err.statusCode === 409 && err.message ? err.message : 'A pending join request or invitation already exists for this group',
+        data: err.existingGroupId
+          ? { existingGroupId: err.existingGroupId }
+          : (err.existingRequestId ? { existingRequestId: err.existingRequestId } : undefined)
       });
     }
 
@@ -684,7 +824,7 @@ export async function getGroupJoinRequests(req, res) {
   try {
     const { groupId, id } = req.params;
     const targetGroupId = groupId || id;
-    const adminId = req.userId;
+    const actorId = req.userId;
 
     if (!targetGroupId || !mongoose.Types.ObjectId.isValid(targetGroupId)) {
       return res.status(400).json({
@@ -701,10 +841,11 @@ export async function getGroupJoinRequests(req, res) {
       });
     }
 
-    if (group.adminId !== adminId) {
+    // BUG 7: Any confirmed active member of the group can view join requests
+    if (!isConfirmedGroupMember(group, actorId) && !isGroupAdmin(group, actorId)) {
       return res.status(403).json({
         success: false,
-        message: 'Only the group admin can view join requests for this group'
+        message: 'Only confirmed members of this group can view join requests'
       });
     }
 
@@ -720,20 +861,18 @@ export async function getGroupJoinRequests(req, res) {
       })
       .lean();
 
-    // Attach safe student profiles for requesters (strictly omitting private phone, email, firebaseUid)
-    const requesterIds = requests.map((r) => r.requesterId);
-    const students = await Student.find(
-      { clerkId: { $in: requesterIds } },
-      { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-    ).lean();
-
-    const studentMap = new Map(students.map((s) => [s.clerkId, s]));
+    // Attach resolved safe student profiles across clerkId & firebaseUid variants (BUG 2)
+    const requesterIds = requests.map((r) => r.requesterId).filter(Boolean);
+    const studentMap = await resolveStudentProfilesMap(requesterIds, { includeContact: false });
 
     const enrichedRequests = requests.map((r) => {
-      const profile = studentMap.get(r.requesterId);
+      const profile = formatSafePublicStudent(getStudentFromMap(studentMap, r.requesterId), {
+        fallbackName: 'Student'
+      });
       return {
         ...r,
-        requester: profile || { name: 'Campus Student', isVerified: false }
+        requesterName: profile.name,
+        requester: profile
       };
     });
 
@@ -761,9 +900,9 @@ export async function acceptStudentJoinRequest(req, res) {
   try {
     const { requestId, id } = req.params;
     const targetRequestId = requestId || id;
-    const adminId = req.userId;
+    const actorId = req.userId;
 
-    if (!adminId) {
+    if (!actorId) {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized: Missing authenticated user ID'
@@ -786,19 +925,27 @@ export async function acceptStudentJoinRequest(req, res) {
       });
     }
 
-    // 2. Authorization check: only group admin (recipient) can accept
-    if (joinRequest.recipientId !== adminId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only the group admin can accept this join request'
-      });
-    }
-
-    // 3. Verify request type is 'join_request'
+    // 2. Verify request type is 'join_request'
     if (joinRequest.type !== 'join_request') {
       return res.status(400).json({
         success: false,
         message: 'Only join requests can be accepted through this endpoint'
+      });
+    }
+
+    // 3. Fetch target group and verify authorization (BUG 7: ANY confirmed group member can accept)
+    const group = await SharedRideGroup.findById(joinRequest.groupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shared ride group not found'
+      });
+    }
+
+    if (!isConfirmedGroupMember(group, actorId) && !isGroupAdmin(group, actorId) && !isSameUserId(joinRequest.recipientId, actorId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only confirmed members of this group can accept join requests'
       });
     }
 
@@ -822,16 +969,7 @@ export async function acceptStudentJoinRequest(req, res) {
       });
     }
 
-    // 5. Fetch target group
-    const group = await SharedRideGroup.findById(joinRequest.groupId);
-    if (!group) {
-      return res.status(404).json({
-        success: false,
-        message: 'Shared ride group not found'
-      });
-    }
-
-    // 6. Verify group is 'open' and not expired
+    // 5. Verify group is 'open' and not expired
     if (group.status !== 'open') {
       return res.status(400).json({
         success: false,
@@ -847,12 +985,20 @@ export async function acceptStudentJoinRequest(req, res) {
       });
     }
 
-    // 7. Prevent duplicate membership
-    const isAlreadyMember = Array.isArray(group.members) && group.members.some((m) => m.userId === joinRequest.requesterId);
+    // 6. Prevent duplicate membership & enforce One Active Group Per Student
+    const isAlreadyMember = Array.isArray(group.members) && group.members.some((m) => isSameUserId(m.userId, joinRequest.requesterId));
     if (isAlreadyMember) {
       return res.status(400).json({
         success: false,
         message: 'Student is already a member of this group'
+      });
+    }
+
+    const requesterOtherActiveGroup = await findActiveGroupForStudent(joinRequest.requesterId, { excludeGroupId: group._id });
+    if (requesterOtherActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: 'This student is already a member of another active group and cannot join a second group.'
       });
     }
 
@@ -923,6 +1069,12 @@ export async function acceptStudentJoinRequest(req, res) {
         throw err;
       }
 
+      if (!isConfirmedGroupMember(liveGroup, actorId) && !isGroupAdmin(liveGroup, actorId) && !isSameUserId(joinRequest.recipientId, actorId)) {
+        const err = new Error('Only confirmed members of this group can accept join requests');
+        err.statusCode = 403;
+        throw err;
+      }
+
       const txNow = new Date();
       if (!liveGroup.expiresAt || liveGroup.expiresAt <= txNow) {
         const err = new Error('Cannot accept request for an expired group');
@@ -939,14 +1091,13 @@ export async function acceptStudentJoinRequest(req, res) {
       // Step A: Atomically transition join request to 'accepted'
       const reqQuery = {
         _id: joinRequest._id,
-        status: 'pending',
-        recipientId: adminId
+        status: 'pending'
       };
       const reqUpdate = {
         $set: {
           status: 'accepted',
           respondedAt: new Date(),
-          respondedBy: adminId
+          respondedBy: actorId
         }
       };
 
@@ -956,16 +1107,25 @@ export async function acceptStudentJoinRequest(req, res) {
 
       if (!transRequest) {
         const err = new Error('Join request is no longer pending or has already been resolved');
-        err.statusCode = 400;
+        err.statusCode = 409;
         throw err;
       }
 
+      // Step A2: Verify requester is not already a confirmed member of another active group
+      const txOtherActiveGroup = await findActiveGroupForStudent(joinRequest.requesterId, { excludeGroupId: group._id, session });
+      if (txOtherActiveGroup) {
+        const activeErr = new Error('This student is already a member of another active group and cannot join a second group.');
+        activeErr.statusCode = 409;
+        throw activeErr;
+      }
+
       // Step B: Atomically and conditionally add member to group only if members.length < targetCapacity
+      const requesterVariants = getCandidateUserIds(joinRequest.requesterId);
       const groupQuery = {
         _id: group._id,
         status: 'open',
         expiresAt: { $gt: txNow },
-        'members.userId': { $ne: joinRequest.requesterId },
+        'members.userId': { $nin: requesterVariants.length > 0 ? requesterVariants : [joinRequest.requesterId] },
         $expr: { $lt: [{ $size: '$members' }, '$targetCapacity'] }
       };
 
@@ -1001,9 +1161,8 @@ export async function acceptStudentJoinRequest(req, res) {
       }
 
       // Step D: Create Outbox notification for requester
-      const adminStudentQuery = Student.findOne({ clerkId: adminId });
-      const adminStudent = session ? await adminStudentQuery.session(session) : await adminStudentQuery;
-      const adminName = adminStudent?.name || 'The group admin';
+      const approverStudent = await resolveSingleStudent(actorId, { session });
+      const approverName = approverStudent?.name || 'A group member';
 
       await createOutboxEvent(
         {
@@ -1013,13 +1172,14 @@ export async function acceptStudentJoinRequest(req, res) {
           payload: {
             groupId: group._id,
             requestId: joinRequest._id,
-            adminId,
-            adminName,
+            adminName: approverName,
+            approvedByName: approverName,
             source: group.source,
             destination: group.destination,
             travelDate: group.travelDate,
             currentMemberCount: transGroup.members.length,
             targetCapacity: transGroup.targetCapacity,
+            availableSpots: Math.max(0, transGroup.targetCapacity - transGroup.members.length),
             isFull: transGroup.status === 'full'
           }
         },
@@ -1045,6 +1205,12 @@ export async function acceptStudentJoinRequest(req, res) {
       }
     });
   } catch (err) {
+    if (isMemberUniqueConflict(err)) {
+      return res.status(409).json({
+        success: false,
+        message: 'This student is already a member of another active group and cannot join a second group.'
+      });
+    }
     if (err.statusCode) {
       return res.status(err.statusCode).json({
         success: false,
@@ -1070,9 +1236,9 @@ export async function rejectStudentJoinRequest(req, res) {
   try {
     const { requestId, id } = req.params;
     const targetRequestId = requestId || id;
-    const adminId = req.userId;
+    const actorId = req.userId;
 
-    if (!adminId) {
+    if (!actorId) {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized: Missing authenticated user ID'
@@ -1095,19 +1261,27 @@ export async function rejectStudentJoinRequest(req, res) {
       });
     }
 
-    // 2. Authorization check: only group admin (recipient) can reject
-    if (joinRequest.recipientId !== adminId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only the group admin can reject this join request'
-      });
-    }
-
-    // 3. Verify request type is 'join_request'
+    // 2. Verify request type is 'join_request'
     if (joinRequest.type !== 'join_request') {
       return res.status(400).json({
         success: false,
         message: 'Only join requests can be rejected through this endpoint'
+      });
+    }
+
+    // 3. Fetch group & check authorization: ANY confirmed group member can reject (BUG 7)
+    const group = await SharedRideGroup.findById(joinRequest.groupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shared ride group not found'
+      });
+    }
+
+    if (!isConfirmedGroupMember(group, actorId) && !isGroupAdmin(group, actorId) && !isSameUserId(joinRequest.recipientId, actorId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only confirmed members of this group can reject join requests'
       });
     }
 
@@ -1131,21 +1305,17 @@ export async function rejectStudentJoinRequest(req, res) {
       });
     }
 
-    // 5. Fetch group to populate route in notification
-    const group = await SharedRideGroup.findById(joinRequest.groupId);
-
-    // 6. Atomically update status to 'rejected'
+    // 5. Atomically update status to 'rejected'
     const updatedRequest = await GroupJoinRequest.findOneAndUpdate(
       {
         _id: joinRequest._id,
-        status: 'pending',
-        recipientId: adminId
+        status: 'pending'
       },
       {
         $set: {
           status: 'rejected',
           respondedAt: new Date(),
-          respondedBy: adminId
+          respondedBy: actorId
         }
       },
       { returnDocument: 'after' }
@@ -1352,12 +1522,20 @@ export async function inviteStudentToGroup(req, res) {
       });
     }
 
-    // 15. Check if candidate is already a member of this group
+    // 15. Check if candidate is already a member of this group or another active group
     const isAlreadyMember = group.members.some((m) => m.userId === candidateTravel.userId);
     if (isAlreadyMember) {
       return res.status(400).json({
         success: false,
         message: 'Student is already a member of this group'
+      });
+    }
+
+    const candidateOtherActiveGroup = await findActiveGroupForStudent(candidateTravel.userId, { excludeGroupId: group._id });
+    if (candidateOtherActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: 'This student is already a member of another active group and cannot be invited.'
       });
     }
 
@@ -1516,28 +1694,34 @@ export async function acceptGroupInvitation(req, res) {
       });
     }
 
-    // 2. Fetch invitation document
+    // 2. Fetch invitation / proposal document
     const joinRequest = await GroupJoinRequest.findById(targetRequestId);
     if (!joinRequest) {
       return res.status(404).json({
         success: false,
-        message: 'Invitation request not found'
+        message: 'Invitation or formation request not found'
       });
     }
 
     // 3. Authorization check: only intended recipient can accept
-    if (joinRequest.recipientId !== recipientId) {
+    if (!isSameUserId(joinRequest.recipientId, recipientId) && !isSameUserId(joinRequest.requesterId, recipientId)) {
       return res.status(403).json({
         success: false,
-        message: 'Only the intended recipient can accept this invitation'
+        message: 'Only the intended recipient can accept this request'
+      });
+    }
+    if (isSameUserId(joinRequest.senderId, recipientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You cannot accept a request that you sent yourself'
       });
     }
 
-    // 4. Verify request type is 'invite'
-    if (joinRequest.type !== 'invite') {
+    // 4. Verify request type is 'invite' or 'formation_proposal'
+    if (joinRequest.type !== 'invite' && joinRequest.type !== 'formation_proposal') {
       return res.status(400).json({
         success: false,
-        message: 'Only invitations can be accepted through this endpoint'
+        message: 'Only invitations or group formation proposals can be accepted through this endpoint'
       });
     }
 
@@ -1546,30 +1730,275 @@ export async function acceptGroupInvitation(req, res) {
       if (joinRequest.status === 'accepted') {
         return res.status(400).json({
           success: false,
-          message: 'Invitation has already been accepted'
+          message: 'Request has already been accepted'
         });
       }
-      if (joinRequest.status === 'rejected') {
+      if (joinRequest.status === 'rejected' || joinRequest.status === 'declined') {
         return res.status(400).json({
           success: false,
-          message: 'Cannot accept a rejected invitation'
+          message: 'Cannot accept a declined request'
         });
       }
       return res.status(400).json({
         success: false,
-        message: `Cannot accept invitation with status "${joinRequest.status}"`
+        message: `Cannot accept request with status "${joinRequest.status}"`
       });
     }
 
-    // 5b. Verify invitation has not expired
+    // 5b. Verify invitation / proposal has not expired
     const now = new Date();
     if (joinRequest.expiresAt && new Date(joinRequest.expiresAt) <= now) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot accept an expired invitation'
+        message: 'Cannot accept an expired request'
       });
     }
 
+    // ------------------------------------------------------------------
+    // BRANCH A: PRE-GROUP FORMATION PROPOSAL ACCEPTANCE (BUG 3 & BUG 4)
+    // Atomically creates ONE SharedRideGroup with [sender (admin), recipient (member)]
+    // ------------------------------------------------------------------
+    if (joinRequest.type === 'formation_proposal') {
+      const senderId = joinRequest.senderId;
+
+      const [recipientActiveGroup, senderActiveGroup] = await Promise.all([
+        findActiveGroupForStudent(recipientId),
+        findActiveGroupForStudent(senderId)
+      ]);
+      if (recipientActiveGroup) {
+        return res.status(409).json({
+          success: false,
+          message: ONE_ACTIVE_GROUP_MESSAGE,
+          data: { existingGroupId: recipientActiveGroup._id }
+        });
+      }
+      if (senderActiveGroup) {
+        return res.status(409).json({
+          success: false,
+          message: 'The requesting student has already joined another active group.',
+          data: { existingGroupId: senderActiveGroup._id }
+        });
+      }
+
+      const [senderTravel, recipientTravel] = await Promise.all([
+        Travel.findById(joinRequest.senderTravelId),
+        Travel.findById(joinRequest.requesterTravelId)
+      ]);
+      if (!senderTravel || !recipientTravel) {
+        return res.status(404).json({
+          success: false,
+          message: 'One of the matching ride posts for this proposal is no longer available'
+        });
+      }
+      if (senderTravel.type !== 'request' || recipientTravel.type !== 'request') {
+        return res.status(400).json({
+          success: false,
+          message: 'Only FIND (request) posts can form a shared ride group'
+        });
+      }
+      if (senderTravel.status !== 'active' || recipientTravel.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot form a group because one of the travel posts is no longer active'
+        });
+      }
+      if (senderTravel.expiresAt <= now || recipientTravel.expiresAt <= now) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot form a group because one of the travel posts has expired'
+        });
+      }
+
+      const stillCompatible = await areFindPostsCompatible(senderTravel, recipientTravel, { skipGroupCheck: true });
+      if (!stillCompatible) {
+        return res.status(400).json({
+          success: false,
+          message: 'Travel details are no longer compatible to form this group'
+        });
+      }
+
+      const finalCapacity = Math.min(6, Math.max(2, Number(joinRequest.proposedCapacity) || 4));
+      const proposalKey = joinRequest.proposalKey || [String(senderTravel._id), String(recipientTravel._id)].sort().join(':');
+      const groupExpiresAt = senderTravel.expiresAt < recipientTravel.expiresAt
+        ? senderTravel.expiresAt
+        : recipientTravel.expiresAt;
+
+      const { createdGroup, updatedRequest } = await runInTransaction(async (session) => {
+        const txNow = new Date();
+        const txOpts = session ? { session } : {};
+
+        // Step 1: Atomically lock and transition pending proposal to accepted
+        const transReq = await GroupJoinRequest.findOneAndUpdate(
+          {
+            _id: joinRequest._id,
+            type: 'formation_proposal',
+            status: 'pending',
+            $or: [
+              { expiresAt: { $exists: false } },
+              { expiresAt: null },
+              { expiresAt: { $gt: txNow } }
+            ]
+          },
+          {
+            $set: {
+              status: 'accepted',
+              respondedAt: txNow,
+              respondedBy: recipientId
+            }
+          },
+          { ...txOpts, returnDocument: 'after' }
+        );
+
+        if (!transReq) {
+          const conflictErr = new Error('Group formation request is no longer pending or has already been processed');
+          conflictErr.statusCode = 409;
+          throw conflictErr;
+        }
+
+        // Step 2: Re-verify One Active Group Per Student inside tx
+        const [txSenderGrp, txRecipientGrp, existingProposalGrp] = await Promise.all([
+          findActiveGroupForStudent(senderId, { session }),
+          findActiveGroupForStudent(recipientId, { session }),
+          SharedRideGroup.findOne({ proposalKey, status: { $in: ['open', 'full'] } }).session(session)
+        ]);
+
+        if (existingProposalGrp) {
+          const dupErr = new Error('A group has already been created for this match proposal');
+          dupErr.statusCode = 409;
+          dupErr.existingGroupId = existingProposalGrp._id;
+          throw dupErr;
+        }
+        if (txSenderGrp) {
+          const err = new Error('The requesting student is already in another active group.');
+          err.statusCode = 409;
+          throw err;
+        }
+        if (txRecipientGrp) {
+          const err = new Error(ONE_ACTIVE_GROUP_MESSAGE);
+          err.statusCode = 409;
+          throw err;
+        }
+
+        // Step 3: Create EXACTLY ONE SharedRideGroup with both A and B as confirmed members
+        const [newGroup] = await SharedRideGroup.create(
+          [
+            {
+              adminId: senderId,
+              originatingTravelId: senderTravel._id,
+              source: senderTravel.source,
+              destination: senderTravel.destination,
+              travelDate: senderTravel.travelDate,
+              departureTime: senderTravel.departureTime,
+              targetCapacity: finalCapacity,
+              status: finalCapacity <= 2 ? 'full' : 'open',
+              expiresAt: groupExpiresAt,
+              proposalKey,
+              notes: joinRequest.message || '',
+              members: [
+                {
+                  userId: senderId,
+                  travelId: senderTravel._id,
+                  role: 'admin',
+                  joinedAt: txNow
+                },
+                {
+                  userId: joinRequest.requesterId,
+                  travelId: recipientTravel._id,
+                  role: 'member',
+                  joinedAt: txNow
+                }
+              ]
+            }
+          ],
+          txOpts
+        );
+
+        // Link created group back onto the accepted proposal
+        transReq.groupId = newGroup._id;
+        await transReq.save(txOpts);
+
+        // Step 4: Cancel any other pending proposals or invites for A or B so no stale proposals remain
+        const pairUserVariants = Array.from(new Set([
+          ...getCandidateUserIds(senderId),
+          ...getCandidateUserIds(recipientId),
+          ...getCandidateUserIds(joinRequest.requesterId)
+        ]));
+        await GroupJoinRequest.updateMany(
+          {
+            _id: { $ne: transReq._id },
+            type: { $in: ['formation_proposal', 'invite'] },
+            status: 'pending',
+            $or: [
+              { senderId: { $in: pairUserVariants } },
+              { requesterId: { $in: pairUserVariants } },
+              { recipientId: { $in: pairUserVariants } }
+            ]
+          },
+          { $set: { status: 'cancelled' } },
+          txOpts
+        );
+
+        // Step 5: Notify A that B accepted and the group is live
+        const recipientStudent = await resolveSingleStudent(recipientId, { session });
+        const recipientName = recipientStudent?.name || 'Student';
+        const avail = Math.max(0, newGroup.targetCapacity - newGroup.members.length);
+
+        await createOutboxEvent(
+          {
+            eventId: `proposal_accepted_${transReq._id}_${senderId}`,
+            eventType: NOTIFICATION_JOB_TYPES.GROUP_INVITATION_ACCEPTED,
+            recipientId: senderId,
+            relatedTravelId: senderTravel._id,
+            payload: {
+              groupId: newGroup._id,
+              requestId: transReq._id,
+              isFormationProposal: true,
+              memberName: recipientName,
+              source: newGroup.source,
+              destination: newGroup.destination,
+              travelDate: newGroup.travelDate,
+              currentMemberCount: newGroup.members.length,
+              targetCapacity: newGroup.targetCapacity,
+              availableSpots: avail,
+              isFull: newGroup.status === 'full'
+            }
+          },
+          session
+        );
+
+        return { createdGroup: newGroup, updatedRequest: transReq };
+      });
+
+      try {
+        triggerOutboxSweep();
+      } catch (sweepErr) {
+        console.warn('[Outbox] Trigger sweep non-blocking warning:', sweepErr.message);
+      }
+
+      const groupObj = createdGroup.toObject({ virtuals: true });
+      const confirmedCount = Array.isArray(groupObj.members) ? groupObj.members.length : 2;
+      const availableSpots = Math.max(0, (groupObj.targetCapacity || finalCapacity) - confirmedCount);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Group formation accepted! Shared ride group created with both members.',
+        data: {
+          group: {
+            ...groupObj,
+            confirmedMemberCount: confirmedCount,
+            availableSpots,
+            availableSeats: availableSpots
+          },
+          invitation: updatedRequest,
+          proposal: updatedRequest,
+          relationshipState: 'ACCEPTED'
+        }
+      });
+    }
+
+    // ------------------------------------------------------------------
+    // BRANCH B: EXISTING GROUP INVITATION ACCEPTANCE
+    // ------------------------------------------------------------------
     // 6. Fetch target group
     const group = await SharedRideGroup.findById(joinRequest.groupId);
     if (!group) {
@@ -1594,12 +2023,21 @@ export async function acceptGroupInvitation(req, res) {
       });
     }
 
-    // 8. Prevent duplicate group membership
-    const isAlreadyMember = Array.isArray(group.members) && group.members.some((m) => m.userId === recipientId);
+    // 8. Prevent duplicate group membership & enforce One Active Group Per Student
+    const isAlreadyMember = Array.isArray(group.members) && group.members.some((m) => isSameUserId(m.userId, recipientId));
     if (isAlreadyMember) {
       return res.status(400).json({
         success: false,
         message: 'You are already a member of this group'
+      });
+    }
+
+    const recipientOtherActiveGroup = await findActiveGroupForStudent(recipientId, { excludeGroupId: group._id });
+    if (recipientOtherActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE,
+        data: { existingGroupId: recipientOtherActiveGroup._id }
       });
     }
 
@@ -1621,7 +2059,7 @@ export async function acceptGroupInvitation(req, res) {
       });
     }
 
-    if (travel.userId !== recipientId) {
+    if (!isSameUserId(travel.userId, recipientId)) {
       return res.status(403).json({
         success: false,
         message: 'Travel post does not belong to the authenticated recipient'
@@ -1727,20 +2165,10 @@ export async function acceptGroupInvitation(req, res) {
       }
 
       // Step B2: Verify recipient is not already a confirmed member of another active group
-      const otherActiveGroup = session
-        ? await SharedRideGroup.findOne({
-            _id: { $ne: group._id },
-            status: { $in: ['open', 'full'] },
-            'members.userId': recipientId
-          }).session(session)
-        : await SharedRideGroup.findOne({
-            _id: { $ne: group._id },
-            status: { $in: ['open', 'full'] },
-            'members.userId': recipientId
-          });
+      const otherActiveGroup = await findActiveGroupForStudent(recipientId, { excludeGroupId: group._id, session });
 
       if (otherActiveGroup) {
-        const activeErr = new Error('You are already a confirmed member of an active Shared Ride Group. You must leave that group before accepting another invitation.');
+        const activeErr = new Error(ONE_ACTIVE_GROUP_MESSAGE);
         activeErr.statusCode = 409;
         throw activeErr;
       }
@@ -1786,9 +2214,8 @@ export async function acceptGroupInvitation(req, res) {
       }
 
       // Step E: Create Outbox notification for group admin
-      const recipientStudentQuery = Student.findOne({ clerkId: recipientId });
-      const recipientStudent = session ? await recipientStudentQuery.session(session) : await recipientStudentQuery;
-      const recipientName = recipientStudent?.name || 'A student';
+      const recipientStudent = await resolveSingleStudent(recipientId, { session });
+      const recipientName = recipientStudent?.name || 'Student';
 
       await createOutboxEvent(
         {
@@ -1798,13 +2225,13 @@ export async function acceptGroupInvitation(req, res) {
           payload: {
             groupId: group._id,
             requestId: joinRequest._id,
-            memberId: recipientId,
             memberName: recipientName,
             source: group.source,
             destination: group.destination,
             travelDate: group.travelDate,
             currentMemberCount: transGroup.members.length,
             targetCapacity: transGroup.targetCapacity,
+            availableSpots: Math.max(0, transGroup.targetCapacity - transGroup.members.length),
             isFull: transGroup.status === 'full'
           }
         },
@@ -1821,15 +2248,31 @@ export async function acceptGroupInvitation(req, res) {
       console.warn('[Outbox] Trigger sweep non-blocking warning:', sweepErr.message);
     }
 
+    const groupObj = updatedGroup.toObject ? updatedGroup.toObject({ virtuals: true }) : updatedGroup;
+    const confirmedCount = Array.isArray(groupObj.members) ? groupObj.members.length : 1;
+    const avail = Math.max(0, (groupObj.targetCapacity || 0) - confirmedCount);
+
     return res.status(200).json({
       success: true,
       message: 'Invitation accepted successfully. You have joined the group.',
       data: {
-        group: updatedGroup,
-        invitation: updatedRequest
+        group: {
+          ...groupObj,
+          confirmedMemberCount: confirmedCount,
+          availableSpots: avail,
+          availableSeats: avail
+        },
+        invitation: updatedRequest,
+        relationshipState: 'ACCEPTED'
       }
     });
   } catch (err) {
+    if (isMemberUniqueConflict(err)) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE
+      });
+    }
     if (err.statusCode) {
       return res.status(err.statusCode).json({
         success: false,
@@ -1882,38 +2325,38 @@ export async function rejectGroupInvitation(req, res) {
     }
 
     // 3. Authorization check: only intended recipient can reject
-    if (joinRequest.recipientId !== recipientId) {
+    if (!isSameUserId(joinRequest.recipientId, recipientId) && !isSameUserId(joinRequest.requesterId, recipientId)) {
       return res.status(403).json({
         success: false,
-        message: 'Only the intended recipient can reject this invitation'
+        message: 'Only the intended recipient can reject this request'
       });
     }
 
-    // 4. Verify request type is 'invite'
-    if (joinRequest.type !== 'invite') {
+    // 4. Verify request type is 'invite' or 'formation_proposal'
+    if (joinRequest.type !== 'invite' && joinRequest.type !== 'formation_proposal') {
       return res.status(400).json({
         success: false,
-        message: 'Only invitations can be rejected through this endpoint'
+        message: 'Only invitations or formation proposals can be rejected through this endpoint'
       });
     }
 
     // 5. Verify status is 'pending' (prevent repeated rejection or changing resolved requests)
     if (joinRequest.status !== 'pending') {
-      if (joinRequest.status === 'rejected') {
+      if (joinRequest.status === 'rejected' || joinRequest.status === 'declined') {
         return res.status(400).json({
           success: false,
-          message: 'Invitation has already been rejected'
+          message: 'Request has already been rejected'
         });
       }
       if (joinRequest.status === 'accepted') {
         return res.status(400).json({
           success: false,
-          message: 'Cannot reject an invitation that has already been accepted'
+          message: 'Cannot reject a request that has already been accepted'
         });
       }
       return res.status(400).json({
         success: false,
-        message: `Cannot reject invitation with status "${joinRequest.status}"`
+        message: `Cannot reject request with status "${joinRequest.status}"`
       });
     }
 
@@ -1921,8 +2364,7 @@ export async function rejectGroupInvitation(req, res) {
     const updatedRequest = await GroupJoinRequest.findOneAndUpdate(
       {
         _id: joinRequest._id,
-        status: 'pending',
-        recipientId
+        status: 'pending'
       },
       {
         $set: {
@@ -1937,28 +2379,32 @@ export async function rejectGroupInvitation(req, res) {
     if (!updatedRequest) {
       return res.status(400).json({
         success: false,
-        message: 'Invitation is no longer pending or has already been resolved'
+        message: 'Request is no longer pending or has already been resolved'
       });
     }
 
-    // 7. Create outbox notification event for the group admin
+    // 7. Create outbox notification event for the sender / group admin
     try {
-      const group = await SharedRideGroup.findById(joinRequest.groupId);
-      const rejectingStudent = await Student.findOne({ clerkId: recipientId }, { name: 1 }).lean();
-      const studentName = rejectingStudent?.name || 'A student';
+      const [group, senderTravel, rejectingStudent] = await Promise.all([
+        joinRequest.groupId ? SharedRideGroup.findById(joinRequest.groupId) : Promise.resolve(null),
+        joinRequest.senderTravelId ? Travel.findById(joinRequest.senderTravelId).lean() : Promise.resolve(null),
+        resolveSingleStudent(recipientId, { lean: true })
+      ]);
+      const studentName = rejectingStudent?.name || 'Student';
 
       await createOutboxEvent({
+        eventId: `proposal_rejected_${joinRequest._id}_${joinRequest.senderId || group?.adminId || 'sender'}`,
         eventType: NOTIFICATION_JOB_TYPES.GROUP_INVITATION_REJECTED,
         recipientId: joinRequest.senderId || group?.adminId,
-        relatedTravelId: joinRequest.requesterTravelId,
+        relatedTravelId: joinRequest.senderTravelId || joinRequest.requesterTravelId,
         payload: {
-          groupId: joinRequest.groupId,
+          groupId: joinRequest.groupId || null,
           requestId: joinRequest._id,
-          memberId: recipientId,
+          isFormationProposal: joinRequest.type === 'formation_proposal',
           memberName: studentName,
-          source: group?.source || 'Source',
-          destination: group?.destination || 'Destination',
-          travelDate: group?.travelDate
+          source: group?.source || senderTravel?.source || 'Source',
+          destination: group?.destination || senderTravel?.destination || 'Destination',
+          travelDate: group?.travelDate || senderTravel?.travelDate
         }
       });
 
@@ -1969,14 +2415,94 @@ export async function rejectGroupInvitation(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: 'Invitation rejected successfully',
-      data: updatedRequest
+      message: joinRequest.type === 'formation_proposal' ? 'Group formation request declined' : 'Invitation rejected successfully',
+      data: updatedRequest,
+      relationshipState: 'DECLINED'
     });
   } catch (err) {
     console.error('[SharedRideGroup] Error rejecting invitation:', err);
     return res.status(500).json({
       success: false,
       message: 'Failed to reject invitation',
+      error: err.message
+    });
+  }
+}
+
+/**
+ * @route   POST /api/groups/invitations/:requestId/withdraw
+ * @desc    Withdraw a sent invitation or formation proposal (sender only)
+ * @access  Protected (Sender only)
+ */
+export async function withdrawInvitation(req, res) {
+  try {
+    const userId = req.userId;
+    const { requestId, id } = req.params;
+    const finalRequestId = requestId || id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user ID'
+      });
+    }
+
+    if (!finalRequestId || !mongoose.Types.ObjectId.isValid(finalRequestId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request ID'
+      });
+    }
+
+    // Find the invitation/proposal
+    const invitation = await GroupJoinRequest.findById(finalRequestId);
+
+    if (!invitation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invitation not found'
+      });
+    }
+
+    // Verify the authenticated user is the sender
+    const userVariants = getCandidateUserIds(userId);
+    const senderMatches = userVariants.some((variant) =>
+      variant.toString() === invitation.senderId?.toString()
+    );
+
+    if (!senderMatches) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only withdraw invitations you sent'
+      });
+    }
+
+    // Only pending invitations can be withdrawn
+    if (invitation.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw invitation with status: ${invitation.status}`
+      });
+    }
+
+    // Update status to 'cancelled' (withdrawn by sender)
+    invitation.status = 'cancelled';
+    invitation.updatedAt = new Date();
+    await invitation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Invitation withdrawn successfully',
+      data: {
+        requestId: invitation._id,
+        status: 'cancelled'
+      }
+    });
+  } catch (err) {
+    console.error('[SharedRideGroup] Error withdrawing invitation:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to withdraw invitation',
       error: err.message
     });
   }
@@ -2013,31 +2539,67 @@ export async function getSharedRideGroupById(req, res) {
     }
 
     // Check if the current authenticated viewer is a confirmed member or the admin of this group
-    const isMemberOrAdmin = Array.isArray(group.members) && group.members.some((m) => m.userId === currentUserId);
+    const isMemberOrAdmin = isConfirmedGroupMember(group, currentUserId) || isGroupAdmin(group, currentUserId);
+    const viewerIsAdmin = isGroupAdmin(group, currentUserId);
 
-    // Attach public student profiles for members (strictly omitting private phone, email, firebaseUid)
-    const memberUserIds = group.members.map((m) => m.userId);
-    const students = await Student.find(
-      { clerkId: { $in: memberUserIds } },
-      { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-    ).lean();
-
-    const studentMap = new Map(students.map((s) => [s.clerkId, s]));
+    // Attach resolved public student profiles across clerkId & firebaseUid variants (BUG 2)
+    // Include contact info (phone/whatsapp) for confirmed members only
+    const memberUserIds = [...new Set([...group.members.map((m) => m.userId), group.adminId].filter(Boolean))];
+    const studentMap = await resolveStudentProfilesMap(memberUserIds, { includeContact: isMemberOrAdmin });
 
     const enrichedMembers = group.members.map((m) => {
-      const profile = studentMap.get(m.userId);
+      const safeProfile = formatSafePublicStudent(getStudentFromMap(studentMap, m.userId), {
+        fallbackName: 'Student',
+        includeContact: isMemberOrAdmin
+      });
       return {
         _id: m._id,
         userId: m.userId,
         travelId: m.travelId,
         role: m.role,
         joinedAt: m.joinedAt,
-        student: profile || { name: 'Campus Student', isVerified: false }
+        isMe: isSameUserId(m.userId, currentUserId),
+        isAdmin: m.role === 'admin' || isSameUserId(m.userId, group.adminId),
+        student: safeProfile
       };
     });
 
     const groupObj = group.toObject({ virtuals: true });
+    const adminProfile = formatSafePublicStudent(getStudentFromMap(studentMap, group.adminId), {
+      fallbackName: 'Student',
+      includeContact: isMemberOrAdmin
+    });
+    const confirmedMemberCount = enrichedMembers.length;
+    const availableSpots = Math.max(0, (groupObj.targetCapacity || 0) - confirmedMemberCount);
+
     groupObj.members = enrichedMembers;
+    groupObj.admin = adminProfile;
+    groupObj.groupDisplayName = buildGroupDisplayName(enrichedMembers.map((m) => m.student), adminProfile.name);
+    groupObj.isConfirmedMember = isMemberOrAdmin;
+    groupObj.isAdmin = viewerIsAdmin;
+    groupObj.confirmedMemberCount = confirmedMemberCount;
+    groupObj.availableSpots = availableSpots;
+    groupObj.availableSeats = availableSpots;
+
+    // Attach viewer's pending request/invitation status on this group (if non-member)
+    if (currentUserId && !isMemberOrAdmin) {
+      const viewerVariants = getCandidateUserIds(currentUserId);
+      const myPending = await GroupJoinRequest.findOne({
+        groupId: group._id,
+        requesterId: { $in: viewerVariants.length > 0 ? viewerVariants : [currentUserId] },
+        status: 'pending',
+        $or: [
+          { expiresAt: { $exists: false } },
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
+      })
+        .select('_id type status expiresAt')
+        .lean();
+      groupObj.myPendingRequest = myPending || null;
+    } else {
+      groupObj.myPendingRequest = null;
+    }
 
     // Privacy Guard:
     // If the viewer is NOT a confirmed group member or admin:
@@ -2077,13 +2639,49 @@ export async function getMyGroups(req, res) {
       });
     }
 
-    const groups = await SharedRideGroup.find({ 'members.userId': userId })
+    const userVariants = getCandidateUserIds(userId);
+    const groups = await SharedRideGroup.find({
+      'members.userId': { $in: userVariants.length > 0 ? userVariants : [userId] },
+      status: { $ne: 'empty' }
+    })
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
 
+    const allUserIds = [
+      ...new Set([
+        ...groups.map((g) => g.adminId),
+        ...groups.flatMap((g) => (g.members || []).map((m) => m.userId))
+      ].filter(Boolean))
+    ];
+
+    const studentMap = await resolveStudentProfilesMap(allUserIds, { includeContact: false });
+
+    const enrichedGroups = groups.map((g) => {
+      const members = (g.members || []).map((m) => ({
+        ...m,
+        isMe: isSameUserId(m.userId, userId),
+        isAdmin: m.role === 'admin' || isSameUserId(m.userId, g.adminId),
+        student: formatSafePublicStudent(getStudentFromMap(studentMap, m.userId), { fallbackName: 'Student' })
+      }));
+      const adminProfile = formatSafePublicStudent(getStudentFromMap(studentMap, g.adminId), { fallbackName: 'Student' });
+      const memberCount = members.length;
+      const availableSpots = Math.max(0, (g.targetCapacity || 0) - memberCount);
+      return {
+        ...g,
+        admin: adminProfile,
+        members,
+        groupDisplayName: buildGroupDisplayName(members.map((m) => m.student), adminProfile.name),
+        isConfirmedMember: true,
+        isAdmin: isGroupAdmin(g, userId),
+        confirmedMemberCount: memberCount,
+        availableSpots,
+        availableSeats: availableSpots
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: groups
+      data: enrichedGroups
     });
   } catch (err) {
     console.error('[SharedRideGroup] Error fetching user groups:', err);
@@ -2097,8 +2695,8 @@ export async function getMyGroups(req, res) {
 
 /**
  * @route   GET /api/groups/:id/invites
- * @desc    List all invitations for a group (Admin only)
- * @access  Protected (Group Admin only)
+ * @desc    List all invitations for a group (Confirmed Members)
+ * @access  Protected (Confirmed Group Members)
  */
 export async function getGroupInvites(req, res) {
   try {
@@ -2120,10 +2718,10 @@ export async function getGroupInvites(req, res) {
       });
     }
 
-    if (group.adminId !== userId) {
+    if (!isConfirmedGroupMember(group, userId) && !isGroupAdmin(group, userId)) {
       return res.status(403).json({
         success: false,
-        message: 'Only the group admin can view invitations for this group'
+        message: 'Only confirmed members of this group can view invitations'
       });
     }
 
@@ -2136,9 +2734,29 @@ export async function getGroupInvites(req, res) {
       })
       .lean();
 
+    const profileIds = [
+      ...new Set(requests.flatMap((r) => [r.requesterId, r.senderId]).filter(Boolean))
+    ];
+    const studentMap = await resolveStudentProfilesMap(profileIds, { includeContact: false });
+
+    const enrichedInvites = requests.map((r) => {
+      const requesterProfile = formatSafePublicStudent(getStudentFromMap(studentMap, r.requesterId), {
+        fallbackName: 'Student'
+      });
+      const senderProfile = formatSafePublicStudent(getStudentFromMap(studentMap, r.senderId), {
+        fallbackName: 'Student'
+      });
+      return {
+        ...r,
+        requesterName: requesterProfile.name,
+        requester: requesterProfile,
+        sender: senderProfile
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: requests
+      data: enrichedInvites
     });
   } catch (err) {
     console.error('[SharedRideGroup] Error fetching group invites:', err);
@@ -2152,7 +2770,7 @@ export async function getGroupInvites(req, res) {
 
 /**
  * @route   GET /api/groups/invitations/received
- * @desc    List all pending group invitations received by the authenticated student
+ * @desc    List all pending group invitations AND group formation proposals received by the student
  * @access  Protected
  */
 export async function getReceivedInvitations(req, res) {
@@ -2166,12 +2784,14 @@ export async function getReceivedInvitations(req, res) {
     }
 
     const now = new Date();
-    // Query pending invitations sent to this user
-    const invitations = await GroupJoinRequest.find({
-      recipientId: userId,
-      type: 'invite',
+    const userVariants = getCandidateUserIds(userId);
+    const invFilter = {
+      recipientId: { $in: userVariants.length > 0 ? userVariants : [userId] },
+      type: { $in: ['invite', 'formation_proposal'] },
       status: 'pending'
-    })
+    };
+
+    const invitations = await GroupJoinRequest.find(invFilter)
       .sort({ createdAt: -1 })
       .populate({
         path: 'groupId',
@@ -2179,37 +2799,74 @@ export async function getReceivedInvitations(req, res) {
       })
       .populate({
         path: 'requesterTravelId',
-        select: 'source destination travelDate departureTime seats status'
+        select: 'source destination travelDate departureTime seats status expiresAt'
+      })
+      .populate({
+        path: 'senderTravelId',
+        select: 'source destination travelDate departureTime seats status expiresAt'
       })
       .lean();
 
-    // Filter out expired groups or invitations
-    const validInvitations = invitations.filter((inv) => {
-      if (!inv.groupId || inv.groupId.status !== 'open') return false;
-      const groupExpiry = inv.groupId.expiresAt;
-      if (groupExpiry && new Date(groupExpiry) <= now) return false;
-      if (inv.expiresAt && new Date(inv.expiresAt) <= now) return false;
-      return true;
-    });
+    // Also check if recipient is already in an active group (formation proposals cannot form a 2nd group)
+    const recipientActiveGroup = await findActiveGroupForStudent(userId);
 
-    // Attach safe student profile for the group admin (sender)
-    const adminIds = [...new Set(validInvitations.map((inv) => inv.senderId || inv.groupId?.adminId).filter(Boolean))];
-    const adminStudents = await Student.find(
-      { clerkId: { $in: adminIds } },
-      { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-    ).lean();
+    // Filter valid invitations and formation proposals
+    const validInvitations = [];
+    for (const inv of invitations) {
+      if (inv.expiresAt && new Date(inv.expiresAt) <= now) continue;
 
-    const adminMap = new Map(adminStudents.map((s) => [s.clerkId, s]));
+      if (inv.type === 'formation_proposal') {
+        if (recipientActiveGroup) continue;
+        const sTravel = inv.senderTravelId;
+        const rTravel = inv.requesterTravelId;
+        if (!sTravel || !rTravel) continue;
+        if (sTravel.status !== 'active' || rTravel.status !== 'active') continue;
+        if ((sTravel.expiresAt && new Date(sTravel.expiresAt) <= now) || (rTravel.expiresAt && new Date(rTravel.expiresAt) <= now)) {
+          continue;
+        }
+        validInvitations.push(inv);
+      } else {
+        if (!inv.groupId || inv.groupId.status !== 'open') continue;
+        const groupExpiry = inv.groupId.expiresAt;
+        if (groupExpiry && new Date(groupExpiry) <= now) continue;
+        validInvitations.push(inv);
+      }
+    }
+
+    // Attach resolved safe student profile for sender / admin across clerkId & firebaseUid variants
+    const senderIds = [...new Set(validInvitations.map((inv) => inv.senderId || inv.groupId?.adminId).filter(Boolean))];
+    const senderMap = await resolveStudentProfilesMap(senderIds, { includeContact: false });
 
     const enriched = validInvitations.map((inv) => {
-      const adminId = inv.senderId || inv.groupId?.adminId;
-      const adminProfile = adminMap.get(adminId) || { name: 'Campus Student', isVerified: false };
-      const currentMemberCount = Array.isArray(inv.groupId?.members) ? inv.groupId.members.length : 1;
+      const senderId = inv.senderId || inv.groupId?.adminId;
+      const senderProfile = formatSafePublicStudent(getStudentFromMap(senderMap, senderId), {
+        fallbackName: 'Student'
+      });
+      const isProposal = inv.type === 'formation_proposal';
+      const currentMemberCount = isProposal
+        ? 0
+        : (Array.isArray(inv.groupId?.members) ? inv.groupId.members.length : 1);
+      const targetCapacity = isProposal
+        ? (inv.proposedCapacity || 4)
+        : (inv.groupId?.targetCapacity || 4);
+
+      const tripMeta = isProposal ? (inv.senderTravelId || inv.requesterTravelId) : inv.groupId;
+
       return {
         ...inv,
-        admin: adminProfile,
+        isFormationProposal: isProposal,
+        proposedCapacity: targetCapacity,
+        targetCapacity,
         confirmedMemberCount: currentMemberCount,
-        targetCapacity: inv.groupId?.targetCapacity || 4
+        availableSpots: isProposal ? targetCapacity : Math.max(0, targetCapacity - currentMemberCount),
+        source: tripMeta?.source || inv.requesterTravelId?.source,
+        destination: tripMeta?.destination || inv.requesterTravelId?.destination,
+        travelDate: tripMeta?.travelDate || inv.requesterTravelId?.travelDate,
+        departureTime: tripMeta?.departureTime ?? inv.requesterTravelId?.departureTime,
+        admin: senderProfile,
+        sender: senderProfile,
+        senderName: senderProfile.name,
+        relationshipState: 'REQUEST_RECEIVED'
       };
     });
 
@@ -2223,6 +2880,113 @@ export async function getReceivedInvitations(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch received invitations',
+      error: err.message
+    });
+  }
+}
+
+/**
+ * @route   GET /api/groups/proposals/sent
+ * @desc    List group formation proposals & invitations sent by the authenticated student
+ * @access  Protected
+ */
+export async function getSentProposals(req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user ID'
+      });
+    }
+
+    const now = new Date();
+    const userVariants = getCandidateUserIds(userId);
+    
+    // STRICT FILTERING: Only return pending invitations
+    // Accepted, rejected, declined, withdrawn invitations should NOT appear in Sent Invitations
+    const proposals = await GroupJoinRequest.find({
+      senderId: { $in: userVariants.length > 0 ? userVariants : [userId] },
+      type: { $in: ['formation_proposal', 'invite'] },
+      status: 'pending' // ONLY pending invitations
+    })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .populate({
+        path: 'groupId',
+        select: 'source destination travelDate departureTime targetCapacity status members expiresAt'
+      })
+      .populate({
+        path: 'requesterTravelId',
+        select: 'source destination travelDate departureTime seats status expiresAt'
+      })
+      .populate({
+        path: 'senderTravelId',
+        select: 'source destination travelDate departureTime seats status expiresAt'
+      })
+      .lean();
+
+    // Filter out expired pending invitations
+    const validProposals = proposals.filter((p) => {
+      if (p.expiresAt && new Date(p.expiresAt) <= now) return false;
+      
+      // For formation proposals, verify both travel posts are still active
+      if (p.type === 'formation_proposal') {
+        const sTravel = p.senderTravelId;
+        const rTravel = p.requesterTravelId;
+        if (!sTravel || !rTravel) return false;
+        if (sTravel.status !== 'active' || rTravel.status !== 'active') return false;
+        if ((sTravel.expiresAt && new Date(sTravel.expiresAt) <= now) || 
+            (rTravel.expiresAt && new Date(rTravel.expiresAt) <= now)) {
+          return false;
+        }
+      } else if (p.type === 'invite') {
+        // For group invitations, verify group is still active
+        if (!p.groupId || p.groupId.status !== 'open') return false;
+        const groupExpiry = p.groupId.expiresAt;
+        if (groupExpiry && new Date(groupExpiry) <= now) return false;
+      }
+      
+      return true;
+    });
+
+    const recipientIds = [...new Set(validProposals.map((p) => p.requesterId || p.recipientId).filter(Boolean))];
+    const recipientMap = await resolveStudentProfilesMap(recipientIds, { includeContact: false });
+
+    const enriched = validProposals.map((p) => {
+        const peerId = p.requesterId || p.recipientId;
+        const recipientProfile = formatSafePublicStudent(getStudentFromMap(recipientMap, peerId), {
+          fallbackName: 'Student'
+        });
+
+        // All invitations in this list are pending, so relationshipState is always REQUEST_SENT
+        const relationshipState = 'REQUEST_SENT';
+
+        const tripMeta = p.groupId || p.senderTravelId || p.requesterTravelId;
+        return {
+          ...p,
+          isFormationProposal: p.type === 'formation_proposal',
+          proposedCapacity: p.proposedCapacity || p.groupId?.targetCapacity || 4,
+          source: tripMeta?.source,
+          destination: tripMeta?.destination,
+          travelDate: tripMeta?.travelDate,
+          departureTime: tripMeta?.departureTime,
+          requester: recipientProfile,
+          recipient: recipientProfile,
+          recipientName: recipientProfile.name,
+          relationshipState
+        };
+      });
+
+    return res.status(200).json({
+      success: true,
+      count: enriched.length,
+      data: enriched
+    });
+  } catch (err) {
+    console.error('[SharedRideGroup] Error fetching sent proposals:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sent proposals',
       error: err.message
     });
   }
@@ -2249,11 +3013,13 @@ export async function createGroupFromFindMatch(req, res) {
       candidateTravelId,
       inviteeTravelId,
       targetCapacity,
+      groupSize,
       actualCabCapacity,
       notes,
       whatsappGroupUrl
     } = req.body;
 
+    const rawTargetCapacity = targetCapacity ?? groupSize;
     const myTravelId = originatingTravelId || travelId;
     const peerTravelId = candidateTravelId || inviteeTravelId;
 
@@ -2279,20 +3045,21 @@ export async function createGroupFromFindMatch(req, res) {
       });
     }
 
-    // 2. Validate targetCapacity (must be a positive integer >= 1; defaults to 2)
-    let parsedTargetCapacity = 2;
-    if (targetCapacity !== undefined && targetCapacity !== null) {
+    // 2. Validate targetCapacity / groupSize (must be an integer between 2 and 6; defaults to 4)
+    let parsedTargetCapacity = 4;
+    if (rawTargetCapacity !== undefined && rawTargetCapacity !== null) {
       if (
-        isNaN(Number(targetCapacity)) ||
-        !Number.isInteger(Number(targetCapacity)) ||
-        Number(targetCapacity) < 1
+        isNaN(Number(rawTargetCapacity)) ||
+        !Number.isInteger(Number(rawTargetCapacity)) ||
+        Number(rawTargetCapacity) < 2 ||
+        Number(rawTargetCapacity) > 6
       ) {
         return res.status(400).json({
           success: false,
-          message: 'targetCapacity must be a positive integer of at least 1'
+          message: 'Group size (targetCapacity) must be an integer between 2 and 6'
         });
       }
-      parsedTargetCapacity = Number(targetCapacity);
+      parsedTargetCapacity = Number(rawTargetCapacity);
     }
 
     // 3. Validate optional actualCabCapacity (positive integer or null)
@@ -2344,15 +3111,15 @@ export async function createGroupFromFindMatch(req, res) {
     }
 
     // 6. Ownership check: originatingTravel must belong to creator
-    if (originatingTravel.userId !== creatorId) {
+    if (!isSameUserId(originatingTravel.userId, creatorId)) {
       return res.status(403).json({
         success: false,
-        message: 'You can only create a shared ride group from your own travel post'
+        message: 'You can only send a group formation request from your own travel post'
       });
     }
 
     // 7. Verify both students are different
-    if (candidateTravel.userId === creatorId) {
+    if (isSameUserId(candidateTravel.userId, creatorId)) {
       return res.status(400).json({
         success: false,
         message: 'Both travel posts belong to the same student. Cannot create group proposal with yourself.'
@@ -2393,207 +3160,208 @@ export async function createGroupFromFindMatch(req, res) {
       });
     }
 
-    // 12. Canonical proposal key for deduplication
+    // 12. Canonical proposal & user-pair keys for deduplication
     const proposalKey = [String(originatingTravel._id), String(candidateTravel._id)].sort().join(':');
+    const pairUserKey = buildPairUserKey(creatorId, candidateTravel.userId);
 
-    // 13. Pre-check: Check if an active group already exists for this proposalKey
+    // 13. Pre-check: Prevent duplicate group formation if an active group already exists for this pair
     const existingProposalGroup = await SharedRideGroup.findOne({
       proposalKey,
-      status: { $in: ['open', 'full'] }
+      status: { $in: ['open', 'full'] },
+      expiresAt: { $gt: now }
     });
 
     if (existingProposalGroup) {
-      const existingInvite = await GroupJoinRequest.findOne({
-        groupId: existingProposalGroup._id,
-        type: 'invite',
-        status: 'pending'
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: 'A shared ride group already exists for this trip proposal',
+      return res.status(409).json({
+        success: false,
+        message: 'An active shared ride group already exists for this pair.',
         data: {
           group: existingProposalGroup,
-          invitation: existingInvite,
+          existingGroupId: existingProposalGroup._id,
+          relationshipState: 'ACCEPTED',
           isExisting: true
         }
       });
     }
 
-    // 14. Pre-check: Verify neither student is already confirmed in another active group for their respective travel posts
-    const existingActiveMemberGroup = await SharedRideGroup.findOne({
-      status: { $in: ['open', 'full'] },
-      $or: [
-        { 'members.travelId': originatingTravel._id },
-        { 'members.travelId': candidateTravel._id }
-      ]
-    });
-
-    if (existingActiveMemberGroup) {
-      const isOriginating = existingActiveMemberGroup.members.some(
-        (m) => String(m.travelId) === String(originatingTravel._id)
-      );
-      return res.status(400).json({
+    // 14. Pre-check: Enforce One Active Group Per Student for both sender and peer
+    const creatorActiveGroup = await findActiveGroupForStudent(creatorId);
+    if (creatorActiveGroup) {
+      return res.status(409).json({
         success: false,
-        message: isOriginating
-          ? 'You are already a confirmed member of an active group for this trip'
-          : 'The other student is already a confirmed member of an active group for this trip'
+        message: ONE_ACTIVE_GROUP_MESSAGE,
+        data: { existingGroupId: creatorActiveGroup._id }
       });
     }
 
-    // 15. Create group and invitation atomically inside transaction
-    const { group, invitation, isExisting } = await runInTransaction(async (session) => {
+    const peerActiveGroup = await findActiveGroupForStudent(candidateTravel.userId);
+    if (peerActiveGroup) {
+      return res.status(409).json({
+        success: false,
+        message: 'The matched student is already a member of another active group.',
+        data: { existingGroupId: peerActiveGroup._id }
+      });
+    }
+
+    // 15. BUG 4 FIX: Create ONLY a pre-group formation proposal inside transaction.
+    // Do NOT create a SharedRideGroup until the receiving student explicitly accepts!
+    const { proposal, isExisting } = await runInTransaction(async (session) => {
       const txNow = new Date();
+      const txOpts = session ? { session } : {};
 
-      // Check proposalKey inside session to prevent simultaneous creation race condition
-      const groupCheck = session
-        ? await SharedRideGroup.findOne({ proposalKey, status: { $in: ['open', 'full'] } }).session(session)
-        : await SharedRideGroup.findOne({ proposalKey, status: { $in: ['open', 'full'] } });
+      // Reconcile any expired pending formation proposals for this pair/key
+      await GroupJoinRequest.updateMany(
+        {
+          type: 'formation_proposal',
+          status: 'pending',
+          expiresAt: { $lte: txNow },
+          $or: [
+            { proposalKey },
+            ...(pairUserKey ? [{ pairUserKey }] : [])
+          ]
+        },
+        { $set: { status: 'expired' } },
+        txOpts
+      );
 
-      if (groupCheck) {
-        const inviteCheck = session
-          ? await GroupJoinRequest.findOne({ groupId: groupCheck._id, type: 'invite', status: 'pending' }).session(session)
-          : await GroupJoinRequest.findOne({ groupId: groupCheck._id, type: 'invite', status: 'pending' });
+      // Re-verify One Active Group Per Student inside transaction
+      const [txCreatorGroup, txPeerGroup, txActiveGroup] = await Promise.all([
+        findActiveGroupForStudent(creatorId, { session }),
+        findActiveGroupForStudent(candidateTravel.userId, { session }),
+        SharedRideGroup.findOne({ proposalKey, status: { $in: ['open', 'full'] }, expiresAt: { $gt: txNow } }).session(session)
+      ]);
 
-        return { group: groupCheck, invitation: inviteCheck, isExisting: true };
+      if (txActiveGroup) {
+        const err = new Error('An active shared ride group already exists for this pair.');
+        err.statusCode = 409;
+        err.existingGroupId = txActiveGroup._id;
+        throw err;
       }
-
-      // Check member travel posts inside session
-      const memberGroupCheck = session
-        ? await SharedRideGroup.findOne({
-            status: { $in: ['open', 'full'] },
-            $or: [{ 'members.travelId': originatingTravel._id }, { 'members.travelId': candidateTravel._id }]
-          }).session(session)
-        : await SharedRideGroup.findOne({
-            status: { $in: ['open', 'full'] },
-            $or: [{ 'members.travelId': originatingTravel._id }, { 'members.travelId': candidateTravel._id }]
-          });
-
-      if (memberGroupCheck) {
-        const err = new Error('One of the students is already confirmed in an active group for this travel post');
-        err.statusCode = 400;
+      if (txCreatorGroup) {
+        const err = new Error(ONE_ACTIVE_GROUP_MESSAGE);
+        err.statusCode = 409;
+        throw err;
+      }
+      if (txPeerGroup) {
+        const err = new Error('The matched student is already a member of another active group.');
+        err.statusCode = 409;
         throw err;
       }
 
-      const options = session ? { session } : {};
+      // Check for existing pending formation proposal on this proposalKey or active user pair
+      const existingPendingProposal = await GroupJoinRequest.findOne({
+        type: 'formation_proposal',
+        status: 'pending',
+        $or: [
+          { proposalKey },
+          ...(pairUserKey ? [{ pairUserKey }] : [])
+        ]
+      }).session(session);
 
-      // Expiration time set to earlier of both travel posts' expiresAt
-      const groupExpiresAt = originatingTravel.expiresAt < candidateTravel.expiresAt
+      if (existingPendingProposal) {
+        return { proposal: existingPendingProposal, isExisting: true };
+      }
+
+      const proposalExpiresAt = originatingTravel.expiresAt < candidateTravel.expiresAt
         ? originatingTravel.expiresAt
         : candidateTravel.expiresAt;
 
-      const [newGroup] = await SharedRideGroup.create(
+      const [newProposal] = await GroupJoinRequest.create(
         [
           {
-            adminId: creatorId,
-            originatingTravelId: originatingTravel._id,
-            source: originatingTravel.source,
-            destination: originatingTravel.destination,
-            travelDate: originatingTravel.travelDate,
-            departureTime: originatingTravel.departureTime,
-            targetCapacity: parsedTargetCapacity,
-            actualCabCapacity: parsedCabCapacity,
-            notes: typeof notes === 'string' ? notes.trim() : '',
-            whatsappGroupUrl: whatsappGroupUrl ? whatsappGroupUrl.trim() : null,
-            proposalKey,
-            status: 'open',
-            expiresAt: groupExpiresAt,
-            members: [
-              {
-                userId: creatorId,
-                travelId: originatingTravel._id,
-                role: 'admin',
-                joinedAt: txNow
-              }
-            ]
-          }
-        ],
-        options
-      );
-
-      // Reconcile any existing expired pending requests for candidate
-      await GroupJoinRequest.updateMany(
-        {
-          groupId: newGroup._id,
-          requesterId: candidateTravel.userId,
-          status: 'pending',
-          expiresAt: { $lte: txNow }
-        },
-        {
-          $set: { status: 'expired' }
-        },
-        options
-      );
-
-      // Create pending invitation for the other student
-      const [newInvitation] = await GroupJoinRequest.create(
-        [
-          {
-            groupId: newGroup._id,
+            groupId: null,
+            type: 'formation_proposal',
             requesterId: candidateTravel.userId,
             requesterTravelId: candidateTravel._id,
             senderId: creatorId,
+            senderTravelId: originatingTravel._id,
             recipientId: candidateTravel.userId,
-            type: 'invite',
+            proposedCapacity: parsedTargetCapacity,
+            proposalKey,
+            pairUserKey,
             status: 'pending',
-            expiresAt: newGroup.expiresAt,
-            message: typeof notes === 'string' && notes ? notes.trim() : 'Invited to join Shared Group from compatible trip match'
+            expiresAt: proposalExpiresAt,
+            message: typeof notes === 'string' && notes.trim()
+              ? notes.trim()
+              : `Group formation request (Capacity ${parsedTargetCapacity}) from compatible trip match`
           }
         ],
-        options
+        txOpts
       );
 
-      // Fetch admin student details for friendly notification message
-      const adminStudentQuery = Student.findOne({ clerkId: creatorId });
-      const adminStudent = session ? await adminStudentQuery.session(session) : await adminStudentQuery;
-      const adminName = adminStudent?.name || 'A student';
+      // Resolve sender student profile cleanly (BUG 2)
+      const senderStudent = await resolveSingleStudent(creatorId, { session });
+      const senderName = senderStudent?.name || 'Student';
 
-      // Create Outbox notification event for the invited student
+      // Create Outbox notification event for recipient B
       await createOutboxEvent(
         {
+          eventId: `formation_proposal_${newProposal._id}_${candidateTravel.userId}`,
           eventType: NOTIFICATION_JOB_TYPES.GROUP_INVITATION_RECEIVED,
           recipientId: candidateTravel.userId,
           relatedTravelId: candidateTravel._id,
           payload: {
-            groupId: newGroup._id,
-            requestId: newInvitation._id,
-            adminId: creatorId,
-            adminName,
+            proposalId: newProposal._id,
+            requestId: newProposal._id,
+            isFormationProposal: true,
             fromMatchProposal: true,
-            customTitle: 'You have a Shared Group invitation!',
-            customMessage: 'A student wants to create a Shared Group with you for your trip. Review and accept the invitation to join.',
-            source: newGroup.source,
-            destination: newGroup.destination,
-            travelDate: newGroup.travelDate,
-            departureTime: newGroup.departureTime,
-            targetCapacity: newGroup.targetCapacity
+            adminName: senderName,
+            senderName,
+            senderCollege: senderStudent?.college || null,
+            senderBranch: senderStudent?.branch || senderStudent?.course || null,
+            customTitle: `${senderName} sent a Group Formation Request!`,
+            customMessage: `${senderName} wants to form a Shared Ride Group (Capacity ${parsedTargetCapacity}) for ${originatingTravel.source} → ${originatingTravel.destination}. Accept or Decline to continue.`,
+            source: originatingTravel.source,
+            destination: originatingTravel.destination,
+            travelDate: originatingTravel.travelDate,
+            departureTime: originatingTravel.departureTime,
+            proposedCapacity: parsedTargetCapacity,
+            targetCapacity: parsedTargetCapacity,
+            navigationUrl: '/shared-rides?tab=invitations'
           }
         },
         session
       );
 
-      return { group: newGroup, invitation: newInvitation, isExisting: false };
+      return { proposal: newProposal, isExisting: false };
     });
 
-    // Trigger outbox sweep asynchronously
     try {
       triggerOutboxSweep();
     } catch (sweepErr) {
       console.warn('[Outbox] Trigger sweep non-blocking warning:', sweepErr.message);
     }
 
+    const viewerIsSender = isSameUserId(proposal.senderId, creatorId);
+    const relationshipState = viewerIsSender ? 'REQUEST_SENT' : 'REQUEST_RECEIVED';
+
     if (isExisting) {
       return res.status(200).json({
         success: true,
-        message: 'A shared ride group already exists for this trip proposal',
-        data: { group, invitation, isExisting: true }
+        message: viewerIsSender
+          ? 'Group formation request already sent and pending response'
+          : 'This student has already sent you a pending group formation request',
+        data: {
+          group: null,
+          proposal,
+          invitation: proposal,
+          proposedCapacity: proposal.proposedCapacity || parsedTargetCapacity,
+          relationshipState,
+          isExisting: true
+        }
       });
     }
 
     return res.status(201).json({
       success: true,
-      message: 'Shared ride group created and invitation sent successfully',
-      data: { group, invitation }
+      message: 'Group formation request sent! Group will be created once the other student accepts.',
+      data: {
+        group: null,
+        proposal,
+        invitation: proposal,
+        proposedCapacity: proposal.proposedCapacity || parsedTargetCapacity,
+        relationshipState
+      }
     });
   } catch (err) {
     // If unique key conflict on proposalKey occurred concurrently
@@ -2602,22 +3370,36 @@ export async function createGroupFromFindMatch(req, res) {
         const myTravelId = req.body?.originatingTravelId || req.body?.travelId;
         const peerTravelId = req.body?.candidateTravelId || req.body?.inviteeTravelId;
         const proposalKey = [String(myTravelId), String(peerTravelId)].sort().join(':');
-        const winningGroup = await SharedRideGroup.findOne({ proposalKey, status: { $in: ['open', 'full'] } });
-        if (winningGroup) {
-          const winningInvite = await GroupJoinRequest.findOne({
-            groupId: winningGroup._id,
-            type: 'invite',
-            status: 'pending'
-          });
+        const winningProposal = await GroupJoinRequest.findOne({
+          proposalKey,
+          type: 'formation_proposal',
+          status: 'pending'
+        });
+        if (winningProposal) {
+          const viewerIsSender = isSameUserId(winningProposal.senderId, req.userId);
           return res.status(200).json({
             success: true,
-            message: 'A shared ride group was concurrently created for this match proposal',
-            data: { group: winningGroup, invitation: winningInvite, isExisting: true }
+            message: 'A group formation proposal was concurrently sent for this match',
+            data: {
+              group: null,
+              proposal: winningProposal,
+              invitation: winningProposal,
+              proposedCapacity: winningProposal.proposedCapacity,
+              relationshipState: viewerIsSender ? 'REQUEST_SENT' : 'REQUEST_RECEIVED',
+              isExisting: true
+            }
           });
         }
       } catch (recoveryErr) {
         console.error('[SharedRideGroup] Recovery error after duplicate proposal key:', recoveryErr);
       }
+    }
+
+    if (isMemberUniqueConflict(err)) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE
+      });
     }
 
     if (err.statusCode) {
@@ -2709,14 +3491,11 @@ export async function directJoinSharedRideGroup(req, res) {
     }
 
     // Check if student is already a confirmed member of ANY active group
-    const existingActiveGroup = await SharedRideGroup.findOne({
-      status: { $in: ['open', 'full'] },
-      'members.userId': studentId
-    });
+    const existingActiveGroup = await findActiveGroupForStudent(studentId, { excludeGroupId: group._id });
     if (existingActiveGroup) {
       return res.status(409).json({
         success: false,
-        message: 'You are already a confirmed member of an active Shared Ride Group. You must leave that group before joining another.'
+        message: ONE_ACTIVE_GROUP_MESSAGE
       });
     }
 
@@ -2803,10 +3582,7 @@ export async function directJoinSharedRideGroup(req, res) {
     }
 
     // 4. Fetch joining student profile for safe notification
-    const studentProfile = await Student.findOne(
-      { clerkId: studentId },
-      { name: 1, college: 1, imageUrl: 1, avatarId: 1, _id: 0 }
-    ).lean();
+    const studentProfile = await resolveSingleStudent(studentId, { lean: true });
 
     // 5. Execute atomic join inside transaction session
     const updatedGroup = await runInTransaction(async (session) => {
@@ -2835,30 +3611,20 @@ export async function directJoinSharedRideGroup(req, res) {
         throw expErr;
       }
 
-      if (currentGroup.adminId === studentId) {
+      if (isGroupAdmin(currentGroup, studentId)) {
         const adminErr = new Error('You are the admin of this group and cannot join it again');
         adminErr.statusCode = 400;
         throw adminErr;
       }
 
-      if (Array.isArray(currentGroup.members) && currentGroup.members.some((m) => m.userId === studentId)) {
+      if (isConfirmedGroupMember(currentGroup, studentId)) {
         const dupErr = new Error('You are already a confirmed member of this group');
         dupErr.statusCode = 409;
         throw dupErr;
       }
 
       // Inside transaction: verify student is not already a member of any other active group
-      const studentActiveGroupTx = session
-        ? await SharedRideGroup.findOne({
-            _id: { $ne: targetGroupId },
-            status: { $in: ['open', 'full'] },
-            'members.userId': studentId
-          }).session(session)
-        : await SharedRideGroup.findOne({
-            _id: { $ne: targetGroupId },
-            status: { $in: ['open', 'full'] },
-            'members.userId': studentId
-          });
+      const studentActiveGroupTx = await findActiveGroupForStudent(studentId, { excludeGroupId: targetGroupId, session });
 
       if (studentActiveGroupTx) {
         const activeGrpErr = new Error('You are already a confirmed member of an active Shared Ride Group. You must leave that group before joining another.');
@@ -2935,6 +3701,12 @@ export async function directJoinSharedRideGroup(req, res) {
       data: updatedGroup
     });
   } catch (err) {
+    if (isMemberUniqueConflict(err)) {
+      return res.status(409).json({
+        success: false,
+        message: ONE_ACTIVE_GROUP_MESSAGE
+      });
+    }
     if (err.statusCode) {
       return res.status(err.statusCode).json({
         success: false,
@@ -2984,7 +3756,7 @@ export async function leaveSharedRideGroup(req, res) {
       });
     }
 
-    const isMember = Array.isArray(group.members) && group.members.some((m) => m.userId === studentId);
+    const isMember = isConfirmedGroupMember(group, studentId);
     if (!isMember) {
       return res.status(403).json({
         success: false,
@@ -2992,10 +3764,7 @@ export async function leaveSharedRideGroup(req, res) {
       });
     }
 
-    const leavingStudent = await Student.findOne(
-      { clerkId: studentId },
-      { name: 1, college: 1, _id: 0 }
-    ).lean();
+    const leavingStudent = await resolveSingleStudent(studentId, { lean: true });
 
     // 2. Perform leave and admin transfer inside transaction
     const updatedGroup = await runInTransaction(async (session) => {
@@ -3010,87 +3779,121 @@ export async function leaveSharedRideGroup(req, res) {
         throw notFoundErr;
       }
 
-      const memberIdx = currentGroup.members.findIndex((m) => m.userId === studentId);
+      const memberIdx = currentGroup.members.findIndex((m) => isSameUserId(m.userId, studentId));
       if (memberIdx === -1) {
         const notMemberErr = new Error('You are not a confirmed member of this shared ride group');
         notMemberErr.statusCode = 403;
         throw notMemberErr;
       }
 
-      const wasAdmin = currentGroup.adminId === studentId;
+      const wasAdmin = isSameUserId(currentGroup.adminId, studentId);
 
       // Remove the member
       currentGroup.members.splice(memberIdx, 1);
 
       const remainingMembersCount = currentGroup.members.length;
 
-      if (wasAdmin) {
-        if (remainingMembersCount > 0) {
-          // Promote earliest joined member to admin
-          currentGroup.members.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
-          const newAdmin = currentGroup.members[0];
-          newAdmin.role = 'admin';
-          currentGroup.adminId = newAdmin.userId;
+      // CRITICAL: Automatically dissolve group if only 1 or 0 members remain
+      // Minimum active group size = 2 confirmed members
+      if (remainingMembersCount <= 1) {
+        // Mark group as empty (dissolved/ended)
+        currentGroup.status = 'empty';
+        
+        // Cancel all pending requests
+        await cancelPendingRequestsForGroup(currentGroup._id, session);
 
-          // Reopen if group was full
-          const now = new Date();
-          if (currentGroup.members.length < currentGroup.targetCapacity && new Date(currentGroup.expiresAt) > now) {
-            currentGroup.status = 'open';
-          }
-
-          // Notify promoted admin
+        // If exactly 1 member remains, notify them about auto-dissolution
+        if (remainingMembersCount === 1) {
+          const lastMember = currentGroup.members[0];
           try {
             await createOutboxEvent({
-              eventType: NOTIFICATION_JOB_TYPES.GROUP_ADMIN_PROMOTED,
-              recipientId: newAdmin.userId,
+              eventType: NOTIFICATION_JOB_TYPES.GROUP_CLOSED,
+              recipientId: lastMember.userId,
               relatedTravelId: currentGroup.originatingTravelId,
               payload: {
                 groupId: currentGroup._id,
                 source: currentGroup.source,
                 destination: currentGroup.destination,
                 travelDate: currentGroup.travelDate,
-                route: `/groups/${currentGroup._id}`,
-                navigationUrl: `/groups/${currentGroup._id}`
+                reason: 'auto_dissolution',
+                message: 'Your group has ended because all other members have left. You can now find new compatible students for your journey.',
+                route: `/shared-rides`,
+                navigationUrl: `/shared-rides`,
+                actionLabel: 'Find New Matches'
               }
             }, session);
-          } catch (promoteEvtErr) {
-            console.warn('[LeaveGroup] Promoted admin event warning:', promoteEvtErr.message);
+          } catch (notifyErr) {
+            console.warn('[LeaveGroup] Auto-dissolution notification warning:', notifyErr.message);
           }
-        } else {
-          // No members left: close group
-          currentGroup.status = 'cancelled';
+        }
+
+        await currentGroup.save(session ? { session } : {});
+        return currentGroup;
+      }
+
+      // Group still has 2+ members, continue normal flow
+      if (wasAdmin) {
+        // Promote earliest joined member to admin
+        currentGroup.members.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+        const newAdmin = currentGroup.members[0];
+        newAdmin.role = 'admin';
+        currentGroup.adminId = newAdmin.userId;
+
+        if (newAdmin.travelId) {
+          currentGroup.originatingTravelId = newAdmin.travelId;
+        }
+
+        // Reopen if group was full
+        const now = new Date();
+        if (currentGroup.members.length < currentGroup.targetCapacity && new Date(currentGroup.expiresAt) > now) {
+          currentGroup.status = 'open';
+        }
+
+        // Notify promoted admin
+        try {
+          await createOutboxEvent({
+            eventType: NOTIFICATION_JOB_TYPES.GROUP_ADMIN_PROMOTED,
+            recipientId: newAdmin.userId,
+            relatedTravelId: currentGroup.originatingTravelId,
+            payload: {
+              groupId: currentGroup._id,
+              source: currentGroup.source,
+              destination: currentGroup.destination,
+              travelDate: currentGroup.travelDate,
+              route: `/groups/${currentGroup._id}`,
+              navigationUrl: `/groups/${currentGroup._id}`
+            }
+          }, session);
+        } catch (promoteEvtErr) {
+          console.warn('[LeaveGroup] Promoted admin event warning:', promoteEvtErr.message);
         }
       } else {
-        // Non-admin member left
+        // Non-admin member left (2+ members remain)
         const now = new Date();
-        if (remainingMembersCount > 0) {
-          // If group was full, reopen it
-          if (currentGroup.members.length < currentGroup.targetCapacity && new Date(currentGroup.expiresAt) > now) {
-            currentGroup.status = 'open';
-          }
+        
+        // If group was full, reopen it
+        if (currentGroup.members.length < currentGroup.targetCapacity && new Date(currentGroup.expiresAt) > now) {
+          currentGroup.status = 'open';
+        }
 
-          // Notify group admin that a member left
-          try {
-            await createOutboxEvent({
-              eventType: NOTIFICATION_JOB_TYPES.GROUP_MEMBER_LEFT,
-              recipientId: currentGroup.adminId,
-              relatedTravelId: currentGroup.originatingTravelId,
-              payload: {
-                groupId: currentGroup._id,
-                source: currentGroup.source,
-                destination: currentGroup.destination,
-                travelDate: currentGroup.travelDate,
-                memberName: leavingStudent?.name || 'A student',
-                route: `/groups/${currentGroup._id}`,
-                navigationUrl: `/groups/${currentGroup._id}`
-              }
-            }, session);
-          } catch (leftEvtErr) {
-            console.warn('[LeaveGroup] Member left event warning:', leftEvtErr.message);
-          }
-        } else {
-          // No members left
-          currentGroup.status = 'cancelled';
+        // Notify group admin that a member left
+        try {
+          await createOutboxEvent({
+            eventType: NOTIFICATION_JOB_TYPES.GROUP_MEMBER_LEFT,
+            recipientId: currentGroup.adminId,
+            relatedTravelId: currentGroup.originatingTravelId,
+            payload: {
+              groupId: currentGroup._id,
+              source: currentGroup.source,
+              destination: currentGroup.destination,
+              travelDate: currentGroup.travelDate,
+              memberName: leavingStudent?.name || 'A student',
+              route: `/groups/${currentGroup._id}`,
+              navigationUrl: `/groups/${currentGroup._id}`
+            }
+          }, session);
+        } catch (leftEvtErr) {
+          console.warn('[LeaveGroup] Member left event warning:', leftEvtErr.message);
         }
       }
 
@@ -3108,6 +3911,12 @@ export async function leaveSharedRideGroup(req, res) {
       data: updatedGroup
     });
   } catch (err) {
+    if (isMemberUniqueConflict(err)) {
+      return res.status(409).json({
+        success: false,
+        message: 'This student is already a member of another active group and cannot join a second group.'
+      });
+    }
     if (err.statusCode) {
       return res.status(err.statusCode).json({
         success: false,
@@ -3118,6 +3927,269 @@ export async function leaveSharedRideGroup(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to leave shared ride group',
+      error: err.message
+    });
+  }
+}
+
+/**
+ * Automatically removes a student from any active Shared Ride Groups linked to a
+ * deleted or cancelled travel post, promotes the next admin or cancels empty groups,
+ * reopens full groups if seats become available, and cancels pending join requests.
+ *
+ * @param {string|mongoose.Types.ObjectId} travelId
+ * @param {string} userId
+ * @returns {Promise<{ removedCount: number, cancelledGroupIds: string[], updatedGroupIds: string[] }>}
+ */
+export async function removeStudentFromGroupsForTravel(travelId, userId) {
+  if (!travelId || !userId || !mongoose.Types.ObjectId.isValid(travelId)) {
+    return { removedCount: 0, cancelledGroupIds: [], updatedGroupIds: [] };
+  }
+
+  const targetTravelObjId = new mongoose.Types.ObjectId(travelId);
+  const targetTravelStr = String(travelId);
+  const candidateUserIds = getCandidateUserIds(userId);
+
+  const matchingGroups = await SharedRideGroup.find({
+    status: { $in: ['open', 'full'] },
+    $or: [
+      { 'members.travelId': targetTravelObjId },
+      { originatingTravelId: targetTravelObjId, 'members.userId': { $in: candidateUserIds } },
+      { 'members.userId': { $in: candidateUserIds } }
+    ]
+  }).select('_id').lean();
+
+  const leavingStudent = await Student.findOne(
+    { clerkId: { $in: candidateUserIds } },
+    { name: 1, _id: 0 }
+  ).lean();
+
+  const summary = await runInTransaction(async (session) => {
+    const now = new Date();
+    const cancelledGroupIds = [];
+    const updatedGroupIds = [];
+    let removedCount = 0;
+
+    for (const gStub of matchingGroups) {
+      const currentGroup = session
+        ? await SharedRideGroup.findById(gStub._id).session(session)
+        : await SharedRideGroup.findById(gStub._id);
+
+      if (!currentGroup || !['open', 'full'].includes(currentGroup.status)) {
+        continue;
+      }
+
+      const memberIdx = currentGroup.members.findIndex(
+        (m) =>
+          candidateUserIds.includes(m.userId) &&
+          (String(m.travelId) === targetTravelStr ||
+            String(currentGroup.originatingTravelId) === targetTravelStr ||
+            matchingGroups.length === 1)
+      );
+
+      if (memberIdx === -1) {
+        continue;
+      }
+
+      const wasAdmin = candidateUserIds.includes(currentGroup.adminId);
+      currentGroup.members.splice(memberIdx, 1);
+      removedCount += 1;
+
+      const remainingMembersCount = currentGroup.members.length;
+
+      // BUG FIX: Auto-dissolve if only 1 or 0 members remain (minimum 2 required)
+      if (remainingMembersCount <= 1) {
+        currentGroup.status = 'empty';
+        cancelledGroupIds.push(String(currentGroup._id));
+
+        await cancelPendingRequestsForGroup(currentGroup._id, session);
+
+        // Notify remaining member (if any) that group has been dissolved
+        if (remainingMembersCount === 1) {
+          const lastMember = currentGroup.members[0];
+          try {
+            await createOutboxEvent(
+              {
+                eventType: NOTIFICATION_JOB_TYPES.GROUP_CLOSED,
+                recipientId: lastMember.userId,
+                relatedTravelId: currentGroup.originatingTravelId,
+                payload: {
+                  groupId: currentGroup._id,
+                  title: 'Shared group closed',
+                  message: `Your shared ride group (${currentGroup.source} → ${currentGroup.destination}) was automatically closed because only one member remained. You can now match individually again.`,
+                  reason: 'insufficient_members',
+                  source: currentGroup.source,
+                  destination: currentGroup.destination,
+                  travelDate: currentGroup.travelDate,
+                  route: `/groups/${currentGroup._id}`,
+                  navigationUrl: `/groups/${currentGroup._id}`
+                }
+              },
+              session
+            );
+          } catch (dissolveEvtErr) {
+            console.warn('[DeleteTravelGroupCleanup] Auto-dissolution notification warning:', dissolveEvtErr.message);
+          }
+        }
+      } else {
+        if (wasAdmin) {
+          currentGroup.members.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+          const newAdmin = currentGroup.members[0];
+          newAdmin.role = 'admin';
+          currentGroup.adminId = newAdmin.userId;
+
+          if (
+            String(currentGroup.originatingTravelId) === targetTravelStr &&
+            newAdmin.travelId
+          ) {
+            currentGroup.originatingTravelId = newAdmin.travelId;
+          }
+
+          try {
+            await createOutboxEvent(
+              {
+                eventType: NOTIFICATION_JOB_TYPES.GROUP_ADMIN_PROMOTED,
+                recipientId: newAdmin.userId,
+                relatedTravelId: currentGroup.originatingTravelId,
+                payload: {
+                  groupId: currentGroup._id,
+                  source: currentGroup.source,
+                  destination: currentGroup.destination,
+                  travelDate: currentGroup.travelDate,
+                  route: `/groups/${currentGroup._id}`,
+                  navigationUrl: `/groups/${currentGroup._id}`
+                }
+              },
+              session
+            );
+          } catch (promoteEvtErr) {
+            console.warn('[DeleteTravelGroupCleanup] Promoted admin event warning:', promoteEvtErr.message);
+          }
+        } else {
+          try {
+            await createOutboxEvent(
+              {
+                eventType: NOTIFICATION_JOB_TYPES.GROUP_MEMBER_LEFT,
+                recipientId: currentGroup.adminId,
+                relatedTravelId: currentGroup.originatingTravelId,
+                payload: {
+                  groupId: currentGroup._id,
+                  source: currentGroup.source,
+                  destination: currentGroup.destination,
+                  travelDate: currentGroup.travelDate,
+                  memberName: leavingStudent?.name || 'A student',
+                  route: `/groups/${currentGroup._id}`,
+                  navigationUrl: `/groups/${currentGroup._id}`
+                }
+              },
+              session
+            );
+          } catch (leftEvtErr) {
+            console.warn('[DeleteTravelGroupCleanup] Member left event warning:', leftEvtErr.message);
+          }
+        }
+
+        if (
+          currentGroup.members.length < currentGroup.targetCapacity &&
+          new Date(currentGroup.expiresAt) > now
+        ) {
+          currentGroup.status = 'open';
+        }
+        updatedGroupIds.push(String(currentGroup._id));
+      }  // End of else block for remainingMembersCount > 1
+
+      await currentGroup.save(session ? { session } : {});
+    }
+
+    // Cancel any pending join requests or invitations tied to this deleted travel post
+    await GroupJoinRequest.updateMany(
+      { requesterTravelId: targetTravelObjId, status: 'pending' },
+      { $set: { status: 'cancelled' } },
+      session ? { session } : {}
+    );
+
+    return { removedCount, cancelledGroupIds, updatedGroupIds };
+  });
+
+  if (summary.removedCount > 0) {
+    try {
+      triggerOutboxSweep();
+    } catch {}
+  }
+
+  return summary;
+}
+
+
+/**
+ * @route   PUT /api/groups/:id/whatsapp
+ * @desc    Update WhatsApp group invite link (Admin only) - BUG 4 FIX
+ * @access  Protected (Admin only)
+ */
+export async function updateGroupWhatsAppLink(req, res) {
+  try {
+    const { groupId, id } = req.params;
+    const targetGroupId = groupId || id;
+    const { whatsappGroupUrl } = req.body;
+    const actorId = req.userId;
+
+    if (!actorId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Missing authenticated user ID'
+      });
+    }
+
+    if (!targetGroupId || !mongoose.Types.ObjectId.isValid(targetGroupId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group ID format'
+      });
+    }
+
+    const group = await SharedRideGroup.findById(targetGroupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shared ride group not found'
+      });
+    }
+
+    if (!isGroupAdmin(group, actorId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admin can update WhatsApp group link'
+      });
+    }
+
+    // Validate URL if provided
+    if (whatsappGroupUrl && typeof whatsappGroupUrl === 'string' && whatsappGroupUrl.trim()) {
+      const trimmedUrl = whatsappGroupUrl.trim();
+      const isValid = /^https:\/\/(chat\.whatsapp\.com|wa\.me)\/[a-zA-Z0-9_\-]+$/i.test(trimmedUrl);
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Must be a valid WhatsApp invite URL (https://chat.whatsapp.com/xxxxx or https://wa.me/xxxxx)'
+        });
+      }
+      group.whatsappGroupUrl = trimmedUrl;
+    } else {
+      // Remove link if empty/null
+      group.whatsappGroupUrl = null;
+    }
+
+    await group.save();
+
+    return res.status(200).json({
+      success: true,
+      message: whatsappGroupUrl ? 'WhatsApp group link updated successfully' : 'WhatsApp group link removed successfully',
+      data: group
+    });
+  } catch (err) {
+    console.error('[Group] Error updating WhatsApp link:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update WhatsApp group link',
       error: err.message
     });
   }
