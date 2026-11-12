@@ -105,6 +105,7 @@ export default function OfferRidePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
+  const { profile } = useAuthProfile();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Mode: 'offer' | 'find' | 'my-rides'
@@ -326,9 +327,9 @@ export default function OfferRidePage() {
         type: isOffer ? 'offer' : 'request',
         notes: notes.trim(),
         gender: gender || null,
-        authorImage: user?.imageUrl || null,
-        authorName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
-        authorEmail: user?.primaryEmailAddress?.emailAddress || null,
+        authorImage: profile?.imageUrl || user?.imageUrl || null,
+        authorName: profile?.name || user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || null,
+        authorEmail: profile?.email || user?.primaryEmailAddress?.emailAddress || null,
       };
 
       // Generate or reuse UUID idempotency key for this submission attempt
@@ -1100,8 +1101,18 @@ export default function OfferRidePage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-[28px] max-w-md w-full p-6 border border-[#F4E3D8] shadow-2xl space-y-4"
+              className="bg-white rounded-[28px] max-w-md w-full p-6 border border-[#F4E3D8] shadow-2xl space-y-4 relative"
             >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full text-[#6E7587] hover:text-[#17233C] hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
               <div className="text-center space-y-2">
                 <div className="w-14 h-14 rounded-2xl bg-[#EDFAF3] border border-[#BCECD4] text-[#16A34A] flex items-center justify-center mx-auto shadow-xs">
                   <CheckCircle2 className="w-8 h-8 stroke-[2.4]" />
