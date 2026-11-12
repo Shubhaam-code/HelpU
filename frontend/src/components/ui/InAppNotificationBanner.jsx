@@ -248,10 +248,13 @@ export function InAppNotificationBanner() {
   const navigate = useNavigate();
   const [currentNotif, setCurrentNotif] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [exitDirection, setExitDirection] = useState('up'); // 'left' | 'right' | 'up'
   const timerRef = useRef(null);
+  const didDragRef = useRef(false);
 
-  const dismiss = useCallback(() => {
+  const dismiss = useCallback((direction = 'up') => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    setExitDirection(direction);
     setCurrentNotif(null);
   }, []);
 
@@ -285,11 +288,11 @@ export function InAppNotificationBanner() {
     };
   }, [currentNotif, isPaused, dismiss]);
 
-  // Handle tap on banner or button
+  // Handle tap on banner or button (ignore accidental click right after swipe)
   const handleBannerClick = () => {
-    if (!currentNotif) return;
+    if (!currentNotif || didDragRef.current) return;
     const route = currentNotif.targetRoute || '/notifications';
-    dismiss();
+    dismiss('up');
     navigate(route);
   };
 
@@ -300,27 +303,50 @@ export function InAppNotificationBanner() {
   const senderName = currentNotif.senderName;
   const avatarUrl = currentNotif.senderAvatar;
 
+  const exitAnimation =
+    exitDirection === 'left'
+      ? { x: -360, opacity: 0, scale: 0.95 }
+      : exitDirection === 'right'
+      ? { x: 360, opacity: 0, scale: 0.95 }
+      : { y: -80, opacity: 0, scale: 0.95 };
+
   return (
     <AnimatePresence>
       {currentNotif && (
         <motion.div
           key={currentNotif.id}
           initial={{ y: -80, opacity: 0, scale: 0.95 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: -80, opacity: 0, scale: 0.95 }}
+          animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+          exit={exitAnimation}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
+          drag
+          dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
+          dragElastic={0.65}
+          dragMomentum={false}
+          onDragStart={() => {
+            didDragRef.current = true;
+            setIsPaused(true);
+          }}
           onDragEnd={(_, info) => {
-            if (info.offset.y < -20) {
-              dismiss();
+            setIsPaused(false);
+            const absX = Math.abs(info.offset.x);
+            const absVx = Math.abs(info.velocity.x);
+            if (info.offset.x < -50 || (absVx > 280 && info.velocity.x < 0)) {
+              dismiss('left');
+            } else if (info.offset.x > 50 || (absVx > 280 && info.velocity.x > 0)) {
+              dismiss('right');
+            } else if (info.offset.y < -25 || (info.velocity.y < -300 && absX < 40)) {
+              dismiss('up');
             }
+            setTimeout(() => {
+              didDragRef.current = false;
+            }, 120);
           }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
           onTouchStart={() => setIsPaused(true)}
           onTouchEnd={() => setIsPaused(false)}
-          className="fixed top-2 sm:top-4 inset-x-2 sm:inset-x-auto sm:right-6 sm:max-w-md z-[99999] cursor-pointer select-none"
+          className="fixed top-2 sm:top-4 inset-x-2 sm:inset-x-auto sm:right-6 sm:max-w-md z-[99999] cursor-pointer select-none touch-none"
           style={{
             paddingTop: 'max(0.25rem, env(safe-area-inset-top, 0px))'
           }}

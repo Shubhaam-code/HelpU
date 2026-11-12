@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { 
   Bell, CheckCheck, Clock, CheckCircle2, XCircle, Car, AlertCircle, 
-  ArrowRight, ShieldCheck, RefreshCw, Sparkles, Filter, Calendar, MessageSquare, ChevronRight, Users
+  ArrowRight, ShieldCheck, RefreshCw, Sparkles, Filter, Calendar, MessageSquare, ChevronRight, Users, X
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
 import { AppHeader } from '../components/layout/AppHeader';
-import { markRead, markAllRead, createGroupFromFindMatch } from '../lib/api';
+import { markRead, markAllRead, deleteNotification, createGroupFromFindMatch } from '../lib/api';
 import { timeAgo, formatDateShort, formatMinutesToTime } from '../lib/utils';
 import { useNotificationsList, useUnreadNotificationsCount } from '../hooks/useAppData';
 import { QUERY_KEYS, invalidateNotificationQueries, invalidateGroupQueries } from '../lib/queryClient';
@@ -24,34 +24,37 @@ export default function NotificationsPage() {
   const [markingAll, setMarkingAll] = useState(false);
   const [creatingGroupId, setCreatingGroupId] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [groupSizeModalNotif, setGroupSizeModalNotif] = useState(null);
+  const [selectedGroupSize, setSelectedGroupSize] = useState(4);
+  const didSwipeRef = useRef(false);
 
-  // Cached notifications list and unread count via TanStack Query (no repeated full-page loading)
+  // Cached notifications list and unread count via TanStack Query (strictly isolated to PoolMate)
   const { 
     data: notifications = [], 
     isLoading, 
     isFetching, 
     error: fetchError,
     refetch 
-  } = useNotificationsList({ limit: 50 });
+  } = useNotificationsList({ limit: 50, module: 'poolmate' });
 
-  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'poolmate' });
 
   // Show skeleton loading ONLY on first visit when no cached data exists yet
   const loading = isLoading && notifications.length === 0;
   const isRefreshing = isFetching && !isLoading;
 
-  // Mark all notifications as read (only when explicitly requested by user)
+  // Mark all PoolMate notifications as read (only when explicitly requested by user)
   const handleMarkAllRead = async () => {
     if (unreadCount === 0 || markingAll) return;
     setMarkingAll(true);
     try {
-      await markAllRead();
+      await markAllRead({ module: 'poolmate' });
       // Optimistically update query cache
       queryClient.setQueriesData({ queryKey: ['notifications', 'list'] }, (old) => {
         if (!Array.isArray(old)) return old;
         return old.map((n) => ({ ...n, isRead: true }));
       });
-      queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id), 0);
+      queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id, 'poolmate'), 0);
       invalidateNotificationQueries();
       window.dispatchEvent(new CustomEvent('notifications-updated'));
     } catch (err) {
@@ -61,8 +64,32 @@ export default function NotificationsPage() {
     }
   };
 
+  // Dismiss / delete a notification (via swipe left/right or close button)
+  const handleDismissNotification = async (notification) => {
+    const id = notification?._id;
+    if (!id) return;
+
+    queryClient.setQueriesData({ queryKey: ['notifications', 'list'] }, (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.filter((n) => n._id !== id);
+    });
+
+    if (!notification.isRead) {
+      queryClient.setQueryData(
+        QUERY_KEYS.unreadCount(user?.id, 'poolmate'),
+        (old) => Math.max(0, (old || 1) - 1)
+      );
+    }
+    window.dispatchEvent(new CustomEvent('notifications-updated'));
+
+    deleteNotification(id).catch((err) => {
+      console.warn('Failed to dismiss notification on server:', err?.message);
+    });
+  };
+
   // Handle clicking on a notification item: marks only THIS notification as read and navigates
   const handleNotificationClick = async (notification) => {
+    if (didSwipeRef.current) return;
     // If not read yet, mark ONLY this notification as read in cache and backend
     if (!notification.isRead) {
       // 1. Optimistic cache update for notifications list
@@ -72,7 +99,7 @@ export default function NotificationsPage() {
       });
 
       // 2. Optimistic decrement of unread count
-      queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id), (old) => Math.max(0, (old || 1) - 1));
+      queryClient.setQueryData(QUERY_KEYS.unreadCount(user?.id, 'poolmate'), (old) => Math.max(0, (old || 1) - 1));
       window.dispatchEvent(new CustomEvent('notifications-updated'));
 
       // 3. Persist read status in MongoDB backend
@@ -87,7 +114,9 @@ export default function NotificationsPage() {
 
     // Direct routing to group details if notification belongs to a Shared Ride Group
     if (groupId) {
-      navigate(`/groups/${groupId}`);
+      navigate(`/groups/${groupId}`, {
+        state: { from: 'notifications', fromLabel: 'Back to Notifications' }
+      });
       return;
     }
 
@@ -107,8 +136,8 @@ export default function NotificationsPage() {
     navigate('/posts');
   };
 
-  // Direct action: Create Shared Ride Group from a compatible FIND match notification
-  const handleCreateGroupFromMatch = async (notification, e) => {
+  // Direct action: Open group size selector or submit Shared Ride Group creation from compatible FIND match
+  const handleCreateGroupFromMatch = async (notification, e, targetSizeOverride = null) => {
     if (e) e.stopPropagation();
     const originatingTravelId = notification.relatedTravelId;
     const candidateTravelId = notification.payload?.candidateTravelId || notification.payload?.initiatorTravelId;
@@ -118,22 +147,32 @@ export default function NotificationsPage() {
       return;
     }
 
+    if (!targetSizeOverride) {
+      setSelectedGroupSize(4);
+      setGroupSizeModalNotif(notification);
+      return;
+    }
+
     setCreatingGroupId(notification._id);
     setActionError(null);
     try {
       const res = await createGroupFromFindMatch({
         originatingTravelId,
-        candidateTravelId
+        candidateTravelId,
+        targetCapacity: targetSizeOverride
       });
       invalidateGroupQueries();
+      setGroupSizeModalNotif(null);
       const group = res.data?.data?.group || res.data?.group;
       if (group?._id) {
         if (!notification.isRead) {
           markRead(notification._id).catch(() => {});
         }
-        navigate(`/groups/${group._id}`);
+        navigate(`/groups/${group._id}`, {
+          state: { from: 'notifications', fromLabel: 'Back to Notifications' }
+        });
       } else {
-        navigate('/shared-rides');
+        navigate('/shared-rides?tab=invitations');
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to create group';
@@ -504,8 +543,9 @@ export default function NotificationsPage() {
             )}
           </div>
         ) : (
-          /* Clean Notification Cards (No tick/checkmark icon anywhere) */
-          <div className="space-y-2.5">
+          /* Clean Notification Cards (Swipe left/right to dismiss) */
+          <div className="space-y-2.5 overflow-x-hidden">
+            <AnimatePresence>
             {filteredNotifications.map((n) => {
               const visuals = getNotificationVisuals(n.type);
               const IconComponent = visuals.icon;
@@ -516,8 +556,21 @@ export default function NotificationsPage() {
                   layout
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, height: 0, marginBottom: 0 }}
+                  drag="x"
+                  dragConstraints={{ left: -300, right: 300 }}
+                  dragElastic={0.25}
+                  dragSnapToOrigin={true}
+                  onDragStart={() => { didSwipeRef.current = true; }}
+                  onDragEnd={(_, info) => {
+                    if (Math.abs(info.offset.x) > 60 || Math.abs(info.velocity.x) > 250) {
+                      handleDismissNotification(n);
+                    }
+                    setTimeout(() => { didSwipeRef.current = false; }, 150);
+                  }}
+                  style={{ touchAction: 'pan-y' }}
                   onClick={() => handleNotificationClick(n)}
-                  className={`bg-white rounded-2xl p-4 sm:p-4.5 border transition-all cursor-pointer relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-sm hover:border-[#FF572E]/40 ${
+                  className={`bg-white rounded-2xl p-4 sm:p-4.5 border transition-all cursor-pointer relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-sm hover:border-[#FF572E]/40 select-none ${
                     n.isRead
                       ? 'border-[#F4E3D8]/80 text-[#6E7587]'
                       : 'border-[#FF572E]/35 bg-gradient-to-r from-white via-white to-[#FFFBF8] shadow-2xs ring-1 ring-[#FF572E]/10'
@@ -625,7 +678,7 @@ export default function NotificationsPage() {
                     </div>
                   </div>
 
-                  {/* Right: Clean Action button */}
+                  {/* Right: Clean Action button & Dismiss Button */}
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pl-13 sm:pl-0">
                     {n.type === 'COMPATIBLE_FIND_MATCH' ? (
                       <button
@@ -659,14 +712,82 @@ export default function NotificationsPage() {
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDismissNotification(n);
+                      }}
+                      className="p-1.5 text-[#8C93A4] hover:text-[#17233C] hover:bg-gray-100 rounded-xl transition-colors cursor-pointer shrink-0"
+                      title="Dismiss notification"
+                      aria-label="Dismiss notification"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 </motion.div>
               );
             })}
+            </AnimatePresence>
           </div>
         )}
 
       </div>
+
+      {/* Group Size Selector Modal */}
+      {groupSizeModalNotif && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs">
+          <div className="bg-white rounded-[24px] border border-[#F4E3D8] shadow-2xl p-5 max-w-sm w-full space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-base text-[#17233C]">Choose Group Size</h3>
+              <button
+                type="button"
+                onClick={() => setGroupSizeModalNotif(null)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-[#6E7587] leading-relaxed">
+              Decide the total group size. Remaining open spots will appear as a ride offer in Matches.
+            </p>
+            <div className="grid grid-cols-5 gap-2">
+              {[2, 3, 4, 5, 6].map((sz) => (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => setSelectedGroupSize(sz)}
+                  className={`py-2 rounded-xl font-black text-xs border transition-all cursor-pointer ${
+                    Number(selectedGroupSize) === sz
+                      ? 'bg-[#FF572E] text-white border-[#FF572E] shadow-xs'
+                      : 'bg-[#FFFBF8] text-[#17233C] border-[#F4E3D8] hover:border-[#FF572E]/50'
+                  }`}
+                >
+                  {sz}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setGroupSizeModalNotif(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white border border-[#F4E3D8] text-xs font-bold text-[#6E7587] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={creatingGroupId === groupSizeModalNotif._id}
+                onClick={() => handleCreateGroupFromMatch(groupSizeModalNotif, null, Number(selectedGroupSize))}
+                className="flex-1 py-2.5 rounded-xl bg-[#FF572E] hover:bg-[#E64A22] text-white text-xs font-black cursor-pointer disabled:opacity-50"
+              >
+                {creatingGroupId === groupSizeModalNotif._id ? 'Creating...' : 'Create Group'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ResponsiveShell>
   );
 }
