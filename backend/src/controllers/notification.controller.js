@@ -3,6 +3,31 @@ import Notification from '../models/Notification.js';
 import DeviceToken from '../models/DeviceToken.js';
 
 /**
+ * Helper to build strict module isolation filter between PoolMate and SlotMate
+ */
+function buildNotificationModuleFilter(moduleName) {
+  if (moduleName === 'slotmate') {
+    return {
+      $or: [
+        { module: 'slotmate' },
+        { type: /^SLOT_/ },
+        { relatedSlotPostId: { $ne: null } }
+      ]
+    };
+  }
+  if (moduleName === 'poolmate') {
+    return {
+      $and: [
+        { module: { $ne: 'slotmate' } },
+        { type: { $not: /^SLOT_/ } },
+        { relatedSlotPostId: null }
+      ]
+    };
+  }
+  return null;
+}
+
+/**
  * @route   GET /api/notifications
  * @desc    Get paginated notifications for logged-in student (newest first)
  * @access  Protected
@@ -20,14 +45,9 @@ export async function getMyNotifications(req, res) {
     }
 
     // Module-specific filtering to cleanly isolate PoolMate and SlotMate
-    if (req.query.module === 'slotmate') {
-      filter.$or = [
-        { module: 'slotmate' },
-        { type: 'SLOT_MATCH_FOUND' }
-      ];
-    } else if (req.query.module === 'poolmate') {
-      filter.module = { $ne: 'slotmate' };
-      filter.type = { $ne: 'SLOT_MATCH_FOUND' };
+    const moduleFilter = buildNotificationModuleFilter(req.query.module);
+    if (moduleFilter) {
+      Object.assign(filter, moduleFilter);
     }
 
     const [total, notifications] = await Promise.all([
@@ -71,14 +91,9 @@ export async function getUnreadNotificationCount(req, res) {
       isRead: false
     };
 
-    if (req.query.module === 'slotmate') {
-      filter.$or = [
-        { module: 'slotmate' },
-        { type: 'SLOT_MATCH_FOUND' }
-      ];
-    } else if (req.query.module === 'poolmate') {
-      filter.module = { $ne: 'slotmate' };
-      filter.type = { $ne: 'SLOT_MATCH_FOUND' };
+    const moduleFilter = buildNotificationModuleFilter(req.query.module);
+    if (moduleFilter) {
+      Object.assign(filter, moduleFilter);
     }
 
     const unreadCount = await Notification.countDocuments(filter);
@@ -157,14 +172,9 @@ export async function markAllNotificationsAsRead(req, res) {
     const recipientId = req.userId;
     const filter = { recipientId, isRead: false };
 
-    if (req.query.module === 'slotmate') {
-      filter.$or = [
-        { module: 'slotmate' },
-        { type: 'SLOT_MATCH_FOUND' }
-      ];
-    } else if (req.query.module === 'poolmate') {
-      filter.module = { $ne: 'slotmate' };
-      filter.type = { $ne: 'SLOT_MATCH_FOUND' };
+    const moduleFilter = buildNotificationModuleFilter(req.query.module);
+    if (moduleFilter) {
+      Object.assign(filter, moduleFilter);
     }
 
     const result = await Notification.updateMany(
@@ -203,6 +213,57 @@ export async function getSlotMateUnreadCount(req, res) {
 export async function markAllSlotMateNotificationsAsRead(req, res) {
   req.query.module = 'slotmate';
   return markAllNotificationsAsRead(req, res);
+}
+
+/**
+ * @route   DELETE /api/notifications/:id
+ * @desc    Dismiss/delete a single notification for the authenticated student
+ * @access  Protected
+ */
+export async function deleteNotification(req, res) {
+  try {
+    const { id } = req.params;
+    const recipientId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid notification ID format'
+      });
+    }
+
+    const filter = { _id: id, recipientId };
+    const moduleFilter = buildNotificationModuleFilter(req.query.module);
+    if (moduleFilter) {
+      Object.assign(filter, moduleFilter);
+    }
+
+    const deleted = await Notification.findOneAndDelete(filter);
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Notification dismissed',
+      deletedId: id
+    });
+  } catch (error) {
+    console.error('Error in deleteNotification:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while deleting notification',
+      error: error.message
+    });
+  }
+}
+
+export async function deleteSlotMateNotification(req, res) {
+  req.query.module = 'slotmate';
+  return deleteNotification(req, res);
 }
 
 /**

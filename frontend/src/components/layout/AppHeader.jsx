@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Bell, ArrowLeft } from 'lucide-react';
 import { useUser } from '../../context/FirebaseAuthContext';
+import { useAuthProfile } from '../../context/AuthProfileContext';
 import { Avatar } from '../ui/Avatar';
 
 /**
@@ -25,8 +26,10 @@ export function AppHeader({
 }) {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { profile } = useAuthProfile();
 
-  const resolvedSrc = src || user?.imageUrl || user?.externalAccounts?.[0]?.imageUrl || user?.profileImageUrl;
+  const resolvedSrc = src || profile?.imageUrl || user?.imageUrl || user?.externalAccounts?.[0]?.imageUrl || user?.profileImageUrl;
+  const resolvedName = profile?.name || user?.fullName || 'Student';
 
   // Sub-page header (with back button)
   if (title) {
@@ -36,7 +39,7 @@ export function AppHeader({
           {backTo !== undefined && (
             <button
               type="button"
-              onClick={() => (backTo === -1 ? navigate(-1) : navigate(backTo))}
+              onClick={() => (typeof backTo === 'function' ? backTo() : backTo === -1 ? navigate(-1) : navigate(backTo))}
               className="p-1.5 -ml-1.5 text-[#17233C] hover:bg-white rounded-xl border border-transparent hover:border-[#F4E3D8] transition-colors cursor-pointer shrink-0"
               aria-label="Go back"
             >
@@ -103,7 +106,7 @@ export function AppHeader({
           <div className="relative rounded-full p-[1.5px] bg-gradient-to-tr from-[#FF572E]/40 via-transparent to-[#FF572E]/20">
             <Avatar 
               src={user ? resolvedSrc : null} 
-              name={user ? (user?.fullName || 'Student') : 'Guest Mode'} 
+              name={user ? resolvedName : 'Guest Mode'} 
               email={user?.primaryEmailAddress?.emailAddress} 
               size="sm" 
               className="border border-white shadow-xs" 

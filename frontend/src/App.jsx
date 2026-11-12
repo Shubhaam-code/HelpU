@@ -151,18 +151,13 @@ function ProtectedRoute({ children }) {
   const { isProfileLoading, hasWhatsApp } = useAuthProfile();
   const location = useLocation();
 
-  // 1. Show clean Helpu loading screen while Auth or Profile status is resolving
+  // 1. Show lightweight inline data-loading state (no full-screen Helpu logo blocker)
   if (!isLoaded || (isSignedIn && isProfileLoading)) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-cream">
-        <div className="flex flex-col items-center gap-5">
-          <img
-            src="/logo.png"
-            alt="Helpu"
-            className="h-10 sm:h-12 w-auto object-contain select-none"
-            draggable="false"
-          />
-          <div className="w-6 h-6 border-2 border-coral border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-dvh flex items-center justify-center bg-cream px-4">
+        <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white border border-[#F4E3D8] shadow-xs text-xs font-bold text-[#17233C]">
+          <div className="w-4 h-4 border-2 border-coral border-t-transparent rounded-full animate-spin shrink-0" />
+          <span>Data loading...</span>
         </div>
       </div>
     );
@@ -206,17 +201,13 @@ function GuestFriendlyRoute({ children }) {
   const { isProfileLoading, hasWhatsApp } = useAuthProfile();
   const location = useLocation();
 
-  if (!isLoaded || (isSignedIn && isProfileLoading)) {
+  // Wait only briefly for local Firebase auth SDK initialization without blocking on backend cold start
+  if (!isLoaded) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-cream">
-        <div className="flex flex-col items-center gap-5">
-          <img
-            src="/logo.png"
-            alt="Helpu"
-            className="h-10 sm:h-12 w-auto object-contain select-none"
-            draggable="false"
-          />
-          <div className="w-6 h-6 border-2 border-coral border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-dvh flex items-center justify-center bg-cream px-4">
+        <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white border border-[#F4E3D8] shadow-xs text-xs font-bold text-[#17233C]">
+          <div className="w-4 h-4 border-2 border-coral border-t-transparent rounded-full animate-spin shrink-0" />
+          <span>Data loading...</span>
         </div>
       </div>
     );
@@ -226,6 +217,12 @@ function GuestFriendlyRoute({ children }) {
 
   // If unauthenticated guest, allow exploring and draft editing
   if (!isSignedIn) {
+    return children;
+  }
+
+  // If backend profile is still loading (slow/waking up), render the static page immediately
+  // instead of hiding the UI behind a full-screen logo splash.
+  if (isProfileLoading) {
     return children;
   }
 

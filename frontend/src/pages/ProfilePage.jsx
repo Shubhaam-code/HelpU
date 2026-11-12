@@ -31,8 +31,8 @@ const COUNTRIES = [
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { signOut } = useFirebaseAuth();
-  const { setWhatsAppNumber: setContextWhatsAppNumber, refreshProfile } = useAuthProfile();
+  const { signOut, updateUserDisplayName } = useFirebaseAuth();
+  const { setWhatsAppNumber: setContextWhatsAppNumber, setProfileData, refreshProfile } = useAuthProfile();
 
   const isGuest = !user;
 
@@ -181,7 +181,13 @@ export default function ProfilePage() {
       const res = await saveProfile(payload);
       const updated = res.data?.data || payload;
       
-      // Update TanStack Query cache immediately
+      // Update Firebase displayName + AuthProfileContext + TanStack Query cache immediately (BUG 1)
+      if (updateUserDisplayName) {
+        await updateUserDisplayName(cleanName);
+      }
+      if (setProfileData) {
+        setProfileData(updated);
+      }
       queryClient.setQueryData(QUERY_KEYS.profile(user?.id), updated);
       invalidateProfileQueries();
       

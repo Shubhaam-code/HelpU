@@ -22,6 +22,7 @@ import {
 } from '../src/services/matching.service.js';
 import {
   createGroupFromFindMatch,
+  acceptGroupInvitation,
   directJoinSharedRideGroup,
   leaveSharedRideGroup
 } from '../src/controllers/group.controller.js';
@@ -225,14 +226,21 @@ async function runTests() {
       body: {
         originatingTravelId: postA._id.toString(),
         candidateTravelId: postB._id.toString(),
-        targetCapacity: 3 // Small capacity to easily test full status & concurrency
+        targetCapacity: 4 // Capacity 4 for A+B + C + 1 spot for D/E
       }
     });
     await createGroupFromFindMatch(reqCreateGrp, resCreateGrp);
     if (resCreateGrp.getStatusCode() !== 201) {
       throw new Error(`Group creation failed: ${JSON.stringify(resCreateGrp.getData())}`);
     }
-    const createdGrp = resCreateGrp.getData().data?.group || resCreateGrp.getData().data;
+    const proposal = resCreateGrp.getData().data?.proposal;
+    // Under BUG 4: B accepts formation proposal to atomically create the group
+    const { req: reqAcceptB, res: resAcceptB } = createMockReqRes({
+      userId: studentB,
+      params: { requestId: proposal._id.toString() }
+    });
+    await acceptGroupInvitation(reqAcceptB, resAcceptB);
+    const createdGrp = resAcceptB.getData().data?.group;
     const testGroupId = createdGrp._id;
     createdGroupIds.push(testGroupId);
 
@@ -255,15 +263,15 @@ async function runTests() {
 
     // Test 11 & 12: Confirmed member count increments, available spots decrements
     const grpAfterC = await SharedRideGroup.findById(testGroupId);
-    if (grpAfterC.members.length !== 2) {
-      throw new Error(`Test 11 Failed: Expected 2 members, found ${grpAfterC.members.length}`);
+    if (grpAfterC.members.length !== 3) {
+      throw new Error(`Test 11 Failed: Expected 3 members [A, B, C], found ${grpAfterC.members.length}`);
     }
     const isCMember = grpAfterC.members.some((m) => m.userId === studentC && m.role === 'member');
     if (!isCMember) throw new Error('Test 11 Failed: Student C is not confirmed member');
-    console.log('✓ Test 11 Passed: Confirmed member count incremented to 2.');
+    console.log('✓ Test 11 Passed: Confirmed member count incremented to 3 [A, B, C].');
     passedTests++;
 
-    const expectedSpotsLeft = grpAfterC.targetCapacity - grpAfterC.members.length; // 3 - 2 = 1
+    const expectedSpotsLeft = grpAfterC.targetCapacity - grpAfterC.members.length; // 4 - 3 = 1
     if (expectedSpotsLeft !== 1) throw new Error(`Test 12 Failed: Expected 1 spot left, computed ${expectedSpotsLeft}`);
     console.log('✓ Test 12 Passed: Available spots decremented correctly to 1.');
     passedTests++;
@@ -321,10 +329,10 @@ async function runTests() {
     }
 
     const grpFull = await SharedRideGroup.findById(testGroupId);
-    if (grpFull.status !== 'full' || grpFull.members.length !== 3) {
-      throw new Error(`Test 15 Failed: Group expected status 'full' with 3 members, got status '${grpFull.status}' and ${grpFull.members.length} members`);
+    if (grpFull.status !== 'full' || grpFull.members.length !== grpFull.targetCapacity) {
+      throw new Error(`Test 15 Failed: Group expected status 'full' with ${grpFull.targetCapacity} members, got status '${grpFull.status}' and ${grpFull.members.length} members`);
     }
-    console.log('✓ Test 15 Passed: Group reached targetCapacity (3) and status transitioned to full.');
+    console.log('✓ Test 15 Passed: Group reached targetCapacity and status transitioned to full.');
     console.log('✓ Test 16 Passed: Atomic concurrency guaranteed — exactly 1 joined, 1 rejected with 400 (Group full).');
     passedTests += 2;
 
@@ -344,10 +352,10 @@ async function runTests() {
     }
 
     const grpAfterLeaveC = await SharedRideGroup.findById(testGroupId);
-    if (grpAfterLeaveC.members.length !== 2) {
-      throw new Error(`Test 17 Failed: Expected 2 members after C left, found ${grpAfterLeaveC.members.length}`);
+    if (grpAfterLeaveC.members.length !== grpAfterLeaveC.targetCapacity - 1) {
+      throw new Error(`Test 17 Failed: Expected ${grpAfterLeaveC.targetCapacity - 1} members after C left, found ${grpAfterLeaveC.members.length}`);
     }
-    console.log('✓ Test 17 Passed: Member left group -> member count decremented to 2, available spots incremented.');
+    console.log(`✓ Test 17 Passed: Member left group -> member count decremented to ${grpAfterLeaveC.members.length}, available spots incremented.`);
     passedTests++;
 
     if (grpAfterLeaveC.status !== 'open') {
@@ -436,10 +444,10 @@ async function runTests() {
     }
 
     const grpEmpty = await SharedRideGroup.findById(testGroupId);
-    if (grpEmpty.status !== 'cancelled' || grpEmpty.members.length !== 0) {
-      throw new Error(`Test 24 Failed: Expected status 'cancelled' and 0 members, got status '${grpEmpty.status}' and ${grpEmpty.members.length} members`);
+    if (!['cancelled', 'empty'].includes(grpEmpty.status) || grpEmpty.members.length !== 0) {
+      throw new Error(`Test 24 Failed: Expected status 'cancelled' or 'empty' and 0 members, got status '${grpEmpty.status}' and ${grpEmpty.members.length} members`);
     }
-    console.log('✓ Test 24 Passed: All members left -> group status marked cancelled / inactive.');
+    console.log('✓ Test 24 Passed: All members left -> group status marked cancelled / empty / inactive.');
     passedTests++;
 
     // Test 25: Excluded from discovery

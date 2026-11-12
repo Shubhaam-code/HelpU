@@ -167,6 +167,12 @@ export function formatNotificationContent(eventType, payload = {}) {
 
     case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_ACCEPTED: {
       const studentName = payload.memberName || 'A student';
+      if (payload.isFormationProposal) {
+        return {
+          title: 'Group Formation Accepted',
+          message: `${studentName} accepted your group formation request for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}. Your Shared Ride Group is now active.`
+        };
+      }
       return {
         title: 'Group Invitation Accepted',
         message: `${studentName} accepted your invitation to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
@@ -175,6 +181,12 @@ export function formatNotificationContent(eventType, payload = {}) {
 
     case NOTIFICATION_JOB_TYPES.GROUP_INVITATION_REJECTED: {
       const studentName = payload.memberName || payload.studentName || 'A student';
+      if (payload.isFormationProposal) {
+        return {
+          title: 'Group Formation Request Declined',
+          message: `${studentName} declined your group formation request for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
+        };
+      }
       return {
         title: 'Group Invitation Declined',
         message: `${studentName} declined your invitation to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''}.`
@@ -190,10 +202,10 @@ export function formatNotificationContent(eventType, payload = {}) {
     }
 
     case NOTIFICATION_JOB_TYPES.GROUP_JOIN_REQUEST_ACCEPTED: {
-      const adminName = payload.adminName || 'The group admin';
+      const approverName = payload.approvedByName || payload.adminName || 'A group member';
       return {
         title: 'Join Request Accepted',
-        message: `Your request to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was accepted by ${adminName}.`
+        message: `Your request to join the Shared Ride Group for ${source} to ${destination}${dateStr ? ' on ' + dateStr : ''} was accepted by ${approverName}.`
       };
     }
 
@@ -228,9 +240,10 @@ export function formatNotificationContent(eventType, payload = {}) {
     }
 
     case NOTIFICATION_JOB_TYPES.GROUP_CLOSED: {
+      const customMessage = payload.message || `The Shared Ride Group for ${source} to ${destination} has been closed as all members have left.`;
       return {
-        title: 'Shared Ride Group Closed',
-        message: `The Shared Ride Group for ${source} to ${destination} has been closed as all members have left.`
+        title: payload.title || 'Your Group Has Ended',
+        message: customMessage
       };
     }
 

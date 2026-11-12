@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  ArrowLeft,
   Search,
   X,
   AlertCircle,
@@ -105,6 +106,23 @@ export default function FacultySearchPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
+      {/* Header matching Matches page */}
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/slotmate')}
+            className="p-1 -ml-1 text-[#17233C] hover:bg-white rounded-xl transition-colors cursor-pointer"
+            aria-label="Back to SlotMate Home"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#17233C] stroke-[2.4]" />
+          </button>
+          <h1 className="font-black text-[#17233C] text-xl tracking-tight">
+            Faculty
+          </h1>
+        </div>
+      </header>
+
       {/* Main Scrollable Container */}
       <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-4 pb-28">
         {/* Enhanced Hero Banner Section - Golden pill removed per feedback */}

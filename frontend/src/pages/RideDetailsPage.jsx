@@ -7,7 +7,7 @@ import {
   Car, MapPin, Calendar, Clock, Users, ShieldCheck, 
   ArrowRight, ArrowLeft, Minus, Plus, Phone, Mail, 
   User as UserIcon, FileText, CheckCircle2, AlertCircle, 
-  Sparkles, Lock, Info, Star, MessageSquare, Check, X
+  Sparkles, Lock, Info, Star, MessageSquare, Check, X, XCircle
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -18,6 +18,7 @@ import { GuestAuthPromptModal } from '../components/auth/GuestAuthPromptModal';
 import { invalidateBookingQueries } from '../lib/queryClient';
 import { 
   getTravelById, 
+  getMyTravels,
   getProfile, 
   createBooking, 
   getMyBookings, 
@@ -44,6 +45,7 @@ export default function RideDetailsPage() {
 
   // Data states
   const [travel, setTravel] = useState(null);
+  const [myTravels, setMyTravels] = useState([]);
   const [profile, setProfile] = useState(null);
   const [myBookings, setMyBookings] = useState([]);
   const [receivedBookings, setReceivedBookings] = useState([]);
@@ -80,8 +82,9 @@ export default function RideDetailsPage() {
     setFetchError('');
 
     try {
-      const [travelRes, profileRes, myBookingsRes, receivedRes] = await Promise.allSettled([
+      const [travelRes, myTravelsRes, profileRes, myBookingsRes, receivedRes] = await Promise.allSettled([
         getTravelById(id),
+        isSignedIn ? getMyTravels() : Promise.resolve({ data: { data: [] } }),
         getProfile(),
         getMyBookings(),
         getReceivedBookings()
@@ -93,6 +96,11 @@ export default function RideDetailsPage() {
       } else {
         const errMsg = travelRes.reason?.response?.data?.message || travelRes.reason?.message || 'Could not load ride details.';
         setFetchError(errMsg);
+      }
+
+      if (myTravelsRes.status === 'fulfilled') {
+        const rawT = myTravelsRes.value.data?.data || myTravelsRes.value.data?.travels || [];
+        setMyTravels(Array.isArray(rawT) ? rawT : []);
       }
 
       if (profileRes.status === 'fulfilled') {
@@ -113,7 +121,7 @@ export default function RideDetailsPage() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isSignedIn]);
 
   useEffect(() => {
     loadData();
@@ -198,6 +206,33 @@ export default function RideDetailsPage() {
     const currentUserId = user?.id;
     return Boolean(currentUserId && travel.userId === currentUserId);
   }, [travel, user]);
+
+  // For FIND-to-FIND student inspection: detect compatible own active FIND post and whether viewer has an Offer
+  const { matchingOwnFindPost, hasMatchingOwnOfferPost } = useMemo(() => {
+    if (!travel || isOwnRide || !Array.isArray(myTravels) || myTravels.length === 0) {
+      return { matchingOwnFindPost: null, hasMatchingOwnOfferPost: false };
+    }
+    const now = new Date();
+    const norm = (s) => (s || '').trim().toLowerCase();
+    const dayKey = (d) => {
+      if (!d) return '';
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(d));
+    };
+
+    const compatible = myTravels.filter((t) => {
+      if (t.status !== 'active' || (t.expiresAt && new Date(t.expiresAt) <= now)) return false;
+      if (norm(t.source) !== norm(travel.source) || norm(t.destination) !== norm(travel.destination)) return false;
+      if (dayKey(t.travelDate) !== dayKey(travel.travelDate)) return false;
+      if (typeof t.departureTime === 'number' && typeof travel.departureTime === 'number') {
+        return Math.abs(t.departureTime - travel.departureTime) <= 420;
+      }
+      return true;
+    });
+
+    const ownOffer = compatible.some((t) => t.type === 'offer');
+    const ownFind = compatible.find((t) => t.type === 'request') || null;
+    return { matchingOwnFindPost: ownFind, hasMatchingOwnOfferPost: ownOffer };
+  }, [travel, isOwnRide, myTravels]);
 
   // Bookings received on this post (if owner)
   const postReceivedBookings = useMemo(() => {
@@ -1201,6 +1236,65 @@ export default function RideDetailsPage() {
                             <span>Coordinate on WhatsApp</span>
                           </button>
                         </div>
+                      </div>
+                    ) : !isOffer && matchingOwnFindPost && !hasMatchingOwnOfferPost ? (
+                      <div className="space-y-2.5">
+                        {travel.groupRelationship?.state === 'ACCEPTED' ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/groups/${travel.groupRelationship.groupId}`, {
+                                state: { from: 'match', fromLabel: 'Back to Ride Details' }
+                              })
+                            }
+                            className="w-full py-4 px-6 rounded-full font-black text-sm bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <Users className="w-4 h-4 stroke-[2.5]" />
+                            <span>View Group</span>
+                          </button>
+                        ) : travel.groupRelationship?.state === 'REQUEST_SENT' ? (
+                          <div className="w-full py-3.5 px-6 rounded-full font-black text-sm bg-amber-50 border border-amber-200 text-amber-800 text-center flex items-center justify-center gap-2">
+                            <Clock className="w-4 h-4 text-amber-600" />
+                            <span>Group Formation Request Pending</span>
+                          </div>
+                        ) : travel.groupRelationship?.state === 'REQUEST_RECEIVED' ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate('/shared-rides?tab=invitations', {
+                                state: { fromLabel: 'Back to Ride Details' }
+                              })
+                            }
+                            className="w-full py-4 px-6 rounded-full font-black text-sm bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                            <span>Review Group Formation Request</span>
+                          </button>
+                        ) : travel.groupRelationship?.state === 'DECLINED' ? (
+                          <div className="w-full py-3.5 px-6 rounded-full font-black text-sm bg-rose-50 border border-rose-200 text-rose-700 text-center flex items-center justify-center gap-2">
+                            <XCircle className="w-4 h-4 text-rose-500" />
+                            <span>Group Request Declined</span>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(
+                                  `/shared-rides?peerTravelId=${travel._id}&createFromTravelId=${matchingOwnFindPost._id}`
+                                )
+                              }
+                              className="w-full py-4 px-6 rounded-full font-black text-sm bg-[#FF572E] hover:bg-[#E64A22] active:scale-[0.99] text-white shadow-lg shadow-[#FF572E]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              <Users className="w-4 h-4 stroke-[2.5]" />
+                              <span>Proceed to Group Formation</span>
+                              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                            </button>
+                            <p className="text-[11px] text-center text-[#6E7587] font-medium px-2">
+                              Create a shared ride group with {travel?.student?.name || travel?.authorName || 'this student'} and choose group capacity.
+                            </p>
+                          </>
+                        )}
                       </div>
                     ) : !myActiveBooking ? (
                       <div className="space-y-2.5">

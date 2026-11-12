@@ -83,10 +83,12 @@ export async function processNotificationJob(job) {
             recipientId,
             eventId,
             type: name,
+            module: 'poolmate',
             title,
             message,
             relatedBookingId: relatedBookingId || null,
             relatedTravelId: relatedTravelId || null,
+            metadata: payload || {},
             isRead: false
           }
         },
@@ -106,6 +108,7 @@ export async function processNotificationJob(job) {
 
             const pushData = {
               type: name,
+              module: 'poolmate',
               eventId,
               bookingId: relatedBookingId ? String(relatedBookingId) : '',
               travelId: relatedTravelId ? String(relatedTravelId) : '',
@@ -204,6 +207,7 @@ export async function processNotificationJob(job) {
             recipientId: booking.passengerId,
             eventId: passengerEventId,
             type: name,
+            module: 'poolmate',
             title,
             message,
             relatedBookingId: booking._id,
@@ -223,6 +227,7 @@ export async function processNotificationJob(job) {
             recipientId: booking.ownerId,
             eventId: ownerEventId,
             type: name,
+            module: 'poolmate',
             title,
             message,
             relatedBookingId: booking._id,
@@ -239,6 +244,7 @@ export async function processNotificationJob(job) {
       try {
         const reminderData = {
           type: name,
+          module: 'poolmate',
           bookingId: String(booking._id),
           travelId: String(travel._id),
           route: `/bookings/${booking._id}`

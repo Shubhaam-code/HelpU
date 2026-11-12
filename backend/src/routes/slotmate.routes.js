@@ -14,7 +14,8 @@ import {
 import {
   getSlotMateNotifications,
   getSlotMateUnreadCount,
-  markAllSlotMateNotificationsAsRead
+  markAllSlotMateNotificationsAsRead,
+  deleteSlotMateNotification
 } from '../controllers/notification.controller.js';
 import { requireAuth, optionalAuth } from '../middlewares/auth.js';
 import { requireIdempotency } from '../middlewares/idempotency.js';
@@ -67,5 +68,8 @@ router.get('/notifications/unread-count', requireAuth, getSlotMateUnreadCount);
 
 // PATCH /api/slotmate/notifications/read-all
 router.patch('/notifications/read-all', requireAuth, markAllSlotMateNotificationsAsRead);
+
+// DELETE /api/slotmate/notifications/:id
+router.delete('/notifications/:id', requireAuth, deleteSlotMateNotification);
 
 export default router;

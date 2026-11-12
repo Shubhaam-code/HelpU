@@ -158,6 +158,23 @@ export default function FacultyDetailsPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
+      {/* Header matching Matches page */}
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/slotmate/faculty')}
+            className="p-1 -ml-1 text-[#17233C] hover:bg-white rounded-xl transition-colors cursor-pointer"
+            aria-label="Back to Faculty Search"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#17233C] stroke-[2.4]" />
+          </button>
+          <h1 className="font-black text-[#17233C] text-xl tracking-tight">
+            Faculty
+          </h1>
+        </div>
+      </header>
+
       {/* Toast notification */}
       {feedbackSuccessToast && (
         <div className="max-w-xl w-full mx-auto px-4 mt-3">

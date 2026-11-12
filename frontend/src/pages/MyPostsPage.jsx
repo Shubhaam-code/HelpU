@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../context/FirebaseAuthContext';
+import { useAuthProfile } from '../context/AuthProfileContext';
 import { 
   Car, Calendar, Clock, MapPin, Plus, 
   Eye, RefreshCw, AlertCircle, ArrowRight, Check,
@@ -15,9 +16,9 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { DatePickerModal } from '../components/ui/DatePickerModal';
 import { TimePickerModal } from '../components/ui/TimePickerModal';
-import { getMyTravels, updateTravel, deleteTravel, cancelTravel } from '../lib/api';
+import { getMyTravels, updateTravel, deleteTravel, cancelTravel, checkTravelGroupStatus } from '../lib/api';
 import { useMyTravels } from '../hooks/useAppData';
-import { invalidateRideQueries } from '../lib/queryClient';
+import { invalidateRideQueries, invalidateGroupQueries } from '../lib/queryClient';
 
 /**
  * Format minutes from midnight into 12-hour AM/PM format
@@ -68,6 +69,7 @@ function formatTravelDate(dateStr) {
 export default function MyPostsPage() {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { profile } = useAuthProfile();
 
   // TanStack Query cached travel posts (Instant navigation, 0ms return visits, zero full-page spinners)
   const { 
@@ -99,6 +101,7 @@ export default function MyPostsPage() {
   // Post deletion states
   const [postToDelete, setPostToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [groupWarning, setGroupWarning] = useState(null); // { groupDetails, postId }
   const [feedbackMsg, setFeedbackMsg] = useState(null); // { type: 'success' | 'error', text: '' }
 
   // Auto-dismiss feedback message after 4.5 seconds
@@ -120,6 +123,7 @@ export default function MyPostsPage() {
         prev.map((t) => (t._id === postToCancel._id ? { ...t, status: 'cancelled' } : t))
       );
       invalidateRideQueries();
+      invalidateGroupQueries();
       setFeedbackMsg({
         type: 'success',
         text: 'Ride cancelled successfully. All passenger bookings were cancelled and passengers notified.'
@@ -136,7 +140,29 @@ export default function MyPostsPage() {
     }
   };
 
-  // Handle post deletion confirmation
+  // Check if post is linked to active group before showing delete confirmation
+  const handleDeleteClick = async (travel) => {
+    try {
+      const response = await checkTravelGroupStatus(travel._id);
+      if (response?.data?.hasActiveGroup) {
+        // Show special warning modal for posts linked to active groups
+        setGroupWarning({
+          groupDetails: response.data.groupDetails,
+          postId: travel._id,
+          post: travel
+        });
+      } else {
+        // No active group, show standard delete confirmation
+        setPostToDelete(travel);
+      }
+    } catch (err) {
+      console.error('Failed to check group status:', err);
+      // If check fails, proceed with standard delete (fail-safe)
+      setPostToDelete(travel);
+    }
+  };
+
+  // Handle post deletion confirmation (standard)
   const handleConfirmDelete = async () => {
     if (!postToDelete) return;
     const targetId = postToDelete._id;
@@ -146,6 +172,7 @@ export default function MyPostsPage() {
       // Immediately remove from UI list
       setTravels((prev) => prev.filter((t) => t._id !== targetId));
       invalidateRideQueries();
+      invalidateGroupQueries();
       setFeedbackMsg({
         type: 'success',
         text: 'Post deleted successfully!'
@@ -158,11 +185,52 @@ export default function MyPostsPage() {
       if (is404) {
         setTravels((prev) => prev.filter((t) => t._id !== targetId));
         invalidateRideQueries();
+        invalidateGroupQueries();
         setFeedbackMsg({
           type: 'success',
           text: 'Post removed from your list.'
         });
         setPostToDelete(null);
+      } else {
+        setFeedbackMsg({
+          type: 'error',
+          text: err?.response?.data?.message || err?.message || 'Failed to delete post. Please try again.'
+        });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle post deletion with group warning (user confirms they want to leave group)
+  const handleConfirmDeleteWithGroup = async () => {
+    if (!groupWarning) return;
+    const targetId = groupWarning.postId;
+    setIsDeleting(true);
+    try {
+      // Delete the travel post (backend automatically handles leaving the group)
+      await deleteTravel(targetId);
+      // Immediately remove from UI list
+      setTravels((prev) => prev.filter((t) => t._id !== targetId));
+      invalidateRideQueries();
+      invalidateGroupQueries();
+      setFeedbackMsg({
+        type: 'success',
+        text: 'Post deleted and you have left the shared ride group!'
+      });
+      setGroupWarning(null);
+    } catch (err) {
+      console.error('Failed to delete post with group:', err);
+      const is404 = err?.status === 404 || err?.response?.status === 404 || err?.message?.includes('404');
+      if (is404) {
+        setTravels((prev) => prev.filter((t) => t._id !== targetId));
+        invalidateRideQueries();
+        invalidateGroupQueries();
+        setFeedbackMsg({
+          type: 'success',
+          text: 'Post removed from your list.'
+        });
+        setGroupWarning(null);
       } else {
         setFeedbackMsg({
           type: 'error',
@@ -613,15 +681,15 @@ export default function MyPostsPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <Avatar
-                          avatarId={travel.authorAvatar || 'm1'}
-                          src={user?.imageUrl}
-                          name={user?.fullName || travel.authorName}
+                          avatarId={travel.authorAvatar || profile?.avatarId || 'm1'}
+                          src={profile?.imageUrl || user?.imageUrl}
+                          name={profile?.name || travel.authorName || user?.fullName || 'Student'}
                           size="md"
                           ring
                         />
                         <div className="min-w-0">
                           <h4 className="font-black text-sm sm:text-base text-[#17233C] truncate leading-tight">
-                            {user?.fullName || travel.authorName || 'Campus Student'}
+                            {profile?.name || travel.authorName || user?.fullName || 'Student'}
                           </h4>
                           <div className="flex items-center gap-1.5 mt-0.5 text-xs text-[#16A34A] font-bold">
                             <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
@@ -648,7 +716,7 @@ export default function MyPostsPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setPostToDelete(travel);
+                              handleDeleteClick(travel);
                             }}
                             className="w-7 h-7 rounded-full bg-[#FFF4ED] hover:bg-red-50 text-[#8C93A4] hover:text-red-500 border border-[#FDE0D0] hover:border-red-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs group/del ml-0.5"
                             title="Delete this post"
@@ -1174,6 +1242,93 @@ export default function MyPostsPage() {
                     <>
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Yes, Delete Post</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* GROUP WARNING MODAL - Warn user they'll leave the group                   */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {groupWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-[28px] border border-[#F4E3D8] shadow-2xl max-w-md w-full p-6 space-y-5"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-black text-[#17233C] leading-snug">
+                    Leave Shared Group?
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#6E7587] font-medium mt-1 leading-relaxed">
+                    This post is linked to an active shared ride group. Deleting it will also remove you from the group.
+                  </p>
+                </div>
+              </div>
+
+              {/* Group Details Box */}
+              <div className="bg-[#FFF8F4] border border-[#FDE0D0] rounded-2xl p-3.5 space-y-2.5 text-xs">
+                <div className="flex items-center gap-2 font-black text-[#17233C]">
+                  <Users className="w-4 h-4 text-[#FF572E]" />
+                  <span>{groupWarning.groupDetails?.groupDisplayName || 'Shared Ride Group'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-[#8C93A4] font-semibold">
+                  <span className="capitalize">{groupWarning.groupDetails?.source}</span>
+                  <ArrowRight className="w-3 h-3 text-[#FF572E] stroke-[2.5]" />
+                  <span className="capitalize">{groupWarning.groupDetails?.destination}</span>
+                </div>
+                <div className="text-[11px] text-[#8C93A4] flex items-center gap-2 font-semibold">
+                  <Users className="w-3 h-3" />
+                  <span>{groupWarning.groupDetails?.memberCount || 0} members</span>
+                  <span>•</span>
+                  <span className="capitalize">{groupWarning.groupDetails?.status || 'active'}</span>
+                </div>
+              </div>
+
+              {/* Warning Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
+                  If you're the last member, the group will be automatically dissolved. Other members will be notified.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setGroupWarning(null)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-[#F4E3D8] bg-[#FFFBF8] hover:bg-[#FFF4ED] text-[#17233C] font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleConfirmDeleteWithGroup}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition-all shadow-md shadow-red-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete & Leave Group</span>
                     </>
                   )}
                 </button>

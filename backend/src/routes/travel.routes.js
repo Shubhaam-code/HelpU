@@ -9,6 +9,7 @@ import SharedRideGroup from '../models/SharedRideGroup.js';
 import GroupJoinRequest from '../models/GroupJoinRequest.js';
 import { createOutboxEvent, triggerOutboxSweep } from '../services/outbox.service.js';
 import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
+import { removeStudentFromGroupsForTravel } from '../controllers/group.controller.js';
 import { 
   findMatchesForTravel, 
   findMatchesForUser,
@@ -19,8 +20,56 @@ import {
   normalizeLocation,
   findCompatibleFindPosts,
   detectAndNotifyCompatibleFindPosts,
-  findCompatibleGroupsForFindPost
+  findCompatibleGroupsForFindPost,
+  getActiveGroupedUserIds,
+  computePairRelationshipStates,
+  buildGroupDisplayName
 } from '../services/matching.service.js';
+import {
+  getCandidateUserIds,
+  isUserInSet,
+  isSameUserId,
+  stripFirebasePrefix,
+  resolveStudentProfilesMap,
+  getStudentFromMap,
+  resolveSingleStudent,
+  formatSafePublicStudent
+} from '../utils/studentProfileResolver.js';
+
+async function getViewerActiveGroupSummary(userId, now = new Date()) {
+  if (!userId) return null;
+  const variants = getCandidateUserIds(userId);
+  const activeGroup = await SharedRideGroup.findOne({
+    status: { $in: ['open', 'full'] },
+    expiresAt: { $gt: now },
+    'members.userId': { $in: variants }
+  }).lean();
+  if (!activeGroup) return null;
+  const memberIds = (activeGroup.members || []).map((m) => m.userId).filter(Boolean);
+  const sMap = await resolveStudentProfilesMap(memberIds, { includeContact: false });
+  const members = (activeGroup.members || []).map((m) => {
+    const p = formatSafePublicStudent(getStudentFromMap(sMap, m.userId), { fallbackName: 'Student' });
+    return { ...p, role: m.role || 'member' };
+  });
+  const confirmedMemberCount = members.length;
+  const targetCapacity = activeGroup.targetCapacity || 4;
+  const availableSpots = Math.max(0, targetCapacity - confirmedMemberCount);
+  return {
+    _id: activeGroup._id,
+    groupId: activeGroup._id,
+    groupDisplayName: buildGroupDisplayName(members),
+    source: activeGroup.source,
+    destination: activeGroup.destination,
+    travelDate: activeGroup.travelDate,
+    departureTime: activeGroup.departureTime,
+    targetCapacity,
+    confirmedMemberCount,
+    availableSpots,
+    availableSeats: availableSpots,
+    status: activeGroup.status,
+    members
+  };
+}
 
 /**
  * Automatically marks active rides past expiresAt as expired and creates Outbox events
@@ -265,6 +314,12 @@ router.post('/', requireAuth, requireIdempotency({ required: false }), async (re
     // 7. Calculate expiry date in Asia/Kolkata timezone
     const expiresAt = calculateExpiresAt(parsedDate);
 
+    // Always resolve latest persisted Student profile for authoritative name/image/email (BUG 1)
+    const ownerStudent = await resolveSingleStudent(req.userId, { lean: true });
+    const resolvedAuthorName = ownerStudent?.name?.trim() || (authorName ? String(authorName).trim() : null);
+    const resolvedAuthorImage = ownerStudent?.imageUrl || (authorImage ? String(authorImage).trim() : null);
+    const resolvedAuthorEmail = ownerStudent?.email || (authorEmail ? String(authorEmail).trim() : null);
+
     // 8. Save document (userId obtained strictly from verified authentication)
     const travel = await Travel.create({
       userId: req.userId,
@@ -278,9 +333,9 @@ router.post('/', requireAuth, requireIdempotency({ required: false }), async (re
       pricePerSeat: Number(pricePerSeat) || 350,
       carModel: carModel?.trim() || (type === 'offer' ? 'Campus Ride' : 'Co-traveler'),
       notes: (notes || description || '').trim(),
-      authorImage: authorImage ? String(authorImage).trim() : null,
-      authorName: authorName ? String(authorName).trim() : null,
-      authorEmail: authorEmail ? String(authorEmail).trim() : null,
+      authorImage: resolvedAuthorImage,
+      authorName: resolvedAuthorName,
+      authorEmail: resolvedAuthorEmail,
       gender: validGender,
       status: 'active',
       expiresAt
@@ -499,18 +554,24 @@ router.get('/', optionalAuth, async (req, res) => {
       });
     }
 
-    // 4. Query active unexpired candidate posts from other students
-    const candidates = await Travel.find({
-      userId: { $ne: req.userId },
-      status: 'active',
-      expiresAt: { $gt: now },
-      type: { $in: candidateTypes }
-    }).sort({ createdAt: -1 }).lean();
+    // 4. Query active unexpired candidate posts from other students & exclude active group members (BUG 6)
+    const [candidates, activeGroupedUserIds] = await Promise.all([
+      Travel.find({
+        userId: { $nin: getCandidateUserIds(req.userId) },
+        status: 'active',
+        expiresAt: { $gt: now },
+        type: { $in: candidateTypes }
+      }).sort({ createdAt: -1 }).lean(),
+      getActiveGroupedUserIds(now)
+    ]);
 
     // 5. Apply Smart Matching Engine across user's active travels
     const matchedMap = new Map();
 
     for (const cand of candidates) {
+      if (isUserInSet(cand.userId, activeGroupedUserIds)) {
+        continue;
+      }
       const candBooked = cand.bookedSeats || 0;
       const candAvailableSeats = Math.max(0, (cand.seats || 1) - candBooked);
 
@@ -618,33 +679,31 @@ router.get('/', optionalAuth, async (req, res) => {
       );
     }
 
-    // Enrich with creator student profile (including phone for direct WhatsApp contact)
+    // Enrich with creator student profile (resolved across clerkId & firebaseUid variants)
     const userIds = [...new Set(matchedList.map(t => t.userId))];
-    const students = await Student.find(
-      { clerkId: { $in: userIds } },
-      { name: 1, email: 1, phone: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-    ).lean();
-    const studentMap = new Map(students.map(s => [s.clerkId, s]));
+    const studentMap = await resolveStudentProfilesMap(userIds, { includeContact: true });
 
     const enriched = matchedList.map(t => {
-      const s = studentMap.get(t.userId);
-      const peerPhone = s?.phone || t.authorPhone || '';
+      const s = getStudentFromMap(studentMap, t.userId);
+      const safePublic = formatSafePublicStudent(s, {
+        fallbackName: t.authorName || 'Student',
+        includeContact: true
+      });
+      const peerPhone = safePublic.phone || t.authorPhone || '';
       const isOffer = t.type === 'offer';
       const isFulfilled = !isOffer && Boolean((t.bookedSeats || 0) >= 1 || t.isFulfilled || t.status === 'completed');
       return {
         ...t,
+        authorName: safePublic.name,
         isFulfilled,
         phone: peerPhone,
         isMine: false,
         student: {
-          name: s?.name || t.authorName || 'Campus Student',
-          email: s?.email || t.authorEmail || '',
+          ...safePublic,
+          email: safePublic.email || t.authorEmail || '',
           phone: peerPhone,
           gender: t.gender || s?.gender || null,
-          imageUrl: s?.imageUrl || t.authorImage || null,
-          avatarId: s?.avatarId || 'm1',
-          college: s?.college || 'VIT, Bhopal',
-          isVerified: Boolean(s?.isVerified)
+          college: safePublic.college || 'VIT, Bhopal'
         }
       };
     });
@@ -805,13 +864,19 @@ router.get('/my', requireAuth, async (req, res) => {
  */
 const handleGetUserMatches = async (req, res) => {
   try {
-    const result = await findMatchesForUser(req.userId);
+    const [result, viewerActiveGroup] = await Promise.all([
+      findMatchesForUser(req.userId),
+      getViewerActiveGroupSummary(req.userId)
+    ]);
     return res.status(200).json({
       success: true,
       hasPostedTravel: result.hasPostedTravel,
       myTravels: result.myTravels,
       count: result.matches.length,
-      data: result.matches
+      data: result.matches,
+      compatibleFinds: result.compatibleFinds || [],
+      compatibleFindsCount: (result.compatibleFinds || []).length,
+      viewerActiveGroup
     });
   } catch (error) {
     console.error('Error fetching user matches:', error);
@@ -859,8 +924,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 
     const isGuest = !req.userId;
-    const isMine = !isGuest && travel.userId === req.userId;
-    const student = isGuest ? null : await Student.findOne({ clerkId: travel.userId }).lean();
+    const isMine = !isGuest && isSameUserId(travel.userId, req.userId);
+    const student = isGuest ? null : await resolveSingleStudent(travel.userId, { lean: true });
 
     // Compute real-time confirmed and available seats
     let isFulfilled = false;
@@ -908,13 +973,29 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const availableSeats = Math.max(0, (travel.seats || 1) - bookedSeats);
 
     // Privacy formatting: For guests, completely scrub private contact information
-    const phoneDisplay = isGuest ? null : (isMine ? '' : (student?.phone || ''));
+    const phoneDisplay = isGuest ? null : (isMine ? '' : (student?.whatsappNumber || student?.phone || ''));
     const emailDisplay = isGuest ? null : (student?.email || travel.authorEmail || '');
+
+    // Compute group formation relationship state for authenticated non-owner viewers on FIND posts (BUG 3)
+    let groupRelationship = null;
+    if (!isGuest && !isMine && travel.type === 'request') {
+      const relMap = await computePairRelationshipStates(req.userId, [travel.userId]);
+      const rawPeerKey = stripFirebasePrefix(travel.userId) || travel.userId;
+      groupRelationship = relMap.get(rawPeerKey) || {
+        relationshipState: 'NONE',
+        proposalId: null,
+        proposedCapacity: null,
+        groupId: null
+      };
+    }
+
+    const resolvedName = student?.name?.trim() || travel.authorName || 'Student';
 
     return res.status(200).json({
       success: true,
       data: {
         ...travel,
+        authorName: isGuest ? resolvedName.split(' ')[0] : resolvedName,
         authorPhone: isGuest ? null : travel.authorPhone,
         authorEmail: isGuest ? null : travel.authorEmail,
         status: effectiveStatus,
@@ -925,14 +1006,17 @@ router.get('/:id', optionalAuth, async (req, res) => {
         carModel: travel.carModel || 'Campus Ride',
         isMine,
         isGuest,
+        groupRelationship,
         phone: phoneDisplay,
         student: {
           name: isGuest
-            ? (travel.authorName ? travel.authorName.split(' ')[0] : 'Campus Student')
-            : (student?.name || travel.authorName || 'Campus Student'),
+            ? (resolvedName ? resolvedName.split(' ')[0] : 'Student')
+            : resolvedName,
           email: emailDisplay,
           imageUrl: student?.imageUrl || travel.authorImage || null,
+          avatarId: student?.avatarId || 'm1',
           college: student?.college || 'VIT, Bhopal',
+          branch: student?.branch || student?.course || null,
           gender: travel.gender || student?.gender || null,
           isVerified: Boolean(student?.isVerified ?? true),
           phone: phoneDisplay,
@@ -985,6 +1069,13 @@ export async function cancelTravelPost(travelId, userId) {
   // 3. Mark travel status as cancelled
   travel.status = 'cancelled';
   await travel.save();
+
+  // 3b. Automatically remove student from any Shared Ride Groups tied to this post
+  try {
+    await removeStudentFromGroupsForTravel(travel._id, userId);
+  } catch (groupCleanupErr) {
+    console.warn('[CancelTravel] Non-fatal group cleanup warning:', groupCleanupErr.message);
+  }
 
   // 4. Find all active bookings (pending, accepted, confirmed)
   const activeBookings = await Booking.find({
@@ -1168,20 +1259,27 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
     }
 
     // 3. Ownership verification
-    if (travel.userId !== req.userId) {
+    if (!isSameUserId(travel.userId, req.userId)) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: You are not authorized to view matches for this travel post'
       });
     }
 
-    // 4. Run matching engine
-    const matches = await findMatchesForTravel(travel);
+    // 4. Run matching engine (exclude group offers from `matches` since Category B returns `sharedRideGroups`)
+    const matches = await findMatchesForTravel(travel, { includeGroupOffers: false });
 
     // 5. If this is a FIND post (type: 'request'), discover compatible Shared Ride Groups AND compatible FIND peers
     let sharedRideGroups = [];
     let compatibleFinds = [];
+    let viewerActiveGroup = null;
     if (travel.type === 'request') {
+      try {
+        viewerActiveGroup = await getViewerActiveGroupSummary(req.userId);
+      } catch (agErr) {
+        console.warn('[Travel Matches] Non-fatal active group lookup error:', agErr.message);
+      }
+
       try {
         sharedRideGroups = await findCompatibleGroupsForFindPost(travel, req.userId);
       } catch (groupMatchErr) {
@@ -1189,10 +1287,13 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
       }
 
       try {
-        compatibleFinds = await findCompatibleFindPosts(travel);
+        compatibleFinds = await findCompatibleFindPosts(travel, { viewerUserId: req.userId, includeInternalUserId: true });
       } catch (findMatchErr) {
         console.warn('[Travel Matches] Non-fatal compatible find matching error:', findMatchErr.message);
       }
+
+      // Relationship states are already enriched by findCompatibleFindPosts
+      // No need for double enrichment
     }
 
     return res.status(200).json({
@@ -1202,7 +1303,8 @@ router.get('/:id/matches', requireAuth, async (req, res) => {
       sharedRideGroups,
       sharedRideGroupsCount: sharedRideGroups.length,
       compatibleFinds,
-      compatibleFindsCount: compatibleFinds.length
+      compatibleFindsCount: compatibleFinds.length,
+      viewerActiveGroup
     });
   } catch (error) {
     console.error('Error finding travel matches:', error);
@@ -1237,7 +1339,7 @@ router.get('/:id/compatible-finds', requireAuth, async (req, res) => {
       });
     }
 
-    if (travel.userId !== req.userId) {
+    if (!isSameUserId(travel.userId, req.userId)) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: You are not authorized to query compatible finds for this post'
@@ -1251,12 +1353,16 @@ router.get('/:id/compatible-finds', requireAuth, async (req, res) => {
       });
     }
 
-    const compatiblePosts = await findCompatibleFindPosts(travel);
+    const [compatiblePosts, viewerActiveGroup] = await Promise.all([
+      findCompatibleFindPosts(travel, { viewerUserId: req.userId }),
+      getViewerActiveGroupSummary(req.userId)
+    ]);
 
     return res.status(200).json({
       success: true,
       count: compatiblePosts.length,
-      data: compatiblePosts
+      data: compatiblePosts,
+      viewerActiveGroup
     });
   } catch (err) {
     console.error('Error finding compatible FIND posts:', err);
@@ -1540,6 +1646,91 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/travels/:id/group-status
+ * @desc    Check if a travel post is linked to an active shared ride group
+ * @access  Protected
+ */
+router.get('/:id/group-status', requireAuth, async (req, res) => {
+  try {
+    const travelId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(travelId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid travel ID'
+      });
+    }
+
+    const travel = await Travel.findById(travelId).lean();
+
+    if (!travel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Travel post not found'
+      });
+    }
+
+    // Verify ownership
+    if (!isSameUserId(travel.userId, req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to check this travel post'
+      });
+    }
+
+    const now = new Date();
+    const variants = getCandidateUserIds(req.userId);
+
+    // Check if user is a member of any active group
+    const activeGroup = await SharedRideGroup.findOne({
+      status: { $in: ['open', 'full'] },
+      expiresAt: { $gt: now },
+      'members.userId': { $in: variants }
+    }).lean();
+
+    if (!activeGroup) {
+      return res.status(200).json({
+        success: true,
+        hasActiveGroup: false,
+        groupDetails: null
+      });
+    }
+
+    // Resolve group member profiles
+    const memberIds = (activeGroup.members || []).map((m) => m.userId).filter(Boolean);
+    const sMap = await resolveStudentProfilesMap(memberIds, { includeContact: false });
+    const members = (activeGroup.members || []).map((m) => {
+      const p = formatSafePublicStudent(getStudentFromMap(sMap, m.userId), { fallbackName: 'Student' });
+      return { ...p, role: m.role || 'member' };
+    });
+
+    return res.status(200).json({
+      success: true,
+      hasActiveGroup: true,
+      groupDetails: {
+        _id: activeGroup._id,
+        groupId: activeGroup._id,
+        groupDisplayName: buildGroupDisplayName(members),
+        source: activeGroup.source,
+        destination: activeGroup.destination,
+        travelDate: activeGroup.travelDate,
+        departureTime: activeGroup.departureTime,
+        memberCount: members.length,
+        status: activeGroup.status,
+        members
+      }
+    });
+  } catch (error) {
+    console.error('Error checking group status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error while checking group status',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route   DELETE /api/travels/:id
  * @desc    Permanently delete a travel post (owner only) and safely cancel associated bookings
  * @access  Protected
@@ -1580,13 +1771,22 @@ router.delete('/:id', requireAuth, async (req, res) => {
       { $set: { status: 'cancelled', cancellationReason: 'Travel post deleted by host' } }
     );
 
+    // 4b. Automatically remove user from any Shared Ride Groups linked to this deleted post
+    let groupCleanup = { removedCount: 0, cancelledGroupIds: [], updatedGroupIds: [] };
+    try {
+      groupCleanup = await removeStudentFromGroupsForTravel(travel._id, req.userId);
+    } catch (groupCleanupErr) {
+      console.warn('[DeleteTravel] Group cleanup error:', groupCleanupErr.message);
+    }
+
     // 5. Permanently remove the travel post from database
     await Travel.findByIdAndDelete(id);
 
     return res.status(200).json({
       success: true,
       message: 'Travel post successfully deleted',
-      deletedId: id
+      deletedId: id,
+      removedFromGroupsCount: groupCleanup.removedCount
     });
   } catch (error) {
     console.error('Error deleting travel post:', error);

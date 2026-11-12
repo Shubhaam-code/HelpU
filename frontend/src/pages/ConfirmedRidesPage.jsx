@@ -47,7 +47,7 @@ export default function ConfirmedRidesPage() {
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' | 'completed'
 
   const { data: confirmedList = [], isLoading } = useConfirmedBookings();
-  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'poolmate' });
 
   // Categorize confirmed rides into Upcoming and Completed history based on local date
   const { upcoming, completed } = useMemo(() => {

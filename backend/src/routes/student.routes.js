@@ -1,7 +1,9 @@
 import express from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import Student from '../models/Student.js';
+import Travel from '../models/Travel.js';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+import { getCandidateUserIds, resolveSingleStudent } from '../utils/studentProfileResolver.js';
 
 const router = express.Router();
 
@@ -13,11 +15,7 @@ const router = express.Router();
 router.get('/profile', requireAuth, async (req, res) => {
   try {
     const canonicalUserId = req.userId;
-    const student = await Student.findOne(
-      req.firebaseUid
-        ? { $or: [{ clerkId: canonicalUserId }, { firebaseUid: req.firebaseUid }] }
-        : { clerkId: canonicalUserId }
-    );
+    const student = await resolveSingleStudent(canonicalUserId);
 
     if (!student) {
       return res.status(200).json({
@@ -72,12 +70,8 @@ async function handleSaveProfile(req, res) {
 
     const { name, fullName, email, phone, college, course, avatarId, imageUrl, whatsappNumber, whatsappCountryCode, bio, gender, registrationNumber, branch, year } = req.body;
 
-    // Check if student already exists so partial updates (e.g. adding WhatsApp number) work smoothly
-    const existing = await Student.findOne(
-      req.firebaseUid
-        ? { $or: [{ clerkId: canonicalUserId }, { firebaseUid: req.firebaseUid }] }
-        : { clerkId: canonicalUserId }
-    );
+    // Check if student already exists across clerkId / firebaseUid variants
+    const existing = await resolveSingleStudent(canonicalUserId);
 
     // Accept either name or fullName for 100% bidirectional compatibility between RideMate and SlotMate
     const incomingName = (name && typeof name === 'string' && name.trim()) 
@@ -213,6 +207,23 @@ async function handleSaveProfile(req, res) {
         setDefaultsOnInsert: true
       }
     );
+
+    // Propagate updated name/imageUrl to all Travel posts authored by this student
+    const candidateUserIds = Array.from(new Set([
+      ...getCandidateUserIds(canonicalUserId),
+      ...getCandidateUserIds(student.clerkId),
+      ...getCandidateUserIds(student.firebaseUid)
+    ]));
+    if (candidateUserIds.length > 0 && student?.name) {
+      const travelSync = { authorName: student.name };
+      if (imageUrl !== undefined) {
+        travelSync.authorImage = student.imageUrl || null;
+      }
+      await Travel.updateMany(
+        { userId: { $in: candidateUserIds } },
+        { $set: travelSync }
+      );
+    }
 
     return res.status(200).json({
       success: true,

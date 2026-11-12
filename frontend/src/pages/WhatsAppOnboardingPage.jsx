@@ -142,8 +142,8 @@ export default function WhatsAppOnboardingPage() {
 
       setLoading(true);
 
-      // Automatically use Google account's display name and email without asking the user
-      const googleName = user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.displayName || profile?.name || 'Campus Student';
+      // Prefer existing persisted student name over Google display name (BUG 1)
+      const googleName = profile?.name?.trim() || user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.displayName || 'Campus Student';
       const userEmail = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || user?.email || profile?.email || '';
 
       const payload = {

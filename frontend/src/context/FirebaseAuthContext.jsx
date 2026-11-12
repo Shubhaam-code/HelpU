@@ -264,6 +264,29 @@ export function FirebaseAuthProvider({ children }) {
     }
   }, []);
 
+  // Update Firebase displayName cleanly and sync local React state (BUG 1)
+  const updateUserDisplayName = useCallback(async (displayName) => {
+    const clean = typeof displayName === 'string' ? displayName.trim() : '';
+    if (!clean) return;
+    if (auth.currentUser) {
+      try {
+        await updateFirebaseProfile(auth.currentUser, { displayName: clean });
+      } catch (err) {
+        console.warn('[FirebaseAuth] Non-fatal updateFirebaseProfile warning:', err?.message);
+      }
+    }
+    setUser((prev) => {
+      if (!prev) return prev;
+      const parts = clean.split(/\s+/);
+      return {
+        ...prev,
+        fullName: clean,
+        firstName: parts[0] || '',
+        lastName: parts.slice(1).join(' ') || ''
+      };
+    });
+  }, []);
+
   const value = {
     user,
     firebaseUser,
@@ -271,6 +294,7 @@ export function FirebaseAuthProvider({ children }) {
     isSignedIn: Boolean(firebaseUser || user),
     userId: user?.id || null,
     getToken,
+    updateUserDisplayName,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,

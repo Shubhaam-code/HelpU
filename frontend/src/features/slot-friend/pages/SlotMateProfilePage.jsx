@@ -16,9 +16,9 @@ import { getProfileDraft } from '../../../utils/guestDraft';
 
 export default function SlotMateProfilePage() {
   const navigate = useNavigate();
-  const { user, firebaseUser, signOut } = useFirebaseAuth();
+  const { user, firebaseUser, signOut, updateUserDisplayName } = useFirebaseAuth();
   const { data: cachedProfile, refetch: refetchProfile } = useUserProfile();
-  const { setWhatsAppNumber: setContextWhatsAppNumber, refreshProfile } = useAuthProfile();
+  const { setWhatsAppNumber: setContextWhatsAppNumber, setProfileData, refreshProfile } = useAuthProfile();
   const { myPosts = [], totalMatchesCount = 0, showToast } = useSlotFriend();
 
   const isGuest = !user;
@@ -137,7 +137,13 @@ export default function SlotMateProfilePage() {
       const res = await saveProfile(payload);
       const updated = res.data?.data || payload;
 
-      // 1. Immediately update TanStack Query cache so all views across Helpu & SlotMate reflect the new data
+      // 1. Immediately update Firebase displayName + AuthProfileContext + TanStack Query cache (BUG 1)
+      if (updateUserDisplayName) {
+        await updateUserDisplayName(cleanName);
+      }
+      if (setProfileData) {
+        setProfileData(updated);
+      }
       queryClient.setQueryData(QUERY_KEYS.profile(user?.id), updated);
       invalidateProfileQueries();
 

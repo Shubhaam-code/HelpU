@@ -4,6 +4,7 @@ import {
   Home, Car, Users, CarTaxiFront, Info, Search, Bell, Menu, X, LogOut, User, FileText, Download, CheckCircle2, CalendarDays
 } from 'lucide-react';
 import { useUser, useFirebaseAuth } from '../../context/FirebaseAuthContext';
+import { useAuthProfile } from '../../context/AuthProfileContext';
 import { Avatar } from '../ui/Avatar';
 import { getUnreadCount } from '../../lib/api';
 
@@ -35,6 +36,8 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   const location = useLocation();
   const { user } = useUser();
   const { signOut } = useFirebaseAuth();
+  const { profile } = useAuthProfile();
+  const resolvedDisplayName = profile?.name || user?.fullName || 'Campus Student';
   
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -215,9 +218,9 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
             >
               <div className="relative rounded-full p-[1.5px] bg-gradient-to-tr from-[#FF572E]/40 via-transparent to-[#FF572E]/20 group-hover:from-[#FF572E] group-hover:to-[#FF572E] transition-all">
                 <Avatar 
-                  src={userProfileImage} 
-                  name={user?.fullName || 'Student'} 
-                  email={user?.primaryEmailAddress?.emailAddress}
+                  src={profile?.imageUrl || userProfileImage} 
+                  name={resolvedDisplayName} 
+                  email={profile?.email || user?.primaryEmailAddress?.emailAddress}
                   size="sm" 
                   className="border border-white shadow-xs"
                 />
@@ -231,18 +234,18 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
                 {/* User info */}
                 <div className="px-4 py-3 border-b border-[#F4E3D8]/60 flex items-center gap-3">
                   <Avatar 
-                    src={userProfileImage}
-                    name={user?.fullName || 'Student'} 
-                    email={user?.primaryEmailAddress?.emailAddress} 
+                    src={profile?.imageUrl || userProfileImage}
+                    name={resolvedDisplayName} 
+                    email={profile?.email || user?.primaryEmailAddress?.emailAddress} 
                     size={38} 
                     className="border border-[#F4E3D8] shadow-2xs shrink-0"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="font-extrabold text-[#17233C] text-xs truncate leading-snug">
-                      {user?.fullName || 'Campus Student'}
+                      {resolvedDisplayName}
                     </div>
                     <div className="text-[11px] text-[#6E7587] truncate mt-0.5 font-medium">
-                      {user?.primaryEmailAddress?.emailAddress || 'student@vitbhopal.ac.in'}
+                      {profile?.email || user?.primaryEmailAddress?.emailAddress || 'student@vitbhopal.ac.in'}
                     </div>
                   </div>
                 </div>

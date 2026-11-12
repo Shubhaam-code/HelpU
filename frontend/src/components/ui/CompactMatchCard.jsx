@@ -23,7 +23,16 @@ export function CompactMatchCard({
     <MatchCard
       match={match}
       bookingStatus={bookingInfo}
-      onPress={() => navigate(`/rides/${travelId}`)}
+      onPress={() =>
+        navigate(
+          match.isGroupOffer
+            ? `/groups/${match.groupId || match.id || travelId}`
+            : `/rides/${travelId}`,
+          match.isGroupOffer
+            ? { state: { from: 'match', fromLabel: 'Back to Find Match' } }
+            : undefined
+        )
+      }
     />
   );
 }

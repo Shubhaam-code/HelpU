@@ -33,7 +33,7 @@ export function AuthProfileProvider({ children }) {
     });
   }, []);
 
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(() => !profileRef.current);
 
   // Sync profile from user-specific localStorage whenever user ID is established
   useEffect(() => {
@@ -188,11 +188,26 @@ export function AuthProfileProvider({ children }) {
     });
   }, [user?.id, setProfileAndRef]);
 
+  const setProfileData = useCallback((nextProfile) => {
+    if (!nextProfile) return;
+    setProfileAndRef((prev) => {
+      const merged = { ...(prev || {}), ...nextProfile };
+      try {
+        if (user?.id) {
+          localStorage.setItem(`helpu_profile_${user.id}`, JSON.stringify(merged));
+        }
+        localStorage.setItem('helpu_active_profile', JSON.stringify(merged));
+      } catch (e) {}
+      return merged;
+    });
+  }, [user?.id, setProfileAndRef]);
+
   const value = {
     profile,
     isProfileLoading,
     hasWhatsApp: Boolean(profile?.whatsappNumber?.trim() || profile?.phone?.trim()),
     setWhatsAppNumber,
+    setProfileData,
     refreshProfile: fetchProfile
   };
 

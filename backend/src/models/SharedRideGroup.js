@@ -110,8 +110,8 @@ const sharedRideGroupSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['open', 'full', 'completed', 'cancelled', 'expired'],
-        message: 'Status must be "open", "full", "completed", "cancelled", or "expired"'
+        values: ['open', 'full', 'empty', 'completed', 'cancelled', 'expired'],
+        message: 'Status must be "open", "full", "empty", "completed", "cancelled", or "expired"'
       },
       default: 'open',
       index: true
@@ -136,6 +136,11 @@ const sharedRideGroupSchema = new mongoose.Schema(
 
 // Virtual for dynamic member count (guarantees consistency without redundant out-of-sync fields)
 sharedRideGroupSchema.virtual('currentMemberCount').get(function () {
+  return Array.isArray(this.members) ? this.members.length : 0;
+});
+
+// Alias virtual matching API response contract
+sharedRideGroupSchema.virtual('confirmedMemberCount').get(function () {
   return Array.isArray(this.members) ? this.members.length : 0;
 });
 
@@ -187,6 +192,15 @@ sharedRideGroupSchema.index(
   {
     unique: true,
     partialFilterExpression: { proposalKey: { $type: 'string' } }
+  }
+);
+
+// Partial unique index: enforces ONE ACTIVE GROUP ('open' or 'full') per student at database level
+sharedRideGroupSchema.index(
+  { 'members.userId': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ['open', 'full'] } }
   }
 );
 

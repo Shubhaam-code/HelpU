@@ -104,7 +104,27 @@ export default function MyMatchesPage() {
   const userMatches = Array.isArray(matchesPayload)
     ? matchesPayload
     : (Array.isArray(matchesPayload?.matches) ? matchesPayload.matches : []);
-  const hasPostedTravel = Boolean(matchesPayload?.hasPostedTravel || userTravels.length > 0 || userMatches.length > 0);
+  const compatibleFinds = useMemo(() => {
+    const raw = Array.isArray(matchesPayload?.compatibleFinds) ? matchesPayload.compatibleFinds : [];
+    return raw.map((peer) => ({
+      ...peer,
+      isCompatibleFindPeer: true,
+      matchedWithPostId: peer.matchedWithTravelId || peer.matchedWithPostId
+    }));
+  }, [matchesPayload?.compatibleFinds]);
+  const allCombinedMatches = useMemo(() => {
+    const map = new Map();
+    for (const m of userMatches) {
+      const id = m._id?.toString() || m.id?.toString();
+      if (id) map.set(id, m);
+    }
+    for (const p of compatibleFinds) {
+      const id = p._id?.toString() || p.id?.toString();
+      if (id && !map.has(id)) map.set(id, p);
+    }
+    return Array.from(map.values());
+  }, [userMatches, compatibleFinds]);
+  const hasPostedTravel = Boolean(matchesPayload?.hasPostedTravel || userTravels.length > 0 || allCombinedMatches.length > 0);
   const myTravels = userTravels.length > 0 ? userTravels : (Array.isArray(matchesPayload?.myTravels) ? matchesPayload.myTravels : []);
 
   // Show loading skeleton ONLY on initial mount when NO cached data is in memory yet
@@ -219,7 +239,7 @@ export default function MyMatchesPage() {
 
     return Array.from(routeMap.values()).map((route) => {
       // Find matches corresponding to any post ID of this route, or matching normalized route key
-      const routeMatches = userMatches.filter((m) => {
+      const routeMatches = allCombinedMatches.filter((m) => {
         const matchedPostId = m.matchedWithPostId?.toString() || m.matchingUserPostId?.toString();
         if (matchedPostId && route.postIds.has(matchedPostId)) {
           return true;
@@ -235,28 +255,28 @@ export default function MyMatchesPage() {
         matchCount: uniqueIds.size
       };
     });
-  }, [myTravels, userMatches]);
+  }, [myTravels, allCombinedMatches]);
 
   // Filter matches based on selected route filter
   const filteredMatches = useMemo(() => {
     if (selectedRouteFilter === 'all') {
-      return userMatches;
+      return allCombinedMatches;
     }
     const targetRoute = uniqueRouteFilters.find((r) => r.routeKey === selectedRouteFilter);
     if (!targetRoute) {
-      return userMatches.filter(
+      return allCombinedMatches.filter(
         (m) => (m.matchedWithPostId?.toString() === selectedRouteFilter) ||
                (getRouteKey(m.source, m.destination) === selectedRouteFilter)
       );
     }
-    return userMatches.filter((m) => {
+    return allCombinedMatches.filter((m) => {
       const matchedPostId = m.matchedWithPostId?.toString() || m.matchingUserPostId?.toString();
       if (matchedPostId && targetRoute.postIds.has(matchedPostId)) {
         return true;
       }
       return getRouteKey(m.source, m.destination) === targetRoute.routeKey;
     });
-  }, [userMatches, selectedRouteFilter, uniqueRouteFilters]);
+  }, [allCombinedMatches, selectedRouteFilter, uniqueRouteFilters]);
 
   return (
     <ResponsiveShell
@@ -415,7 +435,7 @@ export default function MyMatchesPage() {
                     : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
                 }`}
               >
-                All Matches ({userMatches.length})
+                All Matches ({allCombinedMatches.length})
               </button>
               {uniqueRouteFilters.map((route) => {
                 const isSel = selectedRouteFilter === route.routeKey;

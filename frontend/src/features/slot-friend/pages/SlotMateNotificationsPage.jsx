@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 import { useSlotMateNotificationsList, useUnreadNotificationsCount } from '../../../hooks/useAppData';
-import { markRead, markAllSlotMateRead } from '../../../lib/api';
+import { markRead, markAllSlotMateRead, deleteSlotMateNotification } from '../../../lib/api';
 import { timeAgo } from '../../../lib/utils';
 import { getCourseSubjectTheme } from '../utils/courseIconHelper';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
@@ -30,6 +30,7 @@ export default function SlotMateNotificationsPage() {
 
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'read'
   const [markingAll, setMarkingAll] = useState(false);
+  const didSwipeRef = useRef(false);
 
   // TanStack Query for SlotMate notifications
   const {
@@ -86,8 +87,31 @@ export default function SlotMateNotificationsPage() {
     }
   };
 
+  // Dismiss / delete notification on left or right swipe
+  const handleDismissNotification = async (notif) => {
+    const id = notif?._id;
+    if (!id) return;
+
+    queryClient.setQueriesData({ queryKey: ['notifications', 'slotmate'] }, (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.filter((n) => n._id !== id);
+    });
+    if (!notif.isRead) {
+      queryClient.setQueryData(
+        ['notifications', 'unread-count', user?.id, 'slotmate'],
+        (old) => Math.max(0, (old || 1) - 1)
+      );
+    }
+    window.dispatchEvent(new CustomEvent('notifications-updated'));
+
+    deleteSlotMateNotification(id).catch((err) => {
+      console.warn('[SlotMate] Failed to dismiss notification:', err?.message);
+    });
+  };
+
   // Click on single notification: mark read and navigate to match details
   const handleNotificationClick = async (notif) => {
+    if (didSwipeRef.current) return;
     if (!notif.isRead) {
       queryClient.setQueriesData({ queryKey: ['notifications', 'slotmate'] }, (old) => {
         if (!Array.isArray(old)) return old;
@@ -269,8 +293,8 @@ export default function SlotMateNotificationsPage() {
           </motion.div>
         )}
 
-        {/* Notification Cards List */}
-        <div className="space-y-3">
+        {/* Notification Cards List (Swipe left/right to dismiss) */}
+        <div className="space-y-3 overflow-x-hidden">
           <AnimatePresence>
             {filteredNotifications.map((item) => {
               const metadata = item.metadata || {};
@@ -288,9 +312,21 @@ export default function SlotMateNotificationsPage() {
                   layout
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
+                  exit={{ opacity: 0, x: 240, height: 0, marginBottom: 0 }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.45}
+                  dragMomentum={false}
+                  onDragStart={() => { didSwipeRef.current = true; }}
+                  onDragEnd={(_, info) => {
+                    if (Math.abs(info.offset.x) > 85 || Math.abs(info.velocity.x) > 450) {
+                      handleDismissNotification(item);
+                    }
+                    setTimeout(() => { didSwipeRef.current = false; }, 120);
+                  }}
+                  style={{ touchAction: 'pan-y' }}
                   onClick={() => handleNotificationClick(item)}
-                  className={`w-full rounded-[22px] p-4 border transition-all cursor-pointer relative overflow-hidden group active:scale-[0.99] ${
+                  className={`w-full rounded-[22px] p-4 border transition-all cursor-pointer relative overflow-hidden group active:scale-[0.99] select-none ${
                     !item.isRead
                       ? 'bg-gradient-to-br from-[#FFFBEB] via-white to-white border-[#FDE047] shadow-xs'
                       : 'bg-white border-[#F4E3D8] hover:border-[#FACC15]'

@@ -75,7 +75,7 @@ export default function HomePage() {
   const { data: myTravels = [], isLoading: travelsLoading } = useMyTravels();
   const { data: rawMatches, isLoading: matchesLoading } = useUserMatches();
   const userMatches = Array.isArray(rawMatches) ? rawMatches : (Array.isArray(rawMatches?.matches) ? rawMatches.matches : []);
-  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'poolmate' });
   const { data: confirmedBookings = [] } = useConfirmedBookings();
 
   // Automatic date-based categorization: upcoming confirmed rides whose travel date has not passed
@@ -232,7 +232,9 @@ export default function HomePage() {
             <h3 className="font-black text-sm sm:text-base text-[#17233C]">
               Your Travel Activity
             </h3>
-            <span className="text-[11px] font-bold text-[#FF572E]">Live Sync</span>
+            <span className="text-[11px] font-bold text-[#FF572E]">
+              {(travelsLoading || matchesLoading) && myTravels.length === 0 ? 'Data loading...' : 'Live Sync'}
+            </span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:gap-3">

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Target, ShieldCheck, MapPin, Calendar, Clock, 
-  ArrowRight 
+  ArrowRight, Users 
 } from 'lucide-react';
 import { Avatar } from './Avatar';
 
@@ -48,9 +48,17 @@ export function MatchCard({ match, onPress, bookingStatus }) {
   if (!match) return null;
 
   const travelId = match._id?.toString() || match.id?.toString();
+  const isGroupOffer = Boolean(match.isGroupOffer);
+  const isCompatibleFindPeer = Boolean(match.isCompatibleFindPeer);
+  const groupId = match.groupId?.toString() || travelId;
+  const confirmedMemberCount = match.confirmedMemberCount ?? match.membersCount ?? 1;
+  const targetCapacity = match.targetCapacity ?? 4;
+  const membersPreview = Array.isArray(match.membersPreview) ? match.membersPreview : [];
   const isOffer = match.type === 'offer';
   const student = match.student || match.creator || {};
-  const studentName = student.name || match.authorName || 'Campus Student';
+  const studentName = isGroupOffer
+    ? (match.groupDisplayName || student.name || match.authorName || 'Group Offer')
+    : (student.name || match.authorName || 'Campus Student');
   const isVerified = Boolean(student.isVerified);
 
   const bDirection = typeof bookingStatus === 'object' ? bookingStatus?.direction : null;
@@ -75,6 +83,10 @@ export function MatchCard({ match, onPress, bookingStatus }) {
   const handleCardClick = () => {
     if (onPress) {
       onPress(match);
+    } else if (isGroupOffer && groupId) {
+      navigate(`/groups/${groupId}`, {
+        state: { from: 'match', fromLabel: 'Back to Find Match' }
+      });
     } else if (travelId) {
       navigate(`/rides/${travelId}`);
     }
@@ -92,9 +104,27 @@ export function MatchCard({ match, onPress, bookingStatus }) {
         {/* Left: Matching Offer / Request pill + Optional Verified */}
         <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FFF0E6] text-[#FF572E] border border-[#FFD9C7] shrink-0">
-            <Target className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
-            <span>{isOffer ? 'Matching Offer' : 'Matching Find'}</span>
+            {isGroupOffer ? (
+              <Users className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
+            ) : (
+              <Target className="w-3.5 h-3.5 text-[#FF572E] stroke-[2.5]" />
+            )}
+            <span>
+              {isGroupOffer
+                ? 'Group Offer'
+                : isCompatibleFindPeer
+                ? 'Student Match'
+                : isOffer
+                ? 'Matching Offer'
+                : 'Matching Find'}
+            </span>
           </div>
+
+          {isGroupOffer && (
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#FFF8F3] text-[#17233C] border border-[#F4E3D8] shrink-0">
+              <span>{confirmedMemberCount}/{targetCapacity} Members</span>
+            </div>
+          )}
 
           {isVerified && (
             <>
@@ -126,7 +156,12 @@ export function MatchCard({ match, onPress, bookingStatus }) {
         {/* Right: Peach Price Box */}
         <div className="shrink-0">
           {isOffer ? (
-            pricePerSeat > 0 ? (
+            isGroupOffer ? (
+              <div className="bg-[#FFF4ED] rounded-2xl px-3.5 py-2 text-center border border-[#FDE0D0]">
+                <div className="text-sm font-black text-[#FF572E] leading-none">Shared Cab</div>
+                <div className="text-[10px] font-bold text-[#8C93A4] mt-1">Split Fare</div>
+              </div>
+            ) : pricePerSeat > 0 ? (
               <div className="bg-[#FFF4ED] rounded-2xl px-4 py-2 text-center border border-[#FDE0D0]">
                 <div className="text-xl sm:text-2xl font-black text-[#FF572E] leading-none">
                   ₹{pricePerSeat}
@@ -221,21 +256,43 @@ export function MatchCard({ match, onPress, bookingStatus }) {
 
       {/* 5. FOOTER: Student Profile & View Details Button */}
       <div className="flex items-center justify-between gap-3 pt-2">
-        {/* Student Avatar + Full Name */}
+        {/* Student Avatar + Full Name (plus stacked group member avatars for Group Offers) */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <Avatar
-            src={student.imageUrl}
-            name={studentName}
-            email={student.email}
-            size="sm"
-            className="w-9 h-9 aspect-square rounded-full border border-[#F4E3D8] shrink-0"
-          />
-          <span className="font-black text-sm sm:text-base text-[#17233C] truncate">
-            {studentName}
-          </span>
+          {isGroupOffer && membersPreview.length > 0 ? (
+            <div className="flex items-center -space-x-2 shrink-0">
+              {membersPreview.slice(0, 3).map((m, idx) => (
+                <Avatar
+                  key={idx}
+                  src={m.imageUrl}
+                  name={m.name || 'Member'}
+                  avatarId={m.avatarId}
+                  size="sm"
+                  className="w-8 h-8 aspect-square rounded-full border-2 border-white ring-1 ring-[#F4E3D8] shrink-0"
+                />
+              ))}
+            </div>
+          ) : (
+            <Avatar
+              src={student.imageUrl}
+              name={studentName}
+              email={student.email}
+              size="sm"
+              className="w-9 h-9 aspect-square rounded-full border border-[#F4E3D8] shrink-0"
+            />
+          )}
+          <div className="min-w-0">
+            <span className="font-black text-sm sm:text-base text-[#17233C] truncate block">
+              {studentName}
+            </span>
+            {isGroupOffer && (
+              <span className="text-[10.5px] font-semibold text-[#8C93A4] block truncate">
+                Group Organizer • {confirmedMemberCount}/{targetCapacity} joined
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* View Details / View Request Button */}
+        {/* View Details / View Group Details / View Request Button */}
         <button
           type="button"
           onClick={(e) => {
@@ -248,7 +305,7 @@ export function MatchCard({ match, onPress, bookingStatus }) {
               : 'bg-[#FFF0E6] hover:bg-[#FFE0D0] text-[#FF572E] border-[#FFD9C7]'
           }`}
         >
-          <span>{isIncoming ? 'View Request' : 'View Details'}</span>
+          <span>{isGroupOffer ? 'View Group Details' : (isIncoming ? 'View Request' : 'View Details')}</span>
           <ArrowRight className="w-4 h-4 stroke-[2.5]" />
         </button>
       </div>

@@ -115,6 +115,11 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
       const imageUrl = richContent.imageUrl;
 
       // 2. Idempotently persist in-app notification in MongoDB using eventId
+      const notificationModule =
+        event.payload?.module === 'slotmate' || String(event.eventType || '').startsWith('SLOT_')
+          ? 'slotmate'
+          : 'poolmate';
+
       const notificationDoc = await Notification.findOneAndUpdate(
         { eventId: event.eventId },
         {
@@ -122,6 +127,7 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
             recipientId: event.recipientId,
             eventId: event.eventId,
             type: event.eventType,
+            module: notificationModule,
             title,
             message,
             imageUrl,
@@ -138,6 +144,7 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
         _id: notificationDoc?._id,
         eventId: event.eventId,
         type: event.eventType,
+        module: notificationModule,
         title,
         message,
         imageUrl,
@@ -152,6 +159,7 @@ export async function dispatchOutboxEvents({ batchSize = 100, leaseMs = 2 * 60 *
         try {
           const pushPayloadData = {
             ...richContent.customData,
+            module: notificationModule,
             notificationId: notificationDoc?._id ? String(notificationDoc._id) : '',
             eventId: event.eventId
           };

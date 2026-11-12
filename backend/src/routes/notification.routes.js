@@ -5,6 +5,7 @@ import {
   getUnreadNotificationCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  deleteNotification,
   registerDeviceToken,
   unregisterDeviceToken
 } from '../controllers/notification.controller.js';
@@ -22,5 +23,6 @@ router.get('/', getMyNotifications);
 router.get('/unread-count', getUnreadNotificationCount);
 router.patch('/read-all', markAllNotificationsAsRead);
 router.patch('/:id/read', markNotificationAsRead);
+router.delete('/:id', deleteNotification);
 
 export default router;

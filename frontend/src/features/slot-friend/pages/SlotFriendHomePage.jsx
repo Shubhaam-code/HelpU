@@ -28,7 +28,7 @@ export default function SlotFriendHomePage() {
   useScrollRestoration();
   const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'slotmate' });
 
-  const { myPosts = [], totalMatchesCount = 0, getPostMatchCount, createPost } = useSlotFriend();
+  const { myPosts = [], totalMatchesCount = 0, getPostMatchCount, createPost, isLoadingPosts = false } = useSlotFriend();
 
   const [pendingDraft, setPendingDraft] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -172,6 +172,13 @@ export default function SlotFriendHomePage() {
         {/* ========================================================================= */}
         {/* 4. STATISTICS SECTION (4 REAL DYNAMIC VALUES IN A ROW)                    */}
         {/* ========================================================================= */}
+        {isLoadingPosts && myPosts.length === 0 && (
+          <div className="flex justify-end -mb-1">
+            <span className="text-[11px] font-bold text-[#D97706] bg-[#FEF3C7]/70 border border-[#FDE68A] px-2.5 py-0.5 rounded-full">
+              Data loading...
+            </span>
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-2 min-[360px]:gap-2.5 sm:gap-4 py-1">
           {/* 1. My Posts */}
           <div 
