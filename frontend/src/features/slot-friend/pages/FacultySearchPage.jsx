@@ -118,7 +118,7 @@ export default function FacultySearchPage() {
             <ArrowLeft className="w-5 h-5 text-[#17233C] stroke-[2.4]" />
           </button>
           <h1 className="font-black text-[#17233C] text-xl tracking-tight">
-            Faculty
+            Faculty Reviews
           </h1>
         </div>
       </header>
@@ -129,7 +129,7 @@ export default function FacultySearchPage() {
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FEFCE8]/50 to-[#FFF7ED] border border-[#F4E3D8] p-5 sm:p-6 shadow-[0_4px_24px_rgba(23,35,60,0.03)] min-h-[145px] sm:min-h-[160px] flex items-center">
           <div className="relative z-10 max-w-[56%] sm:max-w-[60%]">
             <h1 className="text-2.5xl sm:text-3xl font-extrabold text-[#17233C] tracking-tight leading-tight">
-              Faculty
+              Faculty Reviews
             </h1>
             <p className="text-xs sm:text-sm text-[#4B5563] font-medium mt-1.5 leading-relaxed">
               Search faculty, read student reviews and make better slot choices.
