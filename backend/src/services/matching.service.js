@@ -4,6 +4,249 @@ import SharedRideGroup from '../models/SharedRideGroup.js';
 import GroupJoinRequest from '../models/GroupJoinRequest.js';
 import { createOutboxEvent, triggerOutboxSweep } from './outbox.service.js';
 import { NOTIFICATION_JOB_TYPES } from '../jobs/notification.jobs.js';
+import {
+  getCandidateUserIds,
+  buildUserIdSet,
+  isUserInSet,
+  isSameUserId,
+  stripFirebasePrefix,
+  resolveStudentProfilesMap,
+  getStudentFromMap,
+  formatSafePublicStudent
+} from '../utils/studentProfileResolver.js';
+
+/**
+ * Builds canonical sorted key for a pair of users across UID formats.
+ */
+export function buildPairUserKey(userA, userB) {
+  const a = stripFirebasePrefix(String(userA || ''));
+  const b = stripFirebasePrefix(String(userB || ''));
+  if (!a || !b) return '';
+  return [a, b].sort().join('::');
+}
+
+/**
+ * Builds a friendly combined group display name like "Group A + B".
+ */
+export function buildGroupDisplayName(members = [], fallbackAdminName = '') {
+  const rawNames = [];
+  const seen = new Set();
+
+  for (const m of members || []) {
+    const name = typeof m === 'string' ? m.trim() : (m?.name || '').trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    rawNames.push(name);
+  }
+
+  if (rawNames.length === 0 && fallbackAdminName && fallbackAdminName.trim()) {
+    rawNames.push(fallbackAdminName.trim());
+  }
+
+  if (rawNames.length === 0) return 'Shared Ride Group';
+
+  const firstTokens = rawNames.map((n) => n.split(/\s+/)[0]);
+  const distinctFirstTokens = new Set(firstTokens.map((t) => t.toLowerCase()));
+  const displayTokens = distinctFirstTokens.size === rawNames.length ? firstTokens : rawNames;
+
+  if (displayTokens.length === 1) {
+    return `Group ${displayTokens[0]}`;
+  }
+  if (displayTokens.length === 2) {
+    return `Group ${displayTokens[0]} + ${displayTokens[1]}`;
+  }
+  return `Group ${displayTokens[0]} + ${displayTokens[1]} + ${displayTokens.length - 2} more`;
+}
+
+/**
+ * Returns a Set containing all userId variants of students currently belonging
+ * to an active, unexpired SharedRideGroup (status open or full).
+ */
+export async function getActiveGroupedUserIds(now = new Date()) {
+  const activeGroups = await SharedRideGroup.find(
+    {
+      status: { $in: ['open', 'full'] },
+      expiresAt: { $gt: now }
+    },
+    { 'members.userId': 1 }
+  ).lean();
+
+  const ids = [];
+  for (const g of activeGroups) {
+    if (Array.isArray(g.members) && g.members.length > 0) {
+      for (const m of g.members) {
+        if (m?.userId) ids.push(m.userId);
+      }
+    }
+  }
+  return buildUserIdSet(ids);
+}
+
+/**
+ * Computes backend-driven group formation relationship state between a viewer
+ * and a list of peer user IDs.
+ * States: NONE | REQUEST_SENT | REQUEST_RECEIVED | ACCEPTED | DECLINED
+ */
+export async function computePairRelationshipStates(viewerUserId, peerUserIds = []) {
+  const map = new Map();
+  if (!viewerUserId || !peerUserIds || peerUserIds.length === 0) return map;
+
+  const now = new Date();
+  const viewerVariants = getCandidateUserIds(viewerUserId);
+  const viewerSet = buildUserIdSet([viewerUserId]);
+  const allPeerVariants = Array.from(buildUserIdSet(peerUserIds));
+  const uniqueRawPeers = [...new Set(peerUserIds.filter(Boolean))];
+
+  // Default state
+  for (const pid of uniqueRawPeers) {
+    const rawKey = stripFirebasePrefix(pid) || pid;
+    map.set(rawKey, {
+      relationshipState: 'NONE',
+      proposalId: null,
+      proposedCapacity: null,
+      groupId: null,
+      senderTravelId: null,
+      requesterTravelId: null
+    });
+  }
+
+  // 1. Check active shared groups that contain both viewer and any peer
+  const activeSharedGroups = await SharedRideGroup.find({
+    status: { $in: ['open', 'full'] },
+    expiresAt: { $gt: now },
+    'members.userId': { $in: viewerVariants }
+  })
+    .select('_id members targetCapacity status')
+    .lean();
+
+  const activeGroupPairMap = new Map();
+  for (const g of activeSharedGroups) {
+    const gMemberSet = buildUserIdSet((g.members || []).map((m) => m.userId));
+    for (const pid of uniqueRawPeers) {
+      if (isUserInSet(pid, gMemberSet)) {
+        const rawKey = stripFirebasePrefix(pid) || pid;
+        activeGroupPairMap.set(rawKey, g);
+        map.set(rawKey, {
+          relationshipState: 'ACCEPTED',
+          proposalId: null,
+          proposedCapacity: g.targetCapacity || null,
+          groupId: g._id,
+          senderTravelId: null,
+          requesterTravelId: null
+        });
+      }
+    }
+  }
+
+  // 2. Check GroupJoinRequest records (formation_proposal & invite) for viewer <-> peers
+  const pairKeys = uniqueRawPeers
+    .map((pid) => buildPairUserKey(viewerUserId, pid))
+    .filter(Boolean);
+
+  const requests = await GroupJoinRequest.find({
+    type: { $in: ['formation_proposal', 'invite'] },
+    status: { $in: ['pending', 'accepted', 'rejected', 'declined'] },
+    $or: [
+      ...(pairKeys.length > 0 ? [{ pairUserKey: { $in: pairKeys } }] : []),
+      {
+        senderId: { $in: viewerVariants },
+        $or: [{ requesterId: { $in: allPeerVariants } }, { recipientId: { $in: allPeerVariants } }]
+      },
+      {
+        senderId: { $in: allPeerVariants },
+        $or: [{ requesterId: { $in: viewerVariants } }, { recipientId: { $in: viewerVariants } }]
+      }
+    ]
+  })
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .lean();
+
+  console.log(`[computePairRelationshipStates] Found ${requests.length} requests for viewer ${viewerUserId}:`, 
+    requests.map(r => ({ type: r.type, status: r.status, senderId: r.senderId, recipientId: r.recipientId }))
+  );
+
+  // Track which peer pairs already received a definitive state from active groups or newest record
+  const resolvedPeers = new Set(activeGroupPairMap.keys());
+
+  for (const reqDoc of requests) {
+    // Identify which peer in the list corresponds to this request
+    const participants = [reqDoc.senderId, reqDoc.requesterId, reqDoc.recipientId].filter(Boolean);
+    const matchedPeer = uniqueRawPeers.find((pid) => {
+      const pVariants = buildUserIdSet([pid]);
+      return participants.some((part) => !isUserInSet(part, viewerSet) && isUserInSet(part, pVariants));
+    });
+    if (!matchedPeer) continue;
+
+    const rawKey = stripFirebasePrefix(matchedPeer) || matchedPeer;
+    if (resolvedPeers.has(rawKey)) continue;
+
+    if (reqDoc.expiresAt && new Date(reqDoc.expiresAt) <= now && reqDoc.status === 'pending') {
+      continue;
+    }
+
+    if (reqDoc.status === 'pending') {
+      const iAmSender = isUserInSet(reqDoc.senderId, viewerSet);
+      const state = iAmSender ? 'REQUEST_SENT' : 'REQUEST_RECEIVED';
+      console.log(`[computePairRelationshipStates] Setting ${state} for peer ${matchedPeer}, proposalId: ${reqDoc._id}`);
+      map.set(rawKey, {
+        relationshipState: state,
+        proposalId: reqDoc._id,
+        proposedCapacity: reqDoc.proposedCapacity || null,
+        groupId: reqDoc.groupId || null,
+        senderTravelId: reqDoc.senderTravelId || null,
+        requesterTravelId: reqDoc.requesterTravelId || null
+      });
+      resolvedPeers.add(rawKey);
+    } else if (reqDoc.status === 'accepted') {
+      // Only stays ACCEPTED while the linked group is still active and has both users;
+      // if activeGroupPairMap didn't have it, verify whether groupId is still active with viewer
+      if (reqDoc.groupId) {
+        const linkedGroup = await SharedRideGroup.findOne({
+          _id: reqDoc.groupId,
+          status: { $in: ['open', 'full'] },
+          expiresAt: { $gt: now },
+          'members.userId': { $all: [viewerUserId] }
+        }).select('_id targetCapacity members.userId').lean();
+
+        // fallback check with variants if exact match failed
+        const activeLinked = linkedGroup || (await SharedRideGroup.findOne({
+          _id: reqDoc.groupId,
+          status: { $in: ['open', 'full'] },
+          expiresAt: { $gt: now },
+          'members.userId': { $in: viewerVariants }
+        }).select('_id targetCapacity members.userId').lean());
+
+        if (activeLinked) {
+          const mSet = buildUserIdSet((activeLinked.members || []).map((m) => m.userId));
+          if (isUserInSet(matchedPeer, mSet)) {
+            map.set(rawKey, {
+              relationshipState: 'ACCEPTED',
+              proposalId: reqDoc._id,
+              proposedCapacity: reqDoc.proposedCapacity || activeLinked.targetCapacity || null,
+              groupId: activeLinked._id,
+              senderTravelId: reqDoc.senderTravelId || null,
+              requesterTravelId: reqDoc.requesterTravelId || null
+            });
+            resolvedPeers.add(rawKey);
+          }
+        }
+      }
+      // If group ended/left, fall through so eligibility is restored (NONE or next record)
+    } else if (reqDoc.status === 'rejected' || reqDoc.status === 'declined') {
+      map.set(rawKey, {
+        relationshipState: 'DECLINED',
+        proposalId: reqDoc._id,
+        proposedCapacity: reqDoc.proposedCapacity || null,
+        groupId: reqDoc.groupId || null,
+        senderTravelId: reqDoc.senderTravelId || null,
+        requesterTravelId: reqDoc.requesterTravelId || null
+      });
+      resolvedPeers.add(rawKey);
+    }
+  }
+
+  return map;
+}
 
 /**
  * Normalizes location strings to standard canonical names
@@ -176,7 +419,17 @@ export function isDepartureTimeCompatible(timeA, timeB, maxWindowMinutes = 420) 
  * @param {Object} travelPost - The source Travel Mongoose document
  * @returns {Promise<Array>} List of matched travel posts with public creator details
  */
-export async function findMatchesForTravel(travelPost) {
+/**
+ * Finds compatible travel matches for a given travel post.
+ * Returns matched offers/requests and (when enabled for FIND posts) open Shared Ride Groups
+ * whose remaining capacity acts as an offer in Match.
+ *
+ * @param {Object} travelPost - The source Travel Mongoose document
+ * @param {Object} [options]
+ * @param {boolean} [options.includeGroupOffers=true] - Whether to include compatible open groups as offers
+ * @returns {Promise<Array>} List of matched travel posts and group offers with public creator details
+ */
+export async function findMatchesForTravel(travelPost, { includeGroupOffers = true } = {}) {
   const now = new Date();
 
   // Guard: if current post is not active or already expired, return no matches
@@ -197,13 +450,17 @@ export async function findMatchesForTravel(travelPost) {
   }
 
   // 2. Fetch all active, unexpired candidate posts from other users of the eligible type
-  const candidates = await Travel.find({
-    _id: { $ne: travelPost._id },
-    userId: { $ne: travelPost.userId },
-    status: 'active',
-    expiresAt: { $gt: now },
-    type: { $in: eligibleTypes }
-  }).sort({ createdAt: -1 }).lean();
+  // Exclude students who already belong to an active SharedRideGroup (BUG 6)
+  const [candidates, activeGroupedUserIds] = await Promise.all([
+    Travel.find({
+      _id: { $ne: travelPost._id },
+      userId: { $nin: getCandidateUserIds(travelPost.userId) },
+      status: 'active',
+      expiresAt: { $gt: now },
+      type: { $in: eligibleTypes }
+    }).sort({ createdAt: -1 }).lean(),
+    getActiveGroupedUserIds(now)
+  ]);
 
   const userBooked = travelPost.bookedSeats || 0;
   const userAvailableSeats = Math.max(0, (travelPost.seats || 1) - userBooked);
@@ -212,6 +469,11 @@ export async function findMatchesForTravel(travelPost) {
   const matchedPosts = [];
 
   for (const candidate of candidates) {
+    // Exclude active group members from appearing as independent individual matches
+    if (isUserInSet(candidate.userId, activeGroupedUserIds)) {
+      continue;
+    }
+
     // Rule A: Strict travel direction and location compatibility (NEVER opposite direction)
     if (!isSameDirection(travelPost.source, travelPost.destination, candidate.source, candidate.destination)) {
       continue;
@@ -265,39 +527,79 @@ export async function findMatchesForTravel(travelPost) {
     });
   }
 
-  if (matchedPosts.length === 0) {
-    return [];
+  let enrichedTravelMatches = [];
+  if (matchedPosts.length > 0) {
+    // 4. Attach creator details including phone for direct WhatsApp coordination
+    const userIds = [...new Set(matchedPosts.map((p) => p.userId))];
+    const studentMap = await resolveStudentProfilesMap(userIds, { includeContact: true });
+
+    enrichedTravelMatches = matchedPosts.map((post) => {
+      const student = getStudentFromMap(studentMap, post.userId);
+      const safePublic = formatSafePublicStudent(student, {
+        fallbackName: post.authorName || 'Student',
+        includeContact: true
+      });
+      const peerPhone = safePublic.phone || post.authorPhone || '';
+      const publicProfile = {
+        ...safePublic,
+        email: safePublic.email || post.authorEmail || '',
+        phone: peerPhone,
+        college: safePublic.college || 'VIT, Bhopal'
+      };
+      return {
+        ...post,
+        authorName: publicProfile.name,
+        phone: peerPhone,
+        student: publicProfile,
+        creator: publicProfile
+      };
+    });
   }
 
-  // 4. Attach creator details including phone for direct WhatsApp coordination
-  const userIds = [...new Set(matchedPosts.map((p) => p.userId))];
-  const students = await Student.find(
-    { clerkId: { $in: userIds } },
-    { name: 1, email: 1, phone: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-  ).lean();
+  // 5. For FIND posts, expose open Shared Ride Groups as Group Ride Offers based on remaining capacity
+  if (includeGroupOffers && travelPost.type === 'request') {
+    try {
+      const compatibleGroups = await findCompatibleGroupsForFindPost(travelPost, travelPost.userId);
+      const requiredSeats = travelPost.seats || 1;
+      const groupOffers = compatibleGroups
+        .filter((g) => (g.availableSpots || 0) >= requiredSeats)
+        .map((g) => ({
+          _id: `group_${g._id}`,
+          id: String(g._id),
+          groupId: g._id,
+          isGroupOffer: true,
+          type: 'offer',
+          groupDisplayName: g.groupDisplayName,
+          source: g.source,
+          destination: g.destination,
+          travelDate: g.travelDate,
+          departureTime: g.departureTime,
+          seats: g.targetCapacity,
+          targetCapacity: g.targetCapacity,
+          confirmedMemberCount: g.confirmedMemberCount,
+          availableSpots: g.availableSpots,
+          availableSeats: g.availableSpots,
+          pricePerSeat: 0,
+          status: g.status,
+          members: g.members,
+          membersPreview: g.membersPreview,
+          student: g.admin,
+          creator: g.admin,
+          authorName: g.groupDisplayName || g.admin?.name || 'Shared Ride Group',
+          matchedWithPostId: travelPost._id,
+          matchedWithPostType: travelPost.type,
+          matchedWithTravelDate: travelPost.travelDate,
+          matchedWithRoute: `${travelPost.source} → ${travelPost.destination}`,
+          matchingReason: `Shared group offer (${g.confirmedMemberCount}/${g.targetCapacity} joined • ${g.availableSpots} seats left)`
+        }));
 
-  const studentMap = new Map();
-  students.forEach((s) => studentMap.set(s.clerkId, s));
+      return [...enrichedTravelMatches, ...groupOffers];
+    } catch (groupErr) {
+      console.warn('[MatchingService] Non-fatal error adding group offers:', groupErr.message);
+    }
+  }
 
-  return matchedPosts.map((post) => {
-    const student = studentMap.get(post.userId);
-    const peerPhone = student?.phone || post.authorPhone || '';
-    const publicProfile = {
-      name: student?.name || post.authorName || 'Campus Student',
-      email: student?.email || post.authorEmail || '',
-      phone: peerPhone,
-      imageUrl: student?.imageUrl || post.authorImage || null,
-      avatarId: student?.avatarId || 'm1',
-      college: student?.college || 'VIT, Bhopal',
-      isVerified: Boolean(student?.isVerified)
-    };
-    return {
-      ...post,
-      phone: peerPhone,
-      student: publicProfile,
-      creator: publicProfile
-    };
-  });
+  return enrichedTravelMatches;
 }
 
 /**
@@ -308,10 +610,11 @@ export async function findMatchesForTravel(travelPost) {
  */
 export async function findMatchesForUser(userId) {
   const now = new Date();
+  const userVariants = getCandidateUserIds(userId);
 
   // 1. Fetch user's active, unexpired travels
   const myTravels = await Travel.find({
-    userId,
+    userId: { $in: userVariants.length > 0 ? userVariants : [userId] },
     status: 'active',
     expiresAt: { $gt: now }
   }).sort({ createdAt: -1 }).lean();
@@ -320,12 +623,14 @@ export async function findMatchesForUser(userId) {
     return {
       hasPostedTravel: false,
       myTravels: [],
-      matches: []
+      matches: [],
+      compatibleFinds: []
     };
   }
 
   // 2. Run matching for each of user's active travel posts and aggregate results
   const matchedMap = new Map();
+  const compatibleFindsMap = new Map();
 
   for (const travelPost of myTravels) {
     const matches = await findMatchesForTravel(travelPost);
@@ -335,12 +640,27 @@ export async function findMatchesForUser(userId) {
         matchedMap.set(matchId, match);
       }
     }
+
+    if (travelPost.type === 'request') {
+      try {
+        const finds = await findCompatibleFindPosts(travelPost, { viewerUserId: userId });
+        for (const peer of finds) {
+          const peerId = peer._id.toString();
+          if (!compatibleFindsMap.has(peerId)) {
+            compatibleFindsMap.set(peerId, peer);
+          }
+        }
+      } catch (err) {
+        console.warn('[MatchingService] Non-fatal error collecting compatible FIND peers:', err.message);
+      }
+    }
   }
 
   return {
     hasPostedTravel: true,
     myTravels,
-    matches: Array.from(matchedMap.values())
+    matches: Array.from(matchedMap.values()),
+    compatibleFinds: Array.from(compatibleFindsMap.values())
   };
 }
 
@@ -416,7 +736,7 @@ export async function areFindPostsCompatible(postA, postB, { skipGroupCheck = fa
  * @param {Object} targetFindPost - The source FIND post
  * @returns {Promise<Array>} List of compatible FIND posts with safe public profiles
  */
-export async function findCompatibleFindPosts(targetFindPost) {
+export async function findCompatibleFindPosts(targetFindPost, { viewerUserId = null, includeInternalUserId = false } = {}) {
   if (!targetFindPost || targetFindPost.type !== 'request' || targetFindPost.status !== 'active') {
     return [];
   }
@@ -426,16 +746,23 @@ export async function findCompatibleFindPosts(targetFindPost) {
     return [];
   }
 
-  const candidates = await Travel.find({
-    _id: { $ne: targetFindPost._id },
-    userId: { $ne: targetFindPost.userId },
-    type: 'request',
-    status: 'active',
-    expiresAt: { $gt: now }
-  }).sort({ createdAt: -1 }).lean();
+  const [candidates, activeGroupedUserIds] = await Promise.all([
+    Travel.find({
+      _id: { $ne: targetFindPost._id },
+      userId: { $nin: getCandidateUserIds(targetFindPost.userId) },
+      type: 'request',
+      status: 'active',
+      expiresAt: { $gt: now }
+    }).sort({ createdAt: -1 }).lean(),
+    getActiveGroupedUserIds(now)
+  ]);
 
   const compatiblePosts = [];
   for (const cand of candidates) {
+    // BUG 6: Active group members must never appear as individual matching students
+    if (isUserInSet(cand.userId, activeGroupedUserIds)) {
+      continue;
+    }
     const isCompat = await areFindPostsCompatible(targetFindPost, cand);
     if (isCompat) {
       compatiblePosts.push(cand);
@@ -444,39 +771,48 @@ export async function findCompatibleFindPosts(targetFindPost) {
 
   if (compatiblePosts.length === 0) return [];
 
-  // Enrich with safe public student details (omitting private phone numbers, emails, clerkId, firebaseUid)
+  // Enrich with safe public student details and pair relationship state
   const userIds = [...new Set(compatiblePosts.map((p) => p.userId))];
-  const students = await Student.find(
-    { clerkId: { $in: userIds } },
-    { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-  ).lean();
-
-  const studentMap = new Map();
-  students.forEach((s) => studentMap.set(s.clerkId, s));
+  const effectiveViewer = viewerUserId || targetFindPost.userId;
+  const [studentMap, relationshipMap] = await Promise.all([
+    resolveStudentProfilesMap(userIds, { includeContact: false }),
+    computePairRelationshipStates(effectiveViewer, userIds)
+  ]);
 
   return compatiblePosts.map((post) => {
-    const student = studentMap.get(post.userId);
+    const student = getStudentFromMap(studentMap, post.userId);
     const safeStudent = {
-      name: student?.name || post.authorName || 'Campus Student',
-      imageUrl: student?.imageUrl || post.authorImage || null,
-      avatarId: student?.avatarId || 'm1',
-      college: student?.college || 'VIT, Bhopal',
-      isVerified: Boolean(student?.isVerified)
+      ...formatSafePublicStudent(student, { fallbackName: post.authorName || 'Student' }),
+      college: student?.college || 'VIT, Bhopal'
+    };
+
+    const rawPeerKey = stripFirebasePrefix(post.userId) || post.userId;
+    const rel = relationshipMap.get(rawPeerKey) || {
+      relationshipState: 'NONE',
+      proposalId: null,
+      proposedCapacity: null,
+      groupId: null
     };
 
     return {
       _id: post._id,
-      userId: post.userId,
+      ...(includeInternalUserId ? { userId: post.userId } : {}),
       type: post.type,
       source: post.source,
       destination: post.destination,
       travelDate: post.travelDate,
       departureTime: post.departureTime,
       timeFlexibility: post.timeFlexibility,
+      seats: post.seats || 1,
       status: post.status,
       expiresAt: post.expiresAt,
       student: safeStudent,
-      matchedWithTravelId: targetFindPost._id
+      matchedWithTravelId: targetFindPost._id,
+      relationshipState: rel.relationshipState,
+      proposalId: rel.proposalId,
+      proposedCapacity: rel.proposedCapacity,
+      groupId: rel.groupId,
+      canCreateGroup: rel.relationshipState === 'NONE'
     };
   });
 }
@@ -507,7 +843,7 @@ export async function detectAndNotifyCompatibleFindPosts(newFindPost) {
     return [];
   }
 
-  const compatiblePosts = await findCompatibleFindPosts(newFindPost);
+  const compatiblePosts = await findCompatibleFindPosts(newFindPost, { includeInternalUserId: true });
   if (!compatiblePosts || compatiblePosts.length === 0) {
     return [];
   }
@@ -610,14 +946,32 @@ export async function findCompatibleGroupsForFindPost(findPost, studentId) {
     return [];
   }
 
+  const studentVariants = getCandidateUserIds(studentId);
+
+  // 0. Strict One Active Group Per Student rule: if student is already in any active group, hide group offers
+  if (studentVariants.length > 0) {
+    const alreadyInActiveGroup = await SharedRideGroup.findOne({
+      status: { $in: ['open', 'full'] },
+      expiresAt: { $gt: now },
+      'members.userId': { $in: studentVariants }
+    }).select('_id').lean();
+
+    if (alreadyInActiveGroup) {
+      return [];
+    }
+  }
+
   // 1. Fetch active pending join requests or invitations for this student to exclude groups
-  const pendingRequests = await GroupJoinRequest.find(
-    {
-      requesterId: studentId,
-      status: 'pending'
-    },
-    { groupId: 1, expiresAt: 1 }
-  ).populate({ path: 'groupId', select: 'expiresAt status' }).lean();
+  const pendingRequests = studentVariants.length > 0
+    ? await GroupJoinRequest.find(
+        {
+          requesterId: { $in: studentVariants },
+          status: 'pending',
+          groupId: { $ne: null }
+        },
+        { groupId: 1, expiresAt: 1 }
+      ).populate({ path: 'groupId', select: 'expiresAt status' }).lean()
+    : [];
 
   const activePendingGroupIds = [];
   const expiredRequestIds = [];
@@ -643,8 +997,12 @@ export async function findCompatibleGroupsForFindPost(findPost, studentId) {
   const candidateQuery = {
     status: 'open',
     expiresAt: { $gt: now },
-    adminId: { $ne: studentId },
-    'members.userId': { $ne: studentId },
+    ...(studentVariants.length > 0
+      ? {
+          adminId: { $nin: studentVariants },
+          'members.userId': { $nin: studentVariants }
+        }
+      : {}),
     originatingTravelId: { $ne: findPost._id }
   };
 
@@ -652,15 +1010,26 @@ export async function findCompatibleGroupsForFindPost(findPost, studentId) {
     candidateQuery._id = { $nin: activePendingGroupIds };
   }
 
-  const candidateGroups = await SharedRideGroup.find(candidateQuery).sort({ createdAt: -1 }).lean();
+  const candidateGroups = await SharedRideGroup.find(candidateQuery)
+    .populate({ path: 'originatingTravelId', select: 'status expiresAt' })
+    .sort({ createdAt: -1 })
+    .lean();
 
   // 3. Filter using compatibility rules
   const matchingGroups = [];
   for (const group of candidateGroups) {
-    // Check capacity
+    // Check non-empty & capacity
     const memberCount = Array.isArray(group.members) ? group.members.length : 0;
-    if (memberCount >= group.targetCapacity) {
+    if (memberCount <= 0 || memberCount >= group.targetCapacity) {
       continue;
+    }
+
+    // Ensure originating FIND post is still active and unexpired
+    const origTravel = group.originatingTravelId;
+    if (origTravel && typeof origTravel === 'object') {
+      if (origTravel.status !== 'active' || (origTravel.expiresAt && new Date(origTravel.expiresAt) <= now)) {
+        continue;
+      }
     }
 
     // Check same route and direction
@@ -693,47 +1062,29 @@ export async function findCompatibleGroupsForFindPost(findPost, studentId) {
     ].filter(Boolean))
   ];
 
-  const studentProfiles = await Student.find(
-    { clerkId: { $in: allUserIds } },
-    { name: 1, college: 1, isVerified: 1, imageUrl: 1, avatarId: 1, clerkId: 1, _id: 0 }
-  ).lean();
-
-  const studentMap = new Map();
-  for (const s of studentProfiles) {
-    studentMap.set(s.clerkId, {
-      name: s.name || 'Campus Student',
-      college: s.college || null,
-      isVerified: Boolean(s.isVerified),
-      imageUrl: s.imageUrl || null,
-      avatarId: s.avatarId || null
-    });
-  }
+  const studentMap = await resolveStudentProfilesMap(allUserIds, { includeContact: false });
 
   return matchingGroups.map((g) => {
-    const adminProfile = studentMap.get(g.adminId) || {
-      name: 'Campus Student',
-      college: null,
-      isVerified: false,
-      imageUrl: null,
-      avatarId: null
-    };
+    const adminStudentDoc = getStudentFromMap(studentMap, g.adminId);
+    const adminProfile = formatSafePublicStudent(adminStudentDoc, { fallbackName: 'Student' });
 
     const membersList = (g.members || []).map((m) => {
-      const p = studentMap.get(m.userId);
+      const pDoc = getStudentFromMap(studentMap, m.userId);
+      const safeMember = formatSafePublicStudent(pDoc, { fallbackName: 'Student' });
       return {
-        name: p?.name || 'Member',
-        imageUrl: p?.imageUrl || null,
-        avatarId: p?.avatarId || null,
+        ...safeMember,
         role: m.role || 'member'
       };
     });
 
     const memberCount = Array.isArray(g.members) ? g.members.length : 0;
     const availableSpots = Math.max(0, g.targetCapacity - memberCount);
+    const groupDisplayName = buildGroupDisplayName(membersList, adminProfile.name);
 
     return {
       _id: g._id,
       groupId: g._id,
+      groupDisplayName,
       source: g.source,
       destination: g.destination,
       travelDate: g.travelDate,
@@ -742,6 +1093,7 @@ export async function findCompatibleGroupsForFindPost(findPost, studentId) {
       confirmedMemberCount: memberCount,
       targetCapacity: g.targetCapacity,
       availableSpots,
+      availableSeats: availableSpots,
       status: g.status,
       members: membersList,
       membersPreview: membersList.slice(0, 4)
