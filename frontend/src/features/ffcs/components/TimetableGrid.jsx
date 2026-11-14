@@ -24,43 +24,33 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
 
   return (
     <div className="w-full space-y-3">
-      {/* Helper Banner */}
-      <div className="bg-[#ECFDF5] border border-[#A7F3D0] rounded-2xl p-3 text-center">
-        <p className="text-xs sm:text-sm font-semibold text-[#065F46] leading-relaxed">
-          Registered Slots / Hours are highlighted with <span className="font-extrabold text-[#047857]">green color</span>.
-        </p>
-        <p className="text-[11px] text-[#059669] mt-0.5">
-          If there is no green highlight, it indicates that there are no registered slots for that hour.
-        </p>
-      </div>
-
       {/* Responsive Horizontal Scroll Container */}
       <div className="bg-white rounded-2xl border border-[#FEEBA4] shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-amber-200">
           <table className="min-w-[760px] w-full border-collapse text-center">
-            {/* Table Header */}
+            {/* Table Header - Light Blue Theme */}
             <thead>
-              <tr className="bg-[#17233C] text-white">
-                <th className="py-2.5 px-3 text-[11px] font-black tracking-wider uppercase border-r border-[#2C3B5E] w-16">
+              <tr className="bg-[#E0F2FE] text-[#0369A1]">
+                <th className="py-2.5 px-3 text-[11px] font-black tracking-wider uppercase border-r border-[#BAE6FD] w-16 text-[#0369A1]">
                   Day
                 </th>
                 {VIT_TIME_COLUMNS.map((col) => (
                   <th
                     key={col.id}
-                    className={`py-2 px-1 text-[10px] font-bold border-r border-[#2C3B5E] last:border-r-0 ${
-                      col.isLunch ? 'w-14 bg-[#1E293B]' : 'w-24'
+                    className={`py-2 px-1 text-[10px] font-bold border-r border-[#BAE6FD] last:border-r-0 ${
+                      col.isLunch ? 'w-14 bg-[#BAE6FD]' : 'w-24'
                     }`}
                   >
                     {col.isLunch ? (
-                      <span className="text-amber-300 font-extrabold uppercase tracking-wide">
+                      <span className="text-[#0369A1] font-extrabold uppercase tracking-wide">
                         Lunch
                       </span>
                     ) : (
                       <>
-                        <div className="font-extrabold text-[10px] text-amber-300">
+                        <div className="font-extrabold text-[10px] text-[#0284C7]">
                           {col.start}
                         </div>
-                        <div className="text-[9px] text-slate-300">{col.end}</div>
+                        <div className="text-[9px] text-[#0369A1]/80 font-medium">{col.end}</div>
                       </>
                     )}
                   </th>
