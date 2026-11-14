@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { 
   GraduationCap, Users, BookOpen, CalendarDays, 
   FileText, ChevronRight, Sparkles, Plus, 
-  MessageCircle, Home, PlusCircle, User, CheckCircle2, ArrowRight, Loader2
+  MessageCircle, Home, PlusCircle, User, CheckCircle2, ArrowRight, Loader2,
+  FileCheck
 } from 'lucide-react';
 
 import { AppHeader } from '../../../components/layout/AppHeader';
@@ -17,6 +18,7 @@ import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { getSlotMateDraft, clearSlotMateDraft } from '../../../utils/guestDraft';
 import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 import { useScrollRestoration } from '../../../hooks/useScrollRestoration';
+import { TeacherClassroomIcon } from '../../../components/icons/TeacherClassroomIcon';
 
 export default function SlotFriendHomePage() {
   const navigate = useNavigate();
@@ -181,8 +183,8 @@ export default function SlotFriendHomePage() {
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#FFD426] text-[#17233C] flex items-center justify-center font-black shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                <GraduationCap className="w-6 h-6 stroke-[2.4]" />
+              <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#FEF08A] border border-[#FDE047] text-[#EA580C] flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform p-1.5">
+                <TeacherClassroomIcon className="w-8.5 h-8.5 sm:w-9 sm:h-9" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -193,9 +195,6 @@ export default function SlotFriendHomePage() {
                     New
                   </span>
                 </div>
-                <p className="text-xs text-[#6E7587] font-medium leading-tight mt-0.5 truncate">
-                  Select courses, preview faculties &amp; auto-generate weekly timetable
-                </p>
               </div>
             </div>
             <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#854D0E] flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
