@@ -1,5 +1,6 @@
 export { FFCSProvider, useFFCS } from './context/FFCSContext';
 export { FFCSHome } from './pages/FFCSHome';
+export { AddCourseScreen } from './pages/AddCourseScreen';
 export { AddedCoursesScreen } from './pages/AddedCoursesScreen';
 export { SelectFacultyScreen } from './pages/SelectFacultyScreen';
 export { FFCSTimeTableScreen } from './pages/FFCSTimeTableScreen';

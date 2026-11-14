@@ -51,6 +51,7 @@ import {
 import {
   FFCSProvider,
   FFCSHome,
+  AddCourseScreen,
   AddedCoursesScreen,
   SelectFacultyScreen,
   FFCSTimeTableScreen,
@@ -406,6 +407,7 @@ function AppShell() {
 
       {/* FFCS - Faculty & Course Selection Module Routes */}
       <Route path="/slotmate/ffcs" element={<GuestFriendlyRoute><FFCSHome /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/add" element={<GuestFriendlyRoute><AddCourseScreen /></GuestFriendlyRoute>} />
       <Route path="/slotmate/ffcs/courses" element={<GuestFriendlyRoute><AddedCoursesScreen /></GuestFriendlyRoute>} />
       <Route path="/slotmate/ffcs/faculty/:courseCode" element={<GuestFriendlyRoute><SelectFacultyScreen /></GuestFriendlyRoute>} />
       <Route path="/slotmate/ffcs/timetable" element={<GuestFriendlyRoute><FFCSTimeTableScreen /></GuestFriendlyRoute>} />

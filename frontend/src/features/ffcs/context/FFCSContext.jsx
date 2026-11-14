@@ -3,14 +3,39 @@ import { SAMPLE_COURSES } from '../data/sampleCourses';
 
 const FFCSContext = createContext(null);
 
-const STORAGE_KEY = 'helpU_ffcs_state_v1';
+const STORAGE_KEY = 'helpU_ffcs_state_v2';
 
-const INITIAL_UPLOAD_SLOTS = [
-  { id: 1, label: 'Course 1', courseCode: 'CSE2003', uploaded: true, fileName: 'cse2003_syllabus.png' },
-  { id: 2, label: 'Course 2', courseCode: 'CSE3004', uploaded: true, fileName: 'cse3004_schedule.png' },
-  { id: 3, label: 'Course 3', courseCode: 'CSE3005', uploaded: true, fileName: 'cse3005_timetable.png' },
-  { id: 4, label: 'Course 4', courseCode: 'CSE3006', uploaded: false, fileName: null },
-  { id: 5, label: 'Course 5', courseCode: 'CSE3015', uploaded: false, fileName: null }
+const INITIAL_COURSES = [
+  {
+    id: 'course-1',
+    sequence: 1,
+    label: 'Course 1',
+    code: 'CSE2003',
+    name: 'Computer Architecture and Organization',
+    fileName: 'Upload Image',
+    screenshots: [],
+    uploaded: false
+  },
+  {
+    id: 'course-2',
+    sequence: 2,
+    label: 'Course 2',
+    code: 'CSE3004',
+    name: 'Design and Analysis of Algorithms',
+    fileName: 'Upload Image',
+    screenshots: [],
+    uploaded: false
+  },
+  {
+    id: 'course-3',
+    sequence: 3,
+    label: 'Course 3',
+    code: 'CSE3005',
+    name: 'Software Engineering',
+    fileName: 'Upload Image',
+    screenshots: [],
+    uploaded: false
+  }
 ];
 
 const DEFAULT_CONFIRMED_FACULTIES = {
@@ -62,17 +87,17 @@ const DEFAULT_CONFIRMED_FACULTIES = {
 };
 
 export function FFCSProvider({ children }) {
-  // Load initial from localStorage or defaults
-  const [courses, setCourses] = useState(SAMPLE_COURSES);
-  
-  const [uploadSlots, setUploadSlots] = useState(() => {
+  const [catalogueCourses] = useState(SAMPLE_COURSES);
+
+  // Unlimited user added courses list
+  const [coursesList, setCoursesList] = useState(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_slots`);
+      const saved = localStorage.getItem(`${STORAGE_KEY}_courses_list`);
       if (saved) return JSON.parse(saved);
     } catch (e) {
-      console.warn('Failed to parse FFCS upload slots from storage', e);
+      console.warn('Failed to parse FFCS courses from storage', e);
     }
-    return INITIAL_UPLOAD_SLOTS;
+    return INITIAL_COURSES;
   });
 
   const [confirmedFaculties, setConfirmedFaculties] = useState(() => {
@@ -85,15 +110,16 @@ export function FFCSProvider({ children }) {
     return DEFAULT_CONFIRMED_FACULTIES;
   });
 
-  // Sync to localStorage
+  // Sync courses list to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(`${STORAGE_KEY}_slots`, JSON.stringify(uploadSlots));
+      localStorage.setItem(`${STORAGE_KEY}_courses_list`, JSON.stringify(coursesList));
     } catch (e) {
-      console.warn('Failed to save FFCS upload slots to storage', e);
+      console.warn('Failed to save FFCS courses list to storage', e);
     }
-  }, [uploadSlots]);
+  }, [coursesList]);
 
+  // Sync faculties to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(`${STORAGE_KEY}_faculties`, JSON.stringify(confirmedFaculties));
@@ -102,26 +128,54 @@ export function FFCSProvider({ children }) {
     }
   }, [confirmedFaculties]);
 
-  // Upload or replace image for a slot
-  const uploadCourseImage = (slotId, file) => {
-    const fileName = file?.name || `course_upload_${slotId}.png`;
-    setUploadSlots((prev) =>
-      prev.map((slot) => {
-        if (slot.id === slotId) {
+  // Add a new course (Unlimited courses supported)
+  const addCourse = ({ courseCode, courseName, screenshots = [] }) => {
+    const nextSeq = coursesList.length + 1;
+    const code = courseCode || `CSE${2000 + nextSeq}`;
+    const name = courseName || `Course ${nextSeq}`;
+    
+    // Screenshot info
+    const screenshotNames = screenshots.map((s) => s.name || 'screenshot.png');
+    const displayFileName = screenshotNames.length > 0 
+      ? screenshotNames[0] + (screenshotNames.length > 1 ? ` (+${screenshotNames.length - 1} more)` : '')
+      : 'Upload Image';
+
+    const newCourse = {
+      id: `course-${Date.now()}-${nextSeq}`,
+      sequence: nextSeq,
+      label: `Course ${nextSeq}`,
+      code: code,
+      name: name,
+      fileName: displayFileName,
+      screenshots: screenshots.slice(0, 3), // Max 3 screenshots per course
+      uploaded: screenshots.length > 0
+    };
+
+    setCoursesList((prev) => [...prev, newCourse]);
+    return newCourse;
+  };
+
+  // Upload or replace image for an existing course
+  const uploadCourseImage = (courseIdOrSeq, file) => {
+    const fileName = file?.name || `screenshot.png`;
+    setCoursesList((prev) =>
+      prev.map((c) => {
+        if (c.id === courseIdOrSeq || c.sequence === courseIdOrSeq) {
           return {
-            ...slot,
+            ...c,
             uploaded: true,
-            fileName: fileName
+            fileName: fileName,
+            screenshots: [{ name: fileName, url: URL.createObjectURL(file) }]
           };
         }
-        return slot;
+        return c;
       })
     );
   };
 
   // Confirm / update selected faculty for a course
   const confirmFaculty = (courseCode, facultyData) => {
-    const course = courses.find((c) => c.code === courseCode);
+    const course = catalogueCourses.find((c) => c.code === courseCode);
     setConfirmedFaculties((prev) => ({
       ...prev,
       [courseCode]: {
@@ -143,18 +197,16 @@ export function FFCSProvider({ children }) {
 
   // Load sample demo data
   const loadDemoData = () => {
-    setUploadSlots(INITIAL_UPLOAD_SLOTS);
+    setCoursesList(INITIAL_COURSES);
     setConfirmedFaculties(DEFAULT_CONFIRMED_FACULTIES);
   };
 
   // Reset all selections
   const resetAllData = () => {
-    setUploadSlots(
-      INITIAL_UPLOAD_SLOTS.map((s) => ({ ...s, uploaded: false, fileName: null }))
-    );
+    setCoursesList(INITIAL_COURSES.map(c => ({ ...c, uploaded: false, fileName: 'Upload Image', screenshots: [] })));
     setConfirmedFaculties({});
     try {
-      localStorage.removeItem(`${STORAGE_KEY}_slots`);
+      localStorage.removeItem(`${STORAGE_KEY}_courses_list`);
       localStorage.removeItem(`${STORAGE_KEY}_faculties`);
     } catch (e) {
       console.warn('Error clearing FFCS storage', e);
@@ -162,9 +214,11 @@ export function FFCSProvider({ children }) {
   };
 
   const value = {
-    courses,
-    uploadSlots,
+    courses: catalogueCourses,
+    coursesList,
+    uploadSlots: coursesList, // Alias for backward compatibility
     confirmedFaculties,
+    addCourse,
     uploadCourseImage,
     confirmFaculty,
     removeConfirmedFaculty,
@@ -182,4 +236,3 @@ export function useFFCS() {
   }
   return context;
 }
-

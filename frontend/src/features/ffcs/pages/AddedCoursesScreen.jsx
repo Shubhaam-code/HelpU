@@ -130,7 +130,7 @@ export function AddedCoursesScreen() {
         <div className="pt-2">
           <button
             type="button"
-            onClick={() => navigate('/slotmate/ffcs')}
+            onClick={() => navigate('/slotmate/ffcs/add')}
             className="w-full py-3.5 rounded-2xl bg-[#FFD426] hover:bg-[#FACC15] text-[#17233C] font-black text-sm flex items-center justify-center gap-2 shadow-sm border border-[#EAB308] transition-all cursor-pointer active:scale-98"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
