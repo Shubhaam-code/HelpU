@@ -2,8 +2,9 @@ import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UploadCloud,
-  PlusCircle,
-  ArrowLeft
+  Plus,
+  ArrowLeft,
+  Check
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
@@ -34,7 +35,7 @@ export function FFCSHome() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-32 relative overflow-x-hidden selection:bg-[#FDE047]">
+    <div className="min-h-screen bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-24 relative overflow-x-hidden selection:bg-[#FDE047]">
       {/* Hidden file input for native image picking on cards */}
       <input
         type="file"
@@ -50,7 +51,7 @@ export function FFCSHome() {
       <div className="absolute top-24 -left-12 w-40 h-40 bg-[#FEF08A]/25 rounded-full blur-2xl pointer-events-none" />
 
       {/* Main Container: Mobile First 393px */}
-      <main className="w-full max-w-[393px] mx-auto px-4 pt-2 space-y-3 relative z-10">
+      <main className="w-full max-w-[393px] mx-auto px-4 pt-2 space-y-3.5 relative z-10 flex-1">
         
         {/* Top Minimal Navigation Bar */}
         <div className="flex items-center justify-between pt-1 pb-0.5">
@@ -108,8 +109,8 @@ export function FFCSHome() {
             </div>
           </div>
 
-          {/* UNLIMITED COURSE CARDS: Every course rendered in sequence */}
-          <div className="space-y-2.5">
+          {/* DYNAMIC COURSE CARDS: Displays Actual Course Code, No "Upload Image" text */}
+          <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-amber-200">
             {coursesList.map((course, idx) => {
               const isUploaded = course.uploaded || (course.screenshots && course.screenshots.length > 0);
 
@@ -118,43 +119,45 @@ export function FFCSHome() {
                   key={course.id || idx}
                   className="bg-white rounded-[22px] sm:rounded-[24px] p-3 sm:p-3.5 shadow-[0_4px_16px_rgba(23,35,60,0.03)] border border-[#F1F5F9] flex items-center justify-between gap-3 transition-all hover:shadow-[0_8px_20px_rgba(250,204,21,0.1)]"
                 >
-                  {/* Left: Yellow Circular Number Badge (1, 2, 3...) */}
+                  {/* Left: Yellow Circular Number Badge (1, 2, 3...) + Actual Course Code */}
                   <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     <div className="w-11 h-11 rounded-full bg-[#FACC15] text-[#17233C] font-black text-lg flex items-center justify-center shrink-0 shadow-xs">
                       {course.sequence || idx + 1}
                     </div>
 
-                    {/* Middle: Course Name & Uploaded details */}
+                    {/* Actual Course Code (NO "Course 1" and NO "Upload Image" text!) */}
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-black text-[15px] text-[#17233C] leading-tight truncate">
-                        {course.label || `Course ${idx + 1}`}
+                      <h3 className="font-black text-base text-[#17233C] leading-none tracking-tight truncate">
+                        {course.code || `CSE${2000 + (course.sequence || idx + 1)}`}
                       </h3>
-                      <p className="text-xs font-semibold text-[#64748B] mt-0.5 truncate">
-                        {isUploaded
-                          ? course.fileName || `${course.code || 'Course'} Image`
-                          : 'Upload Image'}
-                      </p>
                     </div>
                   </div>
 
-                  {/* Right: Yellow Rounded Upload Button (STRICT: NO GREEN BUTTONS) */}
-                  <button
-                    type="button"
-                    onClick={() => handleUploadClick(course.id)}
-                    className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-[0_4px_12px_rgba(250,204,21,0.35)] shrink-0 bg-gradient-to-r from-[#FDE047] to-[#FACC15] hover:from-[#FACC15] hover:to-[#EAB308] text-[#17233C] border border-[#FACC15]"
-                  >
-                    <UploadCloud className="w-4 h-4 stroke-[2.4]" />
-                    <span>Upload</span>
-                  </button>
+                  {/* Right: Green Done Button when uploaded, or Yellow Upload Button */}
+                  {isUploaded ? (
+                    <div className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 bg-[#10B981] text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)] border border-[#059669]">
+                      <Check className="w-4 h-4 stroke-[3] text-white" />
+                      <span>Done</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleUploadClick(course.id)}
+                      className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-[0_4px_12px_rgba(250,204,21,0.35)] shrink-0 bg-gradient-to-r from-[#FDE047] to-[#FACC15] hover:from-[#FACC15] hover:to-[#EAB308] text-[#17233C] border border-[#FACC15]"
+                    >
+                      <UploadCloud className="w-4 h-4 stroke-[2.4]" />
+                      <span>Upload</span>
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* ========================================================================= */}
-          {/* PROBLEM 4: ADD MORE COURSE (REPLACES OLD "SEE MORE COURSES")               */}
+          {/* PROBLEM 3: ADD MORE COURSE BUTTON -> ONLY "+ Add More Course"             */}
           {/* ========================================================================= */}
-          <div className="relative flex items-center justify-center w-full pt-1.5 pb-0.5">
+          <div className="relative flex items-center justify-center w-full pt-1 pb-0.5">
             {/* Left burst rays */}
             <div className="flex flex-col gap-1 text-[#FACC15] mr-2 shrink-0">
               <div className="w-2.5 h-0.5 bg-[#FACC15] rounded-full rotate-[-35deg]" />
@@ -162,19 +165,14 @@ export function FFCSHome() {
               <div className="w-2.5 h-0.5 bg-[#FACC15] rounded-full rotate-[35deg]" />
             </div>
 
-            {/* Yellow Dashed Pill Button -> Opens Dedicated Add Course Page */}
+            {/* Yellow Dashed Button -> Displays ONLY: + Add More Course */}
             <button
               type="button"
               onClick={() => navigate('/slotmate/ffcs/add')}
-              className="flex-1 py-2.5 px-4 rounded-full bg-[#FFFDF7] hover:bg-[#FEFCE8] border-2 border-dashed border-[#FACC15] flex flex-col items-center justify-center shadow-xs cursor-pointer active:scale-95 transition-all"
+              className="flex-1 py-3 px-4 rounded-full bg-[#FFFDF7] hover:bg-[#FEFCE8] border-2 border-dashed border-[#FACC15] flex items-center justify-center gap-2 shadow-xs cursor-pointer active:scale-95 transition-all"
             >
-              <div className="flex items-center gap-1.5 text-[#17233C]">
-                <PlusCircle className="w-4 h-4 stroke-[2.4]" />
-                <span className="font-extrabold text-xs sm:text-sm">Add More Course</span>
-              </div>
-              <span className="text-[10px] text-[#64748B] font-semibold leading-tight">
-                (Up to 3 Screenshots)
-              </span>
+              <Plus className="w-4 h-4 stroke-[3] text-[#17233C]" />
+              <span className="font-extrabold text-sm text-[#17233C]">Add More Course</span>
             </button>
 
             {/* Right burst rays */}
@@ -186,39 +184,39 @@ export function FFCSHome() {
           </div>
         </section>
 
-        {/* ========================================================================= */}
-        {/* PROBLEM 1: BOTTOM EMPTY STATE SECTION WITH TRANSPARENT BUBBLE BACKGROUND  */}
-        {/* ========================================================================= */}
-        <section className="relative w-full pt-4 pb-2 flex flex-col items-center justify-center text-center overflow-hidden">
-          
-          {/* User Provided Transparent Yellow-Cream Bubble/Wave background.png */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-            <img
-              src={bgBubbleWaveSrc}
-              alt=""
-              aria-hidden="true"
-              className="w-full h-full object-contain opacity-90 scale-105"
-            />
-          </div>
+      </main>
 
-          {/* Centered Document Illustration Using User's notebook.png */}
-          <div className="relative z-10 w-20 h-20 flex items-center justify-center mb-1 drop-shadow-sm">
+      {/* ========================================================================= */}
+      {/* PROBLEM 1 & 2: FULL-WIDTH BOTTOM BACKGROUND PNG & UPLOAD MESSAGE          */}
+      {/* ========================================================================= */}
+      <section className="relative w-full overflow-hidden pt-4 pb-4 mt-2">
+        {/* Full-width transparent yellow-cream bubble/wave background.png (No white side gaps) */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none select-none overflow-hidden flex items-end">
+          <img
+            src={bgBubbleWaveSrc}
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover object-bottom"
+          />
+        </div>
+
+        {/* Centered Document Illustration & Explanatory Text */}
+        <div className="relative z-10 w-full max-w-[393px] mx-auto px-4 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mb-1 drop-shadow-sm">
             <img
               src={notebookImgSrc}
-              alt="Course Timetable Generator"
+              alt="Course Timetable"
               className="w-full h-full object-contain select-none pointer-events-none"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           </div>
 
-          {/* Explanatory Text */}
-          <p className="relative z-10 font-black text-[15px] sm:text-base text-[#17233C] leading-snug drop-shadow-2xs">
+          <p className="font-extrabold text-[15px] sm:text-base text-[#17233C] leading-snug drop-shadow-2xs">
             Upload your courses to <br />
             generate your timetable
           </p>
-        </section>
-
-      </main>
+        </div>
+      </section>
 
       {/* ========================================================================= */}
       {/* FIXED 3-TAB BOTTOM NAVIGATION: HOME | TIME TABLE | SETTINGS               */}

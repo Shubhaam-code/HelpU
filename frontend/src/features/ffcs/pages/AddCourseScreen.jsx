@@ -136,10 +136,6 @@ export function AddCourseScreen() {
             <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
             <span>Back to Home</span>
           </button>
-
-          <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#FEF08A] text-[#854D0E] border border-[#FDE047]">
-            Add Course
-          </span>
         </div>
 
         {/* ========================================================================= */}

@@ -3,36 +3,31 @@ import { SAMPLE_COURSES } from '../data/sampleCourses';
 
 const FFCSContext = createContext(null);
 
-const STORAGE_KEY = 'helpU_ffcs_state_v2';
+const STORAGE_KEY = 'helpU_ffcs_state_v3';
 
+// Initial 3 courses with actual course codes
 const INITIAL_COURSES = [
   {
     id: 'course-1',
     sequence: 1,
-    label: 'Course 1',
     code: 'CSE2003',
     name: 'Computer Architecture and Organization',
-    fileName: 'Upload Image',
-    screenshots: [],
-    uploaded: false
+    screenshots: [{ name: 'cse2003_syllabus.png' }],
+    uploaded: true
   },
   {
     id: 'course-2',
     sequence: 2,
-    label: 'Course 2',
     code: 'CSE3004',
     name: 'Design and Analysis of Algorithms',
-    fileName: 'Upload Image',
     screenshots: [],
     uploaded: false
   },
   {
     id: 'course-3',
     sequence: 3,
-    label: 'Course 3',
     code: 'CSE3005',
     name: 'Software Engineering',
-    fileName: 'Upload Image',
     screenshots: [],
     uploaded: false
   }
@@ -89,11 +84,14 @@ const DEFAULT_CONFIRMED_FACULTIES = {
 export function FFCSProvider({ children }) {
   const [catalogueCourses] = useState(SAMPLE_COURSES);
 
-  // Unlimited user added courses list
+  // Dynamic unlimited courses list
   const [coursesList, setCoursesList] = useState(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_courses_list`);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (e) {
       console.warn('Failed to parse FFCS courses from storage', e);
     }
@@ -110,7 +108,7 @@ export function FFCSProvider({ children }) {
     return DEFAULT_CONFIRMED_FACULTIES;
   });
 
-  // Sync courses list to localStorage
+  // Sync courses to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(`${STORAGE_KEY}_courses_list`, JSON.stringify(coursesList));
@@ -128,27 +126,20 @@ export function FFCSProvider({ children }) {
     }
   }, [confirmedFaculties]);
 
-  // Add a new course (Unlimited courses supported)
+  // Add a new course (Unlimited courses with automatic sequence numbering)
   const addCourse = ({ courseCode, courseName, screenshots = [] }) => {
     const nextSeq = coursesList.length + 1;
-    const code = courseCode || `CSE${2000 + nextSeq}`;
+    const code = (courseCode || `CSE${2000 + nextSeq}`).toUpperCase().trim();
     const name = courseName || `Course ${nextSeq}`;
-    
-    // Screenshot info
-    const screenshotNames = screenshots.map((s) => s.name || 'screenshot.png');
-    const displayFileName = screenshotNames.length > 0 
-      ? screenshotNames[0] + (screenshotNames.length > 1 ? ` (+${screenshotNames.length - 1} more)` : '')
-      : 'Upload Image';
+    const isUploaded = screenshots && screenshots.length > 0;
 
     const newCourse = {
       id: `course-${Date.now()}-${nextSeq}`,
       sequence: nextSeq,
-      label: `Course ${nextSeq}`,
       code: code,
       name: name,
-      fileName: displayFileName,
       screenshots: screenshots.slice(0, 3), // Max 3 screenshots per course
-      uploaded: screenshots.length > 0
+      uploaded: isUploaded
     };
 
     setCoursesList((prev) => [...prev, newCourse]);
@@ -164,7 +155,6 @@ export function FFCSProvider({ children }) {
           return {
             ...c,
             uploaded: true,
-            fileName: fileName,
             screenshots: [{ name: fileName, url: URL.createObjectURL(file) }]
           };
         }
@@ -203,7 +193,7 @@ export function FFCSProvider({ children }) {
 
   // Reset all selections
   const resetAllData = () => {
-    setCoursesList(INITIAL_COURSES.map(c => ({ ...c, uploaded: false, fileName: 'Upload Image', screenshots: [] })));
+    setCoursesList(INITIAL_COURSES.map(c => ({ ...c, uploaded: false, screenshots: [] })));
     setConfirmedFaculties({});
     try {
       localStorage.removeItem(`${STORAGE_KEY}_courses_list`);
@@ -216,7 +206,7 @@ export function FFCSProvider({ children }) {
   const value = {
     courses: catalogueCourses,
     coursesList,
-    uploadSlots: coursesList, // Alias for backward compatibility
+    uploadSlots: coursesList, // Alias
     confirmedFaculties,
     addCourse,
     uploadCourseImage,
