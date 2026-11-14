@@ -278,3 +278,4 @@ export const VIT_TIMETABLE_DAYS = [
     }
   }
 ];
+

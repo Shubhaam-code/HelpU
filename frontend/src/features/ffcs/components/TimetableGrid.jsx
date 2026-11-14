@@ -159,3 +159,4 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
     </div>
   );
 }
+

@@ -39,9 +39,9 @@ export function FFCSBottomNav({ activeTab }) {
   return (
     <nav
       aria-label="FFCS Bottom Navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#FEEBA4] py-2 px-6 shadow-lg shadow-amber-900/5"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#FEEBA4]/80 py-2 px-5 shadow-[0_-4px_20px_rgba(23,35,60,0.06)]"
     >
-      <div className="max-w-md mx-auto flex items-center justify-around">
+      <div className="max-w-[420px] mx-auto flex items-center justify-around">
         {tabs.map((tab) => {
           const isActive = currentTab === tab.id;
           const Icon = tab.icon;
@@ -51,24 +51,16 @@ export function FFCSBottomNav({ activeTab }) {
               key={tab.id}
               type="button"
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center justify-center py-1 px-4 rounded-2xl transition-all duration-200 cursor-pointer active:scale-95 ${
+              className={`flex flex-col items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 ${
                 isActive
-                  ? 'text-[#17233C]'
-                  : 'text-[#94A3B8] hover:text-[#475569]'
+                  ? 'bg-[#FACC15] text-[#17233C] px-5 py-2 rounded-2xl shadow-sm'
+                  : 'text-[#475569] hover:text-[#17233C] px-4 py-2'
               }`}
             >
-              <div
-                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-200 ${
-                  isActive
-                    ? 'bg-[#FFD426] text-[#17233C] shadow-md shadow-amber-400/30 scale-105'
-                    : 'bg-transparent'
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.4]' : 'stroke-[2]'}`} />
-              </div>
+              <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-[2]'}`} />
               <span
-                className={`text-[11px] mt-1 font-bold tracking-tight transition-colors ${
-                  isActive ? 'text-[#17233C] font-extrabold' : 'text-[#64748B]'
+                className={`text-[11px] mt-0.5 tracking-tight font-black ${
+                  isActive ? 'text-[#17233C]' : 'text-[#64748B] font-bold'
                 }`}
               >
                 {tab.label}
