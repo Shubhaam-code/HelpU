@@ -170,6 +170,41 @@ export default function SlotFriendHomePage() {
         </motion.div>
 
         {/* ========================================================================= */}
+        {/* FFCS - FACULTY & COURSE SELECTION ENTRY BANNER                            */}
+        {/* ========================================================================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: 0.05 }}
+          onClick={() => navigate('/slotmate/ffcs')}
+          className="relative bg-gradient-to-r from-[#FFFBEB] via-[#FFFDF7] to-[#FEF08A]/30 rounded-[24px] sm:rounded-[28px] border-2 border-[#FDE68A] p-3.5 sm:p-4 overflow-hidden shadow-xs hover:border-[#FACC15] hover:shadow-md transition-all cursor-pointer group active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#FFD426] text-[#17233C] flex items-center justify-center font-black shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                <GraduationCap className="w-6 h-6 stroke-[2.4]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight group-hover:text-[#D97706] transition-colors">
+                    FFCS - Faculty &amp; Course Selection
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-[#FEF08A] text-[#854D0E] font-black text-[10px] uppercase tracking-wide border border-[#FDE047]">
+                    New
+                  </span>
+                </div>
+                <p className="text-xs text-[#6E7587] font-medium leading-tight mt-0.5 truncate">
+                  Select courses, preview faculties &amp; auto-generate weekly timetable
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#854D0E] flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
+              <ChevronRight className="w-4 h-4 stroke-[2.8]" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ========================================================================= */}
         {/* 4. STATISTICS SECTION (4 REAL DYNAMIC VALUES IN A ROW)                    */}
         {/* ========================================================================= */}
         {isLoadingPosts && myPosts.length === 0 && (
