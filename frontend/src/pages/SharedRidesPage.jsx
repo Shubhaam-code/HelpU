@@ -145,11 +145,22 @@ export default function SharedRidesPage() {
     return myGroups.find((g) => g.status === 'open' || g.status === 'full') || null;
   }, [myGroups]);
 
-  // Sync ?createFromTravelId=...&peerTravelId=... from RideDetailsPage deep-link
+  // Sync ?createFromTravelId=...&peerTravelId=... and ?tab=... from deep-links
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const createFromId = params.get('createFromTravelId');
     const peerTravelId = params.get('peerTravelId');
+    const tabParam = params.get('tab');
+
+    if (tabParam === 'invitations' || tabParam === 'received' || tabParam === 'received-invitations') {
+      setActiveTab('received-invitations');
+    } else if (tabParam === 'sent-invitations' || tabParam === 'sent') {
+      setActiveTab('sent-invitations');
+    } else if (tabParam === 'my-groups' || tabParam === 'my') {
+      setActiveTab('my-groups');
+    } else if (tabParam === 'discover') {
+      setActiveTab('discover');
+    }
 
     if (createFromId && activeFindPosts.some((p) => p._id === createFromId)) {
       setSelectedTravelId(createFromId);

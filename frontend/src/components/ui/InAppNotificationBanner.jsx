@@ -79,12 +79,19 @@ function resolveTargetRoute(data = {}, type = '') {
   if (data?.module === 'slotmate' || type === 'SLOT_MATCH_FOUND') {
     return data?.postId ? `/slotmate/matches?postId=${data.postId}` : '/slotmate/matches';
   }
+  const t = (type || '').toUpperCase();
+  if (t === 'GROUP_INVITATION_RECEIVED') {
+    if (data?.groupId) return `/groups/${data.groupId}`;
+    return '/shared-rides?tab=invitations';
+  }
+  if (t.startsWith('GROUP_') && data?.groupId) {
+    return `/groups/${data.groupId}`;
+  }
   if (data?.bookingId) return `/bookings/${data.bookingId}`;
   if (data?.relatedBookingId) return `/bookings/${data.relatedBookingId}`;
   if (data?.travelId) return `/rides/${data.travelId}`;
   if (data?.relatedTravelId) return `/rides/${data.relatedTravelId}`;
 
-  const t = (type || '').toUpperCase();
   if (t === 'SLOT_MATCH_FOUND') return '/slotmate/matches';
   if (t.includes('MATCH')) return '/matches';
   if (t.includes('BOOKING')) return '/bookings';

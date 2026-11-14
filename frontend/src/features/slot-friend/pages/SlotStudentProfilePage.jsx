@@ -37,7 +37,7 @@ export default function SlotStudentProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FFFDF9] flex flex-col items-center justify-center p-4 text-center">
+      <div className="min-h-screen min-h-dvh bg-[#FFFDF9] flex flex-col items-center justify-center p-4 text-center">
         <Loader2 className="w-8 h-8 text-[#D97706] animate-spin mb-2" />
         <p className="text-xs font-bold text-[#6E7587]">Loading student profile...</p>
       </div>
@@ -46,7 +46,7 @@ export default function SlotStudentProfilePage() {
 
   if (!student) {
     return (
-      <div className="min-h-screen bg-[#FFFDF9] flex flex-col items-center justify-center p-4 text-center">
+      <div className="min-h-screen min-h-dvh bg-[#FFFDF9] flex flex-col items-center justify-center p-4 text-center">
         <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center text-2xl mb-3">
           ⚠️
         </div>
@@ -79,7 +79,7 @@ export default function SlotStudentProfilePage() {
     : (student.courseName || student.courseCode || 'Course');
 
   return (
-    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col pb-24">
+    <div className="min-h-screen min-h-dvh bg-[#FFFDF9] text-[#17233C] flex flex-col">
       {/* ========================================================================= */}
       {/* 1. HEADER: BACK ARROW + MATCH DETAILS TITLE + THREE-DOT MENU             */}
       {/* ========================================================================= */}
@@ -102,7 +102,7 @@ export default function SlotStudentProfilePage() {
       {/* ========================================================================= */}
       {/* MAIN CONTENT AREA                                                         */}
       {/* ========================================================================= */}
-      <main className="w-full max-w-xl mx-auto px-4 pt-4 space-y-4 flex-1">
+      <main className="w-full max-w-xl mx-auto px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] space-y-4 flex-1">
         {/* ======================================================================= */}
         {/* 2. PROFILE HEADER CARD (WARM YELLOW GRADIENT)                           */}
         {/* ======================================================================= */}
@@ -222,7 +222,7 @@ export default function SlotStudentProfilePage() {
       {/* ========================================================================= */}
       {/* 4. FIXED BOTTOM BAR: CONTACT ON WHATSAPP BUTTON                           */}
       {/* ========================================================================= */}
-      <footer className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#F4E3D8] p-3 z-40">
+      <footer className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#F4E3D8] px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40">
         <div className="max-w-md mx-auto">
           <button
             type="button"

@@ -110,13 +110,37 @@ export default function NotificationsPage() {
 
     const bookingId = notification.relatedBookingId;
     const travelId = notification.relatedTravelId;
-    const groupId = notification.payload?.groupId;
+    const meta = notification.metadata || {};
+    const groupId = meta.groupId;
+    const requestId = meta.requestId || meta.proposalId;
+    const navigationUrl = meta.navigationUrl || meta.route;
 
-    // Direct routing to group details if notification belongs to a Shared Ride Group
-    if (groupId) {
+    // For GROUP_INVITATION_RECEIVED: go to invitations tab or specific group
+    if (notification.type === 'GROUP_INVITATION_RECEIVED') {
+      if (groupId) {
+        navigate(`/groups/${groupId}`, {
+          state: { from: 'notifications', fromLabel: 'Back to Notifications' }
+        });
+      } else {
+        // Formation proposal — go to shared rides invitations tab
+        navigate('/shared-rides?tab=invitations', {
+          state: { from: 'notifications', fromLabel: 'Back to Notifications' }
+        });
+      }
+      return;
+    }
+
+    // For other GROUP_* types: navigate to the group page
+    if (notification.type?.startsWith('GROUP_') && groupId) {
       navigate(`/groups/${groupId}`, {
         state: { from: 'notifications', fromLabel: 'Back to Notifications' }
       });
+      return;
+    }
+
+    // Use navigationUrl/route from metadata if available
+    if (navigationUrl) {
+      navigate(navigationUrl);
       return;
     }
 
@@ -139,8 +163,9 @@ export default function NotificationsPage() {
   // Direct action: Open group size selector or submit Shared Ride Group creation from compatible FIND match
   const handleCreateGroupFromMatch = async (notification, e, targetSizeOverride = null) => {
     if (e) e.stopPropagation();
-    const originatingTravelId = notification.relatedTravelId;
-    const candidateTravelId = notification.payload?.candidateTravelId || notification.payload?.initiatorTravelId;
+    const meta = notification.metadata || {};
+    const originatingTravelId = notification.relatedTravelId || meta.originatingTravelId || meta.travelId;
+    const candidateTravelId = meta.candidateTravelId || meta.initiatorTravelId || meta.matchedTravelId;
 
     if (!originatingTravelId || !candidateTravelId) {
       navigate('/shared-rides');

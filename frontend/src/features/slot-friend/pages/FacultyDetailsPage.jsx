@@ -17,6 +17,7 @@ import {
 
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { RateFacultyModal } from '../components/RateFacultyModal';
+import { FACULTY_PAGE_TITLE, FACULTY_ROUTE } from '../constants';
 import { getFacultyById, submitFacultyRating } from '../../../lib/api';
 import { getFacultyInitials } from '../components/FacultyCard';
 import { useUser } from '../../../context/FirebaseAuthContext';
@@ -116,7 +117,7 @@ export default function FacultyDetailsPage() {
 
   const handleOpenFeedback = () => {
     if (!user) {
-      navigate(`/login?returnTo=${encodeURIComponent(`/slotmate/faculty/${id}`)}`);
+      navigate(`/login?returnTo=${encodeURIComponent(`${FACULTY_ROUTE}/${id}`)}`);
       return;
     }
     setIsModalOpen(true);
@@ -157,20 +158,20 @@ export default function FacultyDetailsPage() {
     : '—';
 
   return (
-    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
+    <div className="min-h-screen min-h-dvh bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
       {/* Header matching Matches page */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/slotmate/faculty')}
+            onClick={() => navigate(FACULTY_ROUTE)}
             className="p-1 -ml-1 text-[#17233C] hover:bg-white rounded-xl transition-colors cursor-pointer"
             aria-label="Back to Faculty Search"
           >
             <ArrowLeft className="w-5 h-5 text-[#17233C] stroke-[2.4]" />
           </button>
-          <h1 className="font-black text-[#17233C] text-xl tracking-tight">
-            Faculty
+          <h1 className="font-black text-[#17233C] text-lg sm:text-xl tracking-tight truncate">
+            {FACULTY_PAGE_TITLE}
           </h1>
         </div>
       </header>
@@ -186,11 +187,11 @@ export default function FacultyDetailsPage() {
       )}
 
       {/* Main Scrollable Container */}
-      <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-4 pb-28">
+      <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))]">
         {/* Back navigation button */}
         <button
           type="button"
-          onClick={() => navigate('/slotmate/faculty')}
+          onClick={() => navigate(FACULTY_ROUTE)}
           aria-label="Back to Faculty Search"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6E7587] hover:text-[#17233C] active:scale-95 transition-all mb-3 cursor-pointer focus:outline-none"
         >
@@ -225,7 +226,7 @@ export default function FacultyDetailsPage() {
             <h2 className="text-lg font-bold text-[#17233C]">{error || 'Faculty Not Found'}</h2>
             <button
               type="button"
-              onClick={() => navigate('/slotmate/faculty')}
+              onClick={() => navigate(FACULTY_ROUTE)}
               className="mt-4 px-5 py-2 rounded-full bg-[#FEF08A] text-[#C2410C] font-black text-xs hover:bg-[#FDE047] active:scale-95 transition-all shadow-2xs cursor-pointer"
             >
               Back to Faculty Search
@@ -245,7 +246,7 @@ export default function FacultyDetailsPage() {
                 <div className="flex items-center justify-between gap-3">
                   {/* Left Column: Name, Designation & Rating Pill */}
                   <div className="flex-1 min-w-0 pr-2">
-                    <h1 className="text-xl sm:text-2xl font-black text-[#17233C] tracking-tight leading-tight truncate">
+                    <h1 className="text-xl sm:text-2xl font-black text-[#17233C] tracking-tight leading-tight break-words line-clamp-2">
                       {faculty.name}
                     </h1>
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm text-[#6E7587] font-semibold mt-1 truncate">
@@ -285,10 +286,10 @@ export default function FacultyDetailsPage() {
                 <div className="w-full h-px bg-[#F4E3D8]/80 my-4" />
 
                 {/* Bottom Information Pill: Overall Student Feedback */}
-                <div className="flex items-center">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FEF9C3] to-[#FEF08A]/70 border border-[#FEF08A] shadow-2xs text-[#78350F] text-xs sm:text-sm font-bold">
+                <div className="flex items-center min-w-0">
+                  <div className="inline-flex flex-wrap items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FEF9C3] to-[#FEF08A]/70 border border-[#FEF08A] shadow-2xs text-[#78350F] text-xs sm:text-sm font-bold max-w-full">
                     <BarChart3 className="w-4 h-4 text-[#D97706] stroke-[2.5] shrink-0" />
-                    <span>
+                    <span className="min-w-0 break-words">
                       Overall Student Feedback:{' '}
                       <strong className="font-black text-[#78350F]">
                         {faculty.status || 'Average'}

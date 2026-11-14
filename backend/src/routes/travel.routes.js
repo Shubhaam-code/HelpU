@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { requireAuth, optionalAuth } from '../middlewares/auth.js';
 import { requireIdempotency } from '../middlewares/idempotency.js';
 import Travel, { calculateExpiresAt } from '../models/Travel.js';
+import Notification from '../models/Notification.js';
 import Student from '../models/Student.js';
 import Booking from '../models/Booking.js';
 import SharedRideGroup from '../models/SharedRideGroup.js';
@@ -1781,6 +1782,23 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     // 5. Permanently remove the travel post from database
     await Travel.findByIdAndDelete(id);
+
+    // 6. Automatically remove all notifications referencing this deleted travel post (Problem 1)
+    try {
+      await Notification.deleteMany({
+        $or: [
+          { relatedTravelId: id },
+          { 'metadata.matchedTravelId': id },
+          { 'metadata.candidateTravelId': id },
+          { 'metadata.originatingTravelId': id },
+          { 'metadata.initiatorTravelId': id },
+          { 'metadata.travelId': id },
+          { 'metadata.targetTravelId': id }
+        ]
+      });
+    } catch (notifCleanupErr) {
+      console.warn('[DeleteTravel] Notification cleanup error:', notifCleanupErr.message);
+    }
 
     return res.status(200).json({
       success: true,

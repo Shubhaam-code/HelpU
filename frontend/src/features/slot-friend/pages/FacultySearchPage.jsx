@@ -14,6 +14,7 @@ import {
 
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { FacultyCard } from '../components/FacultyCard';
+import { FACULTY_PAGE_TITLE, FACULTY_ROUTE } from '../constants';
 import { searchFaculty } from '../../../lib/api';
 import { useUserProfile } from '../../../hooks/useAppData';
 import { useScrollRestoration } from '../../../hooks/useScrollRestoration';
@@ -98,14 +99,14 @@ export default function FacultySearchPage() {
 
   const handleSelectFaculty = (faculty) => {
     const id = faculty.facultyId || faculty._id;
-    navigate(`/slotmate/faculty/${encodeURIComponent(id)}`);
+    navigate(`${FACULTY_ROUTE}/${encodeURIComponent(id)}`);
   };
 
   const isQueryTooShort = query.length > 0 && query.trim().length < 2;
   const isSearchActive = debouncedQuery.length >= 2;
 
   return (
-    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
+    <div className="min-h-screen min-h-dvh bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
       {/* Header matching Matches page */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#FFF8F3]/95 backdrop-blur-md sticky top-0 z-30 border-b border-[#F4E3D8]">
         <div className="flex items-center gap-3">
@@ -117,30 +118,31 @@ export default function FacultySearchPage() {
           >
             <ArrowLeft className="w-5 h-5 text-[#17233C] stroke-[2.4]" />
           </button>
-          <h1 className="font-black text-[#17233C] text-xl tracking-tight">
-            Faculty Reviews
+          <h1 className="font-black text-[#17233C] text-lg sm:text-xl tracking-tight truncate">
+            {FACULTY_PAGE_TITLE}
           </h1>
         </div>
       </header>
 
       {/* Main Scrollable Container */}
-      <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-4 pb-28">
+      <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))]">
         {/* Enhanced Hero Banner Section - Golden pill removed per feedback */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FEFCE8]/50 to-[#FFF7ED] border border-[#F4E3D8] p-5 sm:p-6 shadow-[0_4px_24px_rgba(23,35,60,0.03)] min-h-[145px] sm:min-h-[160px] flex items-center">
-          <div className="relative z-10 max-w-[56%] sm:max-w-[60%]">
-            <h1 className="text-2.5xl sm:text-3xl font-extrabold text-[#17233C] tracking-tight leading-tight">
-              Faculty Reviews
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FEFCE8]/50 to-[#FFF7ED] border border-[#F4E3D8] p-4 min-[360px]:p-5 sm:p-6 shadow-[0_4px_24px_rgba(23,35,60,0.03)] min-h-[140px] sm:min-h-[160px] flex items-center gap-2">
+          <div className="relative z-10 flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17233C] tracking-tight leading-tight">
+              {FACULTY_PAGE_TITLE}
             </h1>
             <p className="text-xs sm:text-sm text-[#4B5563] font-medium mt-1.5 leading-relaxed">
               Search faculty, read student reviews and make better slot choices.
             </p>
           </div>
 
-          {/* 3D Hero Illustration */}
+          {/* 3D Hero Illustration - sized relative to the card so it never
+              covers the copy on narrow Android phones */}
           <img
             src="/faculty-hero-3d.png"
             alt="Faculty Illustration"
-            className="absolute -bottom-3 -right-3 w-44 sm:w-56 h-auto object-contain pointer-events-none drop-shadow-md select-none"
+            className="relative z-0 shrink-0 self-end w-28 min-[360px]:w-36 sm:w-44 md:w-52 max-w-[45%] h-auto object-contain pointer-events-none drop-shadow-md select-none -mb-3 -mr-3"
             loading="eager"
           />
         </section>
@@ -148,7 +150,7 @@ export default function FacultySearchPage() {
         {/* Search Input Section */}
         <div className="mt-4 relative">
           <div className="relative flex items-center">
-            <Search className="absolute left-4 w-5 h-5 text-[#9CA3AF] pointer-events-none stroke-[2.2]" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9CA3AF] pointer-events-none stroke-[2.2]" />
             <input
               type="text"
               value={query}
@@ -156,20 +158,21 @@ export default function FacultySearchPage() {
               placeholder="Search faculty by name..."
               aria-label="Search faculty by name"
               autoComplete="off"
-              className="w-full pl-11 pr-11 py-3.5 bg-white rounded-full border border-[#F4E3D8] text-[15px] font-medium text-[#17233C] placeholder-[#9CA3AF] shadow-[0_2px_12px_rgba(23,35,60,0.03)] focus:outline-none focus:border-[#FACC15] focus:ring-2 focus:ring-[#FEF08A]/60 transition-all"
+              enterKeyHint="search"
+              className="w-full min-h-[48px] pl-11 pr-14 py-3.5 bg-white rounded-full border border-[#F4E3D8] text-base sm:text-[15px] font-medium text-[#17233C] placeholder-[#9CA3AF] shadow-[0_2px_12px_rgba(23,35,60,0.03)] focus:outline-none focus:border-[#FACC15] focus:ring-2 focus:ring-[#FEF08A]/60 transition-all"
             />
             {query.length > 0 && (
               <button
                 type="button"
                 onClick={handleClear}
                 aria-label="Clear search query"
-                className="absolute right-3.5 p-1 rounded-full hover:bg-gray-100 text-[#9CA3AF] hover:text-[#17233C] transition-colors cursor-pointer"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 text-[#9CA3AF] hover:text-[#17233C] transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
             {isSearching && (
-              <div className="absolute right-10">
+              <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
                 <Loader2 className="w-4 h-4 animate-spin text-[#EA580C]" />
               </div>
             )}
@@ -185,12 +188,12 @@ export default function FacultySearchPage() {
 
         {/* Dynamic Content Stream */}
         {isSearchActive && (
-          <div className="flex items-center justify-between mt-5 mb-3 px-1">
-            <h2 className="text-sm font-black text-[#17233C] tracking-tight">
+          <div className="flex items-center justify-between gap-2 mt-5 mb-3 px-1">
+            <h2 className="text-sm font-black text-[#17233C] tracking-tight min-w-0 truncate">
               Results for "{debouncedQuery}"
             </h2>
             {!isSearching && facultyList.length > 0 && (
-              <span className="text-xs font-bold text-[#6E7587] bg-[#F4E3D8]/50 px-2.5 py-0.5 rounded-full">
+              <span className="shrink-0 text-xs font-bold text-[#6E7587] bg-[#F4E3D8]/50 px-2.5 py-0.5 rounded-full">
                 {facultyList.length} {facultyList.length === 1 ? 'result' : 'results'}
               </span>
             )}
@@ -243,7 +246,7 @@ export default function FacultySearchPage() {
             <div className="w-13 h-13 mx-auto rounded-full bg-[#FEF9C3] flex items-center justify-center mb-3 border border-[#FEF08A]">
               <GraduationCap className="w-6 h-6 text-[#EA580C]" />
             </div>
-            <h3 className="text-base font-bold text-[#17233C]">
+            <h3 className="text-base font-bold text-[#17233C] break-words">
               No faculty found matching "{debouncedQuery}"
             </h3>
             <p className="text-xs text-[#6E7587] font-medium mt-1 max-w-xs mx-auto leading-relaxed">

@@ -30,6 +30,15 @@ html {
   /* Inform compositor that vertical gestures are dedicated to scrolling */
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
+  /* Keep focused fields clear of sticky headers when Android scrolls them into view */
+  scroll-padding-top: 4.5rem;
+}
+
+input,
+textarea,
+select {
+  scroll-margin-top: 5.5rem;
+  scroll-margin-bottom: 6rem;
 }
 
 body {

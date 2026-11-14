@@ -47,7 +47,7 @@ export function DesktopNavbar({ avatarId, unreadCount = 0, onToggleSidebar, isSi
   // Sync and fetch actual unread notification count
   const refreshUnreadCount = useCallback(async () => {
     try {
-      const res = await getUnreadCount();
+      const res = await getUnreadCount({ module: 'poolmate' });
       const count = res?.data?.unreadCount ?? res?.data?.count ?? res?.data?.data?.count;
       if (typeof count === 'number') {
         setLiveUnreadCount(count);

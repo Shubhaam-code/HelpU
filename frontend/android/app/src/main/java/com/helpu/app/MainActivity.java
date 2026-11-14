@@ -117,9 +117,11 @@ public class MainActivity extends BridgeActivity {
                 Insets insets = windowInsets.getInsets(
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
                 );
-                // Apply status bar + cutout height as top padding
-                // Bottom padding is managed cleanly by BottomNavigation to prevent double bottom gap
-                v.setPadding(insets.left, insets.top, insets.right, 0);
+                // Reserve the status bar / display cutout at the top and the system
+                // navigation bar / gesture area at the bottom. The web layer also has
+                // identifying safe-area fallbacks, but Android WebView reports env()
+                // insets inconsistently, so the native window owns the real insets.
+                v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
                 return windowInsets;
             });
         }

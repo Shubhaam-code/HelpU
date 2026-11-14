@@ -6,6 +6,7 @@ import {
   getMatchDetails
 } from '../services/slotMatching.service.js';
 import SlotPost from '../models/SlotPost.js';
+import Notification from '../models/Notification.js';
 
 /**
  * @route   POST /api/slotmate/posts
@@ -243,6 +244,21 @@ export async function deletePost(req, res) {
 
     post.status = 'closed';
     await post.save();
+
+    // Auto-cleanup: remove all notifications referencing this closed/deleted slot post (Problem 1)
+    try {
+      await Notification.deleteMany({
+        $or: [
+          { relatedSlotPostId: post._id },
+          { 'metadata.matchId': String(post._id) },
+          { 'metadata.postId': String(post._id) },
+          { 'metadata.matchId': post._id },
+          { 'metadata.postId': post._id }
+        ]
+      });
+    } catch (notifErr) {
+      console.warn('[DeleteSlotPost] Notification cleanup error:', notifErr.message);
+    }
 
     return res.status(200).json({
       success: true,

@@ -1,11 +1,16 @@
 import mongoose from 'mongoose';
 import Notification from '../models/Notification.js';
 import DeviceToken from '../models/DeviceToken.js';
+import Travel from '../models/Travel.js';
+import SlotPost from '../models/SlotPost.js';
 
 /**
  * Helper to build strict module isolation filter between PoolMate and SlotMate
  */
 function buildNotificationModuleFilter(moduleName) {
+  if (moduleName === 'all') {
+    return null;
+  }
   if (moduleName === 'slotmate') {
     return {
       $or: [
@@ -15,16 +20,136 @@ function buildNotificationModuleFilter(moduleName) {
       ]
     };
   }
-  if (moduleName === 'poolmate') {
-    return {
-      $and: [
-        { module: { $ne: 'slotmate' } },
-        { type: { $not: /^SLOT_/ } },
-        { relatedSlotPostId: null }
+  // Default to poolmate: strictly prevent slotmate notifications from leaking into PoolMate
+  return {
+    $and: [
+      { module: { $ne: 'slotmate' } },
+      { type: { $not: /^SLOT_/ } },
+      { relatedSlotPostId: null }
+    ]
+  };
+}
+
+/**
+ * Automatically purges and filters out notifications referencing deleted,
+ * expired, or closed/unavailable posts for the authenticated student (Problem 1)
+ */
+async function pruneStaleNotificationsForUser(recipientId) {
+  if (!recipientId) return;
+  try {
+    const now = new Date();
+    const notifs = await Notification.find({
+      recipientId,
+      $or: [
+        { relatedTravelId: { $ne: null } },
+        { relatedSlotPostId: { $ne: null } },
+        { 'metadata.matchedTravelId': { $exists: true } },
+        { 'metadata.matchId': { $exists: true } },
+        { 'metadata.postId': { $exists: true } }
       ]
-    };
+    }).select('_id type module relatedTravelId relatedSlotPostId metadata').lean();
+
+    if (!notifs || notifs.length === 0) return;
+
+    const staleIds = [];
+    const travelIdsToCheck = new Set();
+    const slotPostIdsToCheck = new Set();
+
+    for (const n of notifs) {
+      if (n.relatedTravelId && mongoose.Types.ObjectId.isValid(n.relatedTravelId)) {
+        travelIdsToCheck.add(String(n.relatedTravelId));
+      }
+      if (n.metadata?.matchedTravelId && mongoose.Types.ObjectId.isValid(n.metadata.matchedTravelId)) {
+        travelIdsToCheck.add(String(n.metadata.matchedTravelId));
+      }
+      if (n.relatedSlotPostId && mongoose.Types.ObjectId.isValid(n.relatedSlotPostId)) {
+        slotPostIdsToCheck.add(String(n.relatedSlotPostId));
+      }
+      if (n.metadata?.matchId && mongoose.Types.ObjectId.isValid(n.metadata.matchId)) {
+        slotPostIdsToCheck.add(String(n.metadata.matchId));
+      }
+      if (n.metadata?.postId && mongoose.Types.ObjectId.isValid(n.metadata.postId)) {
+        slotPostIdsToCheck.add(String(n.metadata.postId));
+      }
+    }
+
+    const [validTravels, validSlotPosts] = await Promise.all([
+      travelIdsToCheck.size > 0
+        ? Travel.find({ _id: { $in: Array.from(travelIdsToCheck) } }).select('_id status expiresAt').lean()
+        : [],
+      slotPostIdsToCheck.size > 0
+        ? SlotPost.find({ _id: { $in: Array.from(slotPostIdsToCheck) } }).select('_id status').lean()
+        : []
+    ]);
+
+    const travelMap = new Map();
+    for (const t of validTravels) {
+      travelMap.set(String(t._id), t);
+    }
+
+    const slotMap = new Map();
+    for (const s of validSlotPosts) {
+      slotMap.set(String(s._id), s);
+    }
+
+    for (const n of notifs) {
+      // Check PoolMate match/travel notifications
+      if (n.type === 'NEW_MATCH_FOUND' || n.type === 'COMPATIBLE_FIND_MATCH') {
+        const tid = n.relatedTravelId ? String(n.relatedTravelId) : null;
+        const matchedTid = n.metadata?.matchedTravelId ? String(n.metadata.matchedTravelId) : null;
+
+        if (tid) {
+          const t = travelMap.get(tid);
+          if (!t || t.status !== 'active' || (t.expiresAt && new Date(t.expiresAt) <= now)) {
+            staleIds.push(n._id);
+            continue;
+          }
+        }
+        if (matchedTid) {
+          const mt = travelMap.get(matchedTid);
+          if (!mt || mt.status !== 'active' || (mt.expiresAt && new Date(mt.expiresAt) <= now)) {
+            staleIds.push(n._id);
+            continue;
+          }
+        }
+      }
+
+      // Check SlotMate match notifications
+      if (n.type === 'SLOT_MATCH_FOUND' || n.module === 'slotmate') {
+        const sid = n.relatedSlotPostId ? String(n.relatedSlotPostId) : null;
+        const matchId = n.metadata?.matchId ? String(n.metadata.matchId) : null;
+        const postId = n.metadata?.postId ? String(n.metadata.postId) : null;
+
+        if (sid) {
+          const s = slotMap.get(sid);
+          if (!s || s.status !== 'active') {
+            staleIds.push(n._id);
+            continue;
+          }
+        }
+        if (matchId) {
+          const ms = slotMap.get(matchId);
+          if (!ms || ms.status !== 'active') {
+            staleIds.push(n._id);
+            continue;
+          }
+        }
+        if (postId) {
+          const ps = slotMap.get(postId);
+          if (!ps || ps.status !== 'active') {
+            staleIds.push(n._id);
+            continue;
+          }
+        }
+      }
+    }
+
+    if (staleIds.length > 0) {
+      await Notification.deleteMany({ _id: { $in: staleIds } });
+    }
+  } catch (err) {
+    console.warn('[NotificationCleanup] Non-fatal error pruning stale notifications:', err.message);
   }
-  return null;
 }
 
 /**
@@ -35,6 +160,10 @@ function buildNotificationModuleFilter(moduleName) {
 export async function getMyNotifications(req, res) {
   try {
     const recipientId = req.userId;
+
+    // Auto-clean stale notifications for deleted/closed/expired posts (Problem 1)
+    await pruneStaleNotificationsForUser(recipientId);
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
@@ -86,6 +215,10 @@ export async function getMyNotifications(req, res) {
 export async function getUnreadNotificationCount(req, res) {
   try {
     const recipientId = req.userId;
+
+    // Auto-clean stale notifications for deleted/closed/expired posts (Problem 1)
+    await pruneStaleNotificationsForUser(recipientId);
+
     const filter = {
       recipientId,
       isRead: false

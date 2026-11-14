@@ -94,6 +94,19 @@ export function initMobileNativeBridge({ navigate }) {
     Keyboard.addListener('keyboardWillShow', (info) => {
       document.body.classList.add('keyboard-open');
       document.documentElement.style.setProperty('--keyboard-height', `${info.keyboardHeight}px`);
+
+      // Keep the focused field above the Android keyboard after the viewport resizes
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (
+          activeEl &&
+          (activeEl.tagName === 'INPUT' ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.isContentEditable)
+        ) {
+          activeEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }, 150);
     }).then((l) => { kbShowRemove = () => l.remove(); });
 
     Keyboard.addListener('keyboardWillHide', () => {
