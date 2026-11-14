@@ -46,6 +46,8 @@ createRoot(document.getElementById('root')).render(
             if (root === 'travels') return true;
             // ✅ Persist: community posts
             if (root === 'community') return true;
+            // ✅ Persist: FFCS courses cache
+            if (root === 'ffcs') return true;
             // ❌ Do NOT persist: private/sensitive data
             // bookings, profile, notifications, groups are excluded
             return false;

@@ -32,6 +32,9 @@ export const CACHE_DURATIONS = {
   NOTIFICATIONS: { staleTime: 60 * 1000, gcTime: 15 * 60 * 1000 },
   // Unread badge count: short freshness, cheap to refetch
   UNREAD_COUNT: { staleTime: 30 * 1000, gcTime: 10 * 60 * 1000 },
+  // FFCS courses & faculty catalogs: 5 min staleTime, 60 min gcTime for instant mobile navigation
+  FFCS_COURSES: { staleTime: 5 * 60 * 1000, gcTime: 60 * 60 * 1000 },
+  FFCS_TEACHERS: { staleTime: 10 * 60 * 1000, gcTime: 60 * 60 * 1000 }
 };
 
 /**
@@ -82,7 +85,9 @@ export const QUERY_KEYS = {
   sentProposals: (userId) => ['groups', 'sentProposals', userId || 'current'],
   mySlotPosts: (userId) => ['mySlotPosts', userId || 'current'],
   slotMatches: (postId) => ['slotMatches', postId || 'all'],
-  slotMatchDetails: (matchId) => ['slotMatches', 'detail', matchId || 'none']
+  slotMatchDetails: (matchId) => ['slotMatches', 'detail', matchId || 'none'],
+  ffcsCourses: (userId) => ['ffcs', 'courses', userId || 'current'],
+  ffcsCourseTeachers: (courseId) => ['ffcs', 'teachers', String(courseId || 'none')]
 };
 
 export const queryKeys = QUERY_KEYS;
@@ -126,6 +131,17 @@ export function invalidateCommunityQueries() {
   queryClient.invalidateQueries({ queryKey: ['community'] });
 }
 
+export function invalidateFFCSCourseQueries() {
+  return queryClient.invalidateQueries({ queryKey: ['ffcs', 'courses'] });
+}
+
+export function invalidateFFCSTeacherQueries(courseId) {
+  if (courseId) {
+    return queryClient.invalidateQueries({ queryKey: ['ffcs', 'teachers', String(courseId)] });
+  }
+  return queryClient.invalidateQueries({ queryKey: ['ffcs', 'teachers'] });
+}
+
 /**
  * Invalidate all SlotMate post and match caches after a create, edit, or delete.
  * Invalidation is prefix-based, so every user/post variant is refreshed.
@@ -145,6 +161,8 @@ export function clearUserCache() {
   queryClient.clear();
   try {
     sessionStorage.removeItem('helpu_active_route_draft');
+    localStorage.removeItem('helpU_ffcs_user_courses_v2');
+    localStorage.removeItem('helpU_ffcs_faculty_selections_v2');
   } catch {}
 }
 

@@ -7,14 +7,17 @@ import { Capacitor } from '@capacitor/core';
 // In Android/iOS native app (Capacitor), ALWAYS use production backend URL.
 // In local web development (npm run dev on localhost), allow local backend fallback.
 const getBaseUrl = () => {
+  // If user explicitly set custom API URL in localStorage, check and use it
   if (typeof window !== 'undefined' && window.localStorage?.getItem('VITE_API_URL')) {
-    return window.localStorage.getItem('VITE_API_URL');
+    const custom = window.localStorage.getItem('VITE_API_URL');
+    if (custom && custom !== 'https://helpu.onrender.com') {
+      return custom;
+    }
   }
 
   const envUrl = import.meta.env.VITE_API_URL || 'https://helpu.onrender.com';
 
   // 1. Native mobile platform (Android APK / iOS via Capacitor)
-  // ALWAYS use production backend. Under NO circumstances should native APK hit localhost:5000!
   let isNative = false;
   try {
     isNative = Boolean(
@@ -29,17 +32,18 @@ const getBaseUrl = () => {
     return envUrl;
   }
 
-  // 2. Web browser during local development (`npm run dev`)
-  // Only use localhost:5000 if in Vite DEV mode on localhost and no explicit onrender override requested
-  if (
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ) {
-    if (envUrl && !envUrl.includes('onrender.com')) {
-      return envUrl;
+  // 2. Web browser: if on localhost, 127.0.0.1 or local network IP (192.168.x, 10.x, etc.)
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('172.')
+    ) {
+      return `http://${hostname}:5000`;
     }
-    return 'http://localhost:5000';
   }
 
   return envUrl;
@@ -86,7 +90,7 @@ apiClient.interceptors.request.use(async (config) => {
           const res = await FirebaseAuthentication.getIdToken({ forceRefresh: false });
           token = res?.token;
         }
-      } catch (nativeErr) {
+      } catch {
         // Continue if native token retrieval fails
       }
     }
@@ -367,6 +371,35 @@ export const getFacultyReviews = (id, page = 1, limit = 10) =>
   apiClient.get(`/api/faculty/${id}/reviews`, { params: { page, limit } });
 export const submitFacultyRating = (id, data) =>
   apiClient.post(`/api/faculty/${id}/ratings`, data);
+
+// FFCS Curriculum & Course Registration
+export const listCurriculumCourses = (params = {}) =>
+  apiClient.get('/api/curriculum/courses', { params });
+export const searchCurriculumCourses = (q = '', params = {}) =>
+  apiClient.get('/api/curriculum/courses/search', { params: { q, ...params } });
+export const getCurriculumCourse = (courseId) =>
+  apiClient.get(`/api/curriculum/courses/${courseId}`);
+export const addFFCSCourse = (data = {}, files = [], options = {}) => {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      formData.append(key, String(value));
+    }
+  });
+  files.forEach((file) => formData.append('screenshots', file));
+  return apiClient.post('/api/courses/add', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000, // 2 minutes to allow Gemini AI extraction of screenshots
+    ...options
+  });
+};
+export const getMyFFCSCourses = () => apiClient.get('/api/courses');
+export const getFFCSCourse = (courseId) => apiClient.get(`/api/courses/${courseId}`);
+export const getFFCSCourseStatus = (courseId) => apiClient.get(`/api/courses/${courseId}/status`);
+export const getFFCSCourseTeachers = (courseId) =>
+  apiClient.get(`/api/courses/${courseId}/teachers`);
+export const deleteFFCSCourse = (courseId) => apiClient.delete(`/api/courses/${courseId}`);
+export const getMyTeachers = () => apiClient.get('/api/teachers');
 
 export default apiClient;
 
