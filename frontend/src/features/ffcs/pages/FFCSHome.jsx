@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UploadCloud,
   Plus,
   ArrowLeft,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
@@ -14,37 +15,14 @@ import bgBubbleWaveSrc from '../../../assets/images/background.png';
 
 export function FFCSHome() {
   const navigate = useNavigate();
-  const { coursesList, uploadCourseImage } = useFFCS();
-  const [selectedCourseForUpload, setSelectedCourseForUpload] = useState(null);
-  const fileInputRef = useRef(null);
+  const { coursesList, loading } = useFFCS();
 
-  const handleUploadClick = (courseId) => {
-    setSelectedCourseForUpload(courseId);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file && selectedCourseForUpload !== null) {
-      uploadCourseImage(selectedCourseForUpload, file);
-      setSelectedCourseForUpload(null);
-    }
+  const handleUploadClick = () => {
+    navigate('/slotmate/ffcs/add');
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-24 relative overflow-x-hidden selection:bg-[#FDE047]">
-      {/* Hidden file input for native image picking on cards */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept="image/*"
-        className="hidden"
-      />
-
+    <div className="min-h-[100dvh] bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between relative overflow-x-hidden selection:bg-[#FDE047]">
       {/* Decorative Golden Ambient Gradients at Top */}
       <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#FEF08A]/40 via-[#FFFBEB]/20 to-transparent pointer-events-none" />
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#FDE047]/20 rounded-full blur-3xl pointer-events-none" />
@@ -111,8 +89,24 @@ export function FFCSHome() {
 
           {/* DYNAMIC COURSE CARDS: Displays Actual Course Code, No "Upload Image" text */}
           <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-amber-200">
+            {loading && coursesList.length === 0 && (
+              <div className="flex items-center justify-center gap-2 py-6 text-xs font-bold text-[#854D0E]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading your courses...
+              </div>
+            )}
+
+            {!loading && coursesList.length === 0 && (
+              <div className="text-center py-6 space-y-1">
+                <p className="font-black text-sm text-[#17233C]">No courses added yet</p>
+                <p className="text-[11px] text-[#64748B]">
+                  Tap Add More Course to search the curriculum.
+                </p>
+              </div>
+            )}
+
             {coursesList.map((course, idx) => {
-              const isUploaded = course.uploaded || (course.screenshots && course.screenshots.length > 0);
+              const isUploaded = course.status === 'completed' || course.status === 'needs_review';
 
               return (
                 <div
@@ -130,6 +124,9 @@ export function FFCSHome() {
                       <h3 className="font-black text-base text-[#17233C] leading-none tracking-tight truncate">
                         {course.code || `CSE${2000 + (course.sequence || idx + 1)}`}
                       </h3>
+                      <p className="text-[10px] text-[#64748B] font-semibold truncate mt-1">
+                        {course.name || ''}
+                      </p>
                     </div>
                   </div>
 
@@ -142,7 +139,7 @@ export function FFCSHome() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => handleUploadClick(course.id)}
+                      onClick={handleUploadClick}
                       className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-[0_4px_12px_rgba(250,204,21,0.35)] shrink-0 bg-gradient-to-r from-[#FDE047] to-[#FACC15] hover:from-[#FACC15] hover:to-[#EAB308] text-[#17233C] border border-[#FACC15]"
                     >
                       <UploadCloud className="w-4 h-4 stroke-[2.4]" />
@@ -187,10 +184,10 @@ export function FFCSHome() {
       </main>
 
       {/* ========================================================================= */}
-      {/* PROBLEM 1 & 2: FULL-WIDTH BOTTOM BACKGROUND PNG & UPLOAD MESSAGE          */}
+      {/* PROBLEM 1 & 2: FULL-WIDTH BOTTOM BACKGROUND PNG & CALENDAR LOGO           */}
       {/* ========================================================================= */}
-      <section className="relative w-full overflow-hidden pt-4 pb-4 mt-2">
-        {/* Full-width transparent yellow-cream bubble/wave background.png (No white side gaps) */}
+      <section className="relative w-full flex-1 flex flex-col items-center justify-end pt-6 pb-24 sm:pb-28 overflow-hidden mt-auto">
+        {/* Full-width transparent yellow-cream bubble/wave background.png (No white gaps or bottom strip) */}
         <div className="absolute inset-0 w-full h-full pointer-events-none select-none overflow-hidden flex items-end">
           <img
             src={bgBubbleWaveSrc}
@@ -200,9 +197,10 @@ export function FFCSHome() {
           />
         </div>
 
-        {/* Centered Document Illustration & Explanatory Text */}
+        {/* Centered Calendar / Notebook Illustration & Explanatory Text */}
         <div className="relative z-10 w-full max-w-[393px] mx-auto px-4 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mb-1 drop-shadow-sm">
+          {/* Increased Calendar/Notebook Logo Size Noticeably */}
+          <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center mb-2.5 drop-shadow-md mx-auto">
             <img
               src={notebookImgSrc}
               alt="Course Timetable"
@@ -211,6 +209,7 @@ export function FFCSHome() {
             />
           </div>
 
+          {/* Explanatory Text with proper vertical spacing */}
           <p className="font-extrabold text-[15px] sm:text-base text-[#17233C] leading-snug drop-shadow-2xs">
             Upload your courses to <br />
             generate your timetable
