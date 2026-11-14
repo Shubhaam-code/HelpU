@@ -30,4 +30,15 @@ Thumbs.db
 make_hero.ps1
 test_search_error.js
 
+# FFCS uploaded screenshots / curriculum files
+backend/uploads/
+*.pdf
+scratch_test_pdf.mjs
+test_pdf.js
+extracted_course_data.json
+live_extracted_teachers.json
+live_test*.mjs
+test_image_extraction.mjs
+
+
 

@@ -13,6 +13,10 @@ import helpRoutes from './routes/help.routes.js';
 import groupRoutes from './routes/group.routes.js';
 import slotmateRoutes from './routes/slotmate.routes.js';
 import facultyRoutes from './routes/faculty.routes.js';
+import curriculumRoutes from './routes/curriculum.routes.js';
+import adminCurriculumRoutes from './routes/adminCurriculum.routes.js';
+import ffcsCourseRoutes from './routes/ffcsCourse.routes.js';
+import teacherRoutes from './routes/teacher.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,9 +27,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve static assets (images, fallback banners)
-app.use('/images', express.static(path.join(__dirname, '../public/images')));
-app.use('/public', express.static(path.join(__dirname, '../public')));
+// Serve static assets with HTTP caching (7 days browser cache, 1 day stale-while-revalidate)
+const staticAssetOptions = {
+  maxAge: '7d',
+  immutable: true,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+  }
+};
+app.use('/images', express.static(path.join(__dirname, '../public/images'), staticAssetOptions));
+app.use('/public', express.static(path.join(__dirname, '../public'), staticAssetOptions));
 
 // Root Route
 app.get('/', (req, res) => {
@@ -59,5 +70,11 @@ app.use('/api/help', helpRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/slotmate', slotmateRoutes);
 app.use('/api/faculty', facultyRoutes);
+
+// FFCS curriculum, course registration and teacher APIs
+app.use('/api/curriculum', curriculumRoutes);
+app.use('/api/admin/curriculum', adminCurriculumRoutes);
+app.use('/api/courses', ffcsCourseRoutes);
+app.use('/api/teachers', teacherRoutes);
 
 export default app;

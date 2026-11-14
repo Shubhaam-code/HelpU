@@ -45,6 +45,11 @@ const studentSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    isAdmin: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
     imageUrl: {
       type: String,
       trim: true

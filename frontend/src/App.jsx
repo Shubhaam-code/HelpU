@@ -47,6 +47,17 @@ import {
   FacultyDetailsPage
 } from './features/slot-friend';
 
+// FFCS (Faculty & Course Selection) Module
+import {
+  FFCSProvider,
+  FFCSHome,
+  AddCourseScreen,
+  AddedCoursesScreen,
+  SelectFacultyScreen,
+  FFCSTimeTableScreen,
+  FFCSSettingsScreen
+} from './features/ffcs';
+
 // PWA Utilities & Banners
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPwaPrompt } from './components/ui/InstallPwaPrompt';
@@ -394,6 +405,16 @@ function AppShell() {
       <Route path="/slot-friend/student/:studentId" element={<ProtectedRoute><SlotStudentProfilePage /></ProtectedRoute>} />
       <Route path="/slot-friend/profile" element={<GuestFriendlyRoute><SlotMateProfilePage /></GuestFriendlyRoute>} />
 
+      {/* FFCS - Faculty & Course Selection Module Routes */}
+      <Route path="/slotmate/ffcs" element={<GuestFriendlyRoute><FFCSHome /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/add" element={<GuestFriendlyRoute><AddCourseScreen /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/courses" element={<GuestFriendlyRoute><AddedCoursesScreen /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/faculty/:courseCode" element={<GuestFriendlyRoute><SelectFacultyScreen /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/timetable" element={<GuestFriendlyRoute><FFCSTimeTableScreen /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/settings" element={<GuestFriendlyRoute><FFCSSettingsScreen /></GuestFriendlyRoute>} />
+      <Route path="/ffcs" element={<Navigate to="/slotmate/ffcs" replace />} />
+      <Route path="/ffcs/*" element={<Navigate to="/slotmate/ffcs" replace />} />
+
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -406,7 +427,9 @@ export default function App() {
     <ErrorBoundary>
       <AuthProfileProvider>
         <SlotFriendProvider>
-          <AppShell />
+          <FFCSProvider>
+            <AppShell />
+          </FFCSProvider>
         </SlotFriendProvider>
       </AuthProfileProvider>
     </ErrorBoundary>
