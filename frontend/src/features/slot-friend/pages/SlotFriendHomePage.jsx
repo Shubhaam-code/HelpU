@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   GraduationCap, Users, BookOpen, CalendarDays, 
   FileText, ChevronRight, Sparkles, Plus, 
-  MessageCircle, Home, PlusCircle, User, CheckCircle2, ArrowRight
+  MessageCircle, Home, PlusCircle, User, CheckCircle2, ArrowRight, Loader2
 } from 'lucide-react';
 
 import { AppHeader } from '../../../components/layout/AppHeader';
@@ -403,7 +403,12 @@ export default function SlotFriendHomePage() {
           </div>
 
           {/* Actual Logged-In User Posts (Maximum 3 on Home Page) or Clean Empty State */}
-          {myPosts.length > 0 ? (
+          {isLoadingPosts && myPosts.length === 0 ? (
+            <div className="py-7 px-3 text-center flex flex-col items-center justify-center">
+              <Loader2 className="w-6 h-6 text-[#D97706] animate-spin mb-2" />
+              <p className="text-[11px] text-[#6E7587] font-medium">Loading your slot posts...</p>
+            </div>
+          ) : myPosts.length > 0 ? (
             <div className="space-y-2.5">
               {myPosts.slice(0, 3).map((post) => {
                 const postMatchCount = post.matchCount ?? 0;

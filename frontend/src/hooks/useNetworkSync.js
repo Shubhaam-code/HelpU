@@ -30,6 +30,14 @@ export function useNetworkSync() {
         queryKey: ['community'],
         refetchType: 'active',
       });
+      queryClient.invalidateQueries({
+        queryKey: ['mySlotPosts'],
+        refetchType: 'active',
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['slotMatches'],
+        refetchType: 'active',
+      });
     }
 
     let capacitorListener = null;

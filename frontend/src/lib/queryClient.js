@@ -17,6 +17,9 @@ export const CACHE_DURATIONS = {
   HOME_MATCHES: { staleTime: 2 * 60 * 1000, gcTime: 30 * 60 * 1000 },
   // Public ride listings: 5 min stale — returning to list page shows instantly
   MY_RIDES: { staleTime: 5 * 60 * 1000, gcTime: 24 * 60 * 60 * 1000 },
+  // SlotMate posts & per-post match lists: instant tab switches, background refresh
+  SLOT_POSTS: { staleTime: 5 * 60 * 1000, gcTime: 30 * 60 * 1000 },
+  SLOT_MATCHES: { staleTime: 5 * 60 * 1000, gcTime: 30 * 60 * 1000 },
   // Bookings & seat availability: ALWAYS fresh from backend (safety-critical)
   BOOKINGS: { staleTime: 0, gcTime: 5 * 60 * 1000 },
   // Shared groups: moderate, group membership can change
@@ -38,11 +41,11 @@ export const CACHE_DURATIONS = {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 45 * 1000, // 45 seconds default freshness window
-      gcTime: 15 * 60 * 1000, // 15 minutes garbage collection window (preserves cached data across tabs)
+      staleTime: 5 * 60 * 1000, // 5 minutes: cached data is shown instantly across tab switches
+      gcTime: 30 * 60 * 1000, // 30 minutes: keep inactive cache available for quick navigation
       refetchOnWindowFocus: false, // Prevents aggressive refetch on app refocus in Capacitor mobile
       refetchOnReconnect: true, // Automatically revalidates when mobile device regains network
-      refetchOnMount: false, // Prevents full-screen spinners on tab re-entry when data is still fresh
+      refetchOnMount: true, // Revalidate stale data in the background without hiding cached data
       retry: 1
     }
   }
@@ -76,7 +79,10 @@ export const QUERY_KEYS = {
   groupJoinRequests: (groupId) => ['groups', 'joinRequests', groupId || 'none'],
   groupInvites: (groupId) => ['groups', 'sentInvites', groupId || 'none'],
   receivedInvitations: (userId) => ['groups', 'receivedInvites', userId || 'current'],
-  sentProposals: (userId) => ['groups', 'sentProposals', userId || 'current']
+  sentProposals: (userId) => ['groups', 'sentProposals', userId || 'current'],
+  mySlotPosts: (userId) => ['mySlotPosts', userId || 'current'],
+  slotMatches: (postId) => ['slotMatches', postId || 'all'],
+  slotMatchDetails: (matchId) => ['slotMatches', 'detail', matchId || 'none']
 };
 
 export const queryKeys = QUERY_KEYS;
@@ -118,6 +124,17 @@ export function invalidateProfileQueries() {
 
 export function invalidateCommunityQueries() {
   queryClient.invalidateQueries({ queryKey: ['community'] });
+}
+
+/**
+ * Invalidate all SlotMate post and match caches after a create, edit, or delete.
+ * Invalidation is prefix-based, so every user/post variant is refreshed.
+ */
+export function invalidateSlotPostQueries() {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['mySlotPosts'] }),
+    queryClient.invalidateQueries({ queryKey: ['slotMatches'] })
+  ]);
 }
 
 /**

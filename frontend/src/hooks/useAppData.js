@@ -9,6 +9,8 @@ import {
   getNotifications,
   getSlotMateNotifications,
   getSlotMateUnreadCount,
+  getPostMatches,
+  getSlotMatchDetails,
   markRead,
   markAllRead,
   getTravels,
@@ -208,6 +210,44 @@ export function useSlotMateNotificationsList(params = {}) {
     },
     enabled: Boolean(user?.id),
     ...CACHE_DURATIONS.NOTIFICATIONS
+  });
+}
+
+/**
+ * Cached matching students for one SlotMate post.
+ * Cached per post id so returning to a previously viewed match list is instant.
+ */
+export function useSlotPostMatches(postId, options = {}) {
+  return useQuery({
+    queryKey: QUERY_KEYS.slotMatches(postId),
+    queryFn: async () => {
+      if (!postId) return { post: null, matches: [], totalMatches: 0 };
+      const res = await getPostMatches(postId);
+      const matches = res.data?.matches;
+      return {
+        post: res.data?.post || null,
+        matches: Array.isArray(matches) ? matches : [],
+        totalMatches: res.data?.totalMatches || 0
+      };
+    },
+    enabled: Boolean(postId) && options.enabled !== false,
+    ...CACHE_DURATIONS.SLOT_MATCHES
+  });
+}
+
+/**
+ * Cached details for one SlotMate student/match profile.
+ */
+export function useSlotMatchDetails(matchId) {
+  return useQuery({
+    queryKey: QUERY_KEYS.slotMatchDetails(matchId),
+    queryFn: async () => {
+      if (!matchId) return null;
+      const res = await getSlotMatchDetails(matchId);
+      return res.data?.match || null;
+    },
+    enabled: Boolean(matchId),
+    ...CACHE_DURATIONS.SLOT_MATCHES
   });
 }
 
@@ -790,6 +830,8 @@ export default {
   useUserMatchesData,
   useNotificationsList,
   useSlotMateNotificationsList,
+  useSlotPostMatches,
+  useSlotMatchDetails,
   useUnreadNotificationsCount,
   useTravels,
   useTravelDetails,

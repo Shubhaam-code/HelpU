@@ -384,12 +384,8 @@ export default function MyMatchesPage() {
                 <Sparkles className="w-5 h-5 text-[#FF572E]" />
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    FIND Requests Active
-                  </span>
-                  <span className="text-[11px] font-bold text-[#17233C]">
+                <div className="mb-0.5">
+                  <span className="text-xs sm:text-sm font-extrabold text-[#17233C]">
                     Offers, Shared Groups &amp; Compatible Students
                   </span>
                 </div>

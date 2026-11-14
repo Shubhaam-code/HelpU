@@ -1,26 +1,24 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   getMySlotPosts, 
   createSlotPost as createSlotPostApi, 
   updateSlotPost as updateSlotPostApi,
-  deleteSlotPost as deleteSlotPostApi,
-  getPostMatches,
-  getSlotMatchDetails,
-  searchCourses
+  deleteSlotPost as deleteSlotPostApi
 } from '../../../lib/api';
 import { useFirebaseAuth } from '../../../context/FirebaseAuthContext';
+import {
+  CACHE_DURATIONS,
+  QUERY_KEYS,
+  invalidateSlotPostQueries
+} from '../../../lib/queryClient';
 
 const SlotFriendContext = createContext(null);
 
 export function SlotFriendProvider({ children }) {
-  const { user } = useFirebaseAuth();
+  const { user, isLoaded } = useFirebaseAuth();
 
-  // 1. My Posts State (real data from MongoDB)
-  const [myPosts, setMyPosts] = useState([]);
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
-  const [postsError, setPostsError] = useState(null);
-
-  // 2. Feedback Toast State
+  // 1. Feedback Toast State
   const [toast, setToast] = useState(null);
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -58,33 +56,26 @@ export function SlotFriendProvider({ children }) {
     };
   }, []);
 
-  // 3. Fetch user's real posts from backend
-  const fetchMyPosts = useCallback(async () => {
-    setIsLoadingPosts(true);
-    setPostsError(null);
-    try {
+  // 3. Cached my-posts query. `select` keeps formatted posts cached for every consumer.
+  const postsQuery = useQuery({
+    queryKey: QUERY_KEYS.mySlotPosts(user?.id),
+    queryFn: async () => {
       const res = await getMySlotPosts();
       const rawPosts = res?.data?.posts || [];
-      const formatted = rawPosts.map(formatPost);
-      setMyPosts(formatted);
-      return formatted;
-    } catch (err) {
-      console.warn('[SlotMate] Failed to fetch user posts:', err?.message);
-      setPostsError(err?.message || 'Failed to load slot posts');
-      return [];
-    } finally {
-      setIsLoadingPosts(false);
-    }
-  }, [formatPost]);
+      return Array.isArray(rawPosts) ? rawPosts : [];
+    },
+    select: useCallback((rawPosts) => rawPosts.map(formatPost).filter(Boolean), [formatPost]),
+    enabled: Boolean(user?.id),
+    ...CACHE_DURATIONS.SLOT_POSTS
+  });
 
-  // Load posts on user auth ready
-  useEffect(() => {
-    if (user) {
-      fetchMyPosts();
-    } else {
-      setMyPosts([]);
-    }
-  }, [user, fetchMyPosts]);
+  const myPosts = postsQuery.data ?? [];
+  // `isLoading` means "no cached data + first fetch". Background revalidation
+  // uses `isFetching`, so tab switches keep rendering the cached list.
+  const isLoadingPosts = !isLoaded || (Boolean(user?.id) && postsQuery.isLoading);
+  const postsError = postsQuery.error
+    ? postsQuery.error.message || 'Failed to load slot posts'
+    : null;
 
   // 4. Create a Slot Post via backend API
   const createPost = useCallback(async (postData, options = {}) => {
@@ -100,15 +91,15 @@ export function SlotFriendProvider({ children }) {
       const newPost = res?.data?.post;
       const matchCount = res?.data?.matchCount ?? 0;
 
-      // Refresh real posts from backend (Success modal handles visual confirmation)
-      await fetchMyPosts();
+      // Refresh cached lists and per-post match data in the background.
+      await invalidateSlotPostQueries();
       return { post: newPost, matchCount };
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Failed to publish slot post';
       showToast(message, 'error');
       throw err;
     }
-  }, [showToast, fetchMyPosts]);
+  }, [showToast]);
 
   // 4b. Update an existing Slot Post via backend API
   const updatePost = useCallback(async (postId, postData) => {
@@ -125,56 +116,29 @@ export function SlotFriendProvider({ children }) {
       const matchCount = res?.data?.matchCount ?? 0;
 
       showToast('Slot post updated successfully!', 'success');
-      await fetchMyPosts();
+      await invalidateSlotPostQueries();
       return { post: updated, matchCount };
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Failed to update slot post';
       showToast(message, 'error');
       throw err;
     }
-  }, [showToast, fetchMyPosts]);
+  }, [showToast]);
 
   // 5. Delete / Close a Slot Post via backend API
   const deletePost = useCallback(async (postId) => {
     try {
       await deleteSlotPostApi(postId);
-      setMyPosts((prev) => prev.filter((p) => p.id !== postId && p._id !== postId));
       showToast('Slot post removed.', 'info');
-      await fetchMyPosts();
+      await invalidateSlotPostQueries();
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Failed to delete slot post';
       showToast(message, 'error');
       throw err;
     }
-  }, [showToast, fetchMyPosts]);
+  }, [showToast]);
 
-  // 6. Fetch matching students for a specific post
-  const fetchMatchesForPost = useCallback(async (postId) => {
-    try {
-      const res = await getPostMatches(postId);
-      return {
-        post: res?.data?.post,
-        matches: res?.data?.matches || [],
-        totalMatches: res?.data?.totalMatches || 0
-      };
-    } catch (err) {
-      console.error('[SlotMate] Failed to fetch matches for post:', err);
-      return { post: null, matches: [], totalMatches: 0 };
-    }
-  }, []);
-
-  // 7. Fetch details for a specific match
-  const fetchMatchDetails = useCallback(async (matchId) => {
-    try {
-      const res = await getSlotMatchDetails(matchId);
-      return res?.data?.match || null;
-    } catch (err) {
-      console.error('[SlotMate] Failed to fetch match details:', err);
-      return null;
-    }
-  }, []);
-
-  // 8. Match count helper
+  // 6. Match count helper
   const getPostMatchCount = useCallback((post) => {
     if (!post) return 0;
     return typeof post.matchCount === 'number' ? post.matchCount : 0;
@@ -188,13 +152,11 @@ export function SlotFriendProvider({ children }) {
   const value = {
     myPosts,
     isLoadingPosts,
+    isFetchingPosts: postsQuery.isFetching,
     postsError,
-    fetchMyPosts,
     createPost,
     updatePost,
     deletePost,
-    fetchMatchesForPost,
-    fetchMatchDetails,
     getPostMatchCount,
     totalMatchesCount,
     allMatches: myPosts, // for backward-compatible array references

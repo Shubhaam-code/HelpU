@@ -513,38 +513,37 @@ export default function GroupDetailsPage() {
               <div className="absolute top-0 right-0 left-0 h-24 bg-gradient-to-b from-[#FFF5EE]/70 to-transparent pointer-events-none" />
 
               {/* Status and Role Top Bar */}
-              <div className="relative z-10 flex items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
+              <div className="relative z-10 flex items-start justify-between gap-2.5 border-b border-gray-100 pb-3">
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF3EC] border border-[#FDE0D0] text-[#FF572E] text-[10px] sm:text-[11px] font-black uppercase tracking-wider shrink-0">
                     <CarTaxiFront className="w-3.5 h-3.5 text-[#FF572E]" />
                     <span>Shared Cab Group</span>
                   </span>
 
                   {isAdmin && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#FFEBE0] text-[#FF572E] border border-[#FDD0BE] text-[10px] font-black uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#FFEBE0] text-[#FF572E] border border-[#FDD0BE] text-[10px] font-black uppercase tracking-wider shrink-0">
                       You are Admin
                     </span>
                   )}
                   {!isAdmin && isConfirmedMember && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#EBF5FF] text-[#2563EB] border border-[#BFDBFE] text-[10px] font-black uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#EBF5FF] text-[#2563EB] border border-[#BFDBFE] text-[10px] font-black uppercase tracking-wider shrink-0">
                       Confirmed Member
                     </span>
                   )}
+
+                  <StatusBadge status={group.status} />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={group.status} />
-                  {!isInactiveGroup && (isAdmin || isConfirmedMember) && (
-                    <button
-                      type="button"
-                      disabled={leaving}
-                      onClick={() => setShowLeaveModal(true)}
-                      className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {leaving ? 'Leaving...' : 'Leave Group'}
-                    </button>
-                  )}
-                </div>
+                {!isInactiveGroup && (isAdmin || isConfirmedMember) && (
+                  <button
+                    type="button"
+                    disabled={leaving}
+                    onClick={() => setShowLeaveModal(true)}
+                    className="shrink-0 px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 active:scale-95"
+                  >
+                    {leaving ? 'Leaving...' : 'Leave Group'}
+                  </button>
+                )}
               </div>
 
               {/* Route Display */}
@@ -611,9 +610,14 @@ export default function GroupDetailsPage() {
             {!isInactiveGroup && (isAdmin || isConfirmedMember) && (
               <div className="bg-white rounded-[22px] sm:rounded-[26px] border border-[#F4E3D8] shadow-xs p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                      <MessageCircle className="w-4 h-4 text-emerald-700" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-[#EAF8F0] border border-[#BCECD4] flex items-center justify-center p-1.5 shadow-2xs shrink-0">
+                      <img
+                        src="/whatsapp.svg"
+                        alt="WhatsApp"
+                        className="w-5 h-5 object-contain"
+                        onError={(e) => { e.currentTarget.src = '/whatsapp.png'; }}
+                      />
                     </div>
                     <div>
                       <h3 className="font-black text-sm sm:text-base text-[#17233C]">
@@ -689,9 +693,14 @@ export default function GroupDetailsPage() {
                       href={group.whatsappGroupUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <img
+                        src="/whatsapp.svg"
+                        alt="WhatsApp"
+                        className="w-4 h-4 object-contain brightness-0 invert"
+                        onError={(e) => { e.currentTarget.src = '/whatsapp.png'; }}
+                      />
                       <span>Open WhatsApp Group</span>
                     </a>
                   ) : (
@@ -743,9 +752,14 @@ export default function GroupDetailsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleContactMemberOnWhatsApp(member)}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                                className="px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#20BD5A] text-white text-[11px] font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 active:scale-95"
                               >
-                                <MessageCircle className="w-3 h-3" />
+                                <img
+                                  src="/whatsapp.svg"
+                                  alt="WhatsApp"
+                                  className="w-3.5 h-3.5 object-contain brightness-0 invert"
+                                  onError={(e) => { e.currentTarget.src = '/whatsapp.png'; }}
+                                />
                                 <span>WhatsApp</span>
                               </button>
                             ) : (

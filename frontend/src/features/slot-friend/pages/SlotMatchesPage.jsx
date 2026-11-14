@@ -7,6 +7,7 @@ import {
   ArrowRight, CheckCircle2, CheckCircle, CircleSlash
 } from 'lucide-react';
 import { useSlotFriend } from '../context/SlotFriendContext';
+import { useSlotPostMatches } from '../../../hooks/useAppData';
 import { useUser } from '../../../context/FirebaseAuthContext';
 import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
@@ -23,7 +24,6 @@ export default function SlotMatchesPage() {
 
   const { 
     myPosts = [], 
-    fetchMatchesForPost, 
     getPostMatchCount, 
     deletePost,
     isLoadingPosts 
@@ -51,6 +51,14 @@ export default function SlotMatchesPage() {
     });
   }, [myPosts, postIdParam, courseFilterParam, slotFilterParam, isViewingSpecificCourse]);
 
+  const targetPostId = currentPost?._id || currentPost?.id || postIdParam || null;
+
+  // Cached per-post match list. Cached results render immediately on tab return.
+  const { data: matchesPayload, isLoading: isMatchesQueryLoading } = useSlotPostMatches(
+    targetPostId,
+    { enabled: isViewingSpecificCourse }
+  );
+
   // Filter tabs for Page 1: 'all' | 'with-matches' | 'no-matches'
   const [filterTab, setFilterTab] = useState('all');
 
@@ -70,10 +78,11 @@ export default function SlotMatchesPage() {
     return myPosts;
   }, [filterTab, myPosts, withMatchesPosts, noMatchesPosts]);
 
-  // Real matched students for Page 2 fetched from backend API
-  const [matchedStudents, setMatchedStudents] = useState([]);
-  const [isLoadingMatches, setIsLoadingMatches] = useState(false);
-  const [postDetailsFromApi, setPostDetailsFromApi] = useState(null);
+  // Real matched students for Page 2 come from the cached query above.
+  const matchedStudents = matchesPayload?.matches || [];
+  const postDetailsFromApi = matchesPayload?.post || null;
+  const isLoadingMatches =
+    isMatchesQueryLoading || (isViewingSpecificCourse && isLoadingPosts && !targetPostId);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -89,35 +98,6 @@ export default function SlotMatchesPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    const targetPostId = currentPost?._id || currentPost?.id || postIdParam;
-    if (isViewingSpecificCourse && targetPostId) {
-      setIsLoadingMatches(true);
-      fetchMatchesForPost(targetPostId)
-        .then((res) => {
-          if (isMounted) {
-            setMatchedStudents(res?.matches || []);
-            if (res?.post) {
-              setPostDetailsFromApi(res.post);
-            }
-          }
-        })
-        .catch((err) => {
-          console.warn('[SlotMate] Error fetching matches:', err);
-          if (isMounted) setMatchedStudents([]);
-        })
-        .finally(() => {
-          if (isMounted) setIsLoadingMatches(false);
-        });
-    } else {
-      setMatchedStudents([]);
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [isViewingSpecificCourse, currentPost?._id, currentPost?.id, postIdParam, fetchMatchesForPost]);
 
   const effectivePost = currentPost || postDetailsFromApi;
 
@@ -407,10 +387,10 @@ export default function SlotMatchesPage() {
                 <div
                   key={student.matchId || student.postId}
                   onClick={() => handleStudentClick(student.matchId || student.postId)}
-                  className="bg-white rounded-[26px] sm:rounded-[28px] p-4 min-[390px]:p-4.5 border border-[#F4E3D8] shadow-[0_4px_16px_rgba(250,204,21,0.06)] hover:border-[#FACC15] transition-all cursor-pointer relative overflow-hidden flex flex-col min-[520px]:flex-row min-[520px]:items-center justify-between gap-3.5 group active:scale-[0.99]"
+                  className="bg-white rounded-[26px] sm:rounded-[28px] p-4 min-[390px]:p-4.5 border border-[#F4E3D8] shadow-[0_4px_16px_rgba(250,204,21,0.06)] hover:border-[#FACC15] transition-all cursor-pointer relative overflow-hidden flex items-center justify-between gap-3.5 group active:scale-[0.99]"
                 >
                   {/* Left Side: Student Avatar + Details + Badges */}
-                  <div className="relative z-10 flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                  <div className="relative z-10 flex items-center gap-3.5 min-w-0 flex-1">
                     
                     {/* Student Avatar with Online/Verified Indicator */}
                     <div className="relative shrink-0">
@@ -461,25 +441,22 @@ export default function SlotMatchesPage() {
                     </div>
                   </div>
 
-                  {/* Right Side: Attractive "Connect on WhatsApp" Button */}
-                  <div className="relative z-10 shrink-0 pt-1 min-[520px]:pt-0">
-                    <button
-                      type="button"
-                      onClick={(e) => handleOpenWhatsApp(e, student)}
-                      className="w-full min-[520px]:w-auto px-4 min-[390px]:px-5 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-[#FDE047] via-[#FACC15] to-[#EAB308] hover:from-[#FACC15] hover:to-[#CA8A04] text-[#17233C] font-black text-xs min-[390px]:text-sm flex items-center justify-center gap-2 shadow-sm hover:shadow-md active:scale-95 transition-all cursor-pointer border border-[#EAB308]/60"
-                      aria-label={`Connect with ${student.studentName} on WhatsApp`}
+                  {/* Right Side: Compact WhatsApp Icon */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleOpenWhatsApp(e, student)}
+                    className="relative z-10 shrink-0 w-10 h-10 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 transition-all cursor-pointer"
+                    aria-label={`Connect with ${student.studentName} on WhatsApp`}
+                    title={`Connect with ${student.studentName} on WhatsApp`}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      className="w-5 h-5 fill-current"
                     >
-                      <img
-                        src="/whatsapp.svg"
-                        alt="WhatsApp"
-                        className="w-4.5 h-4.5 object-contain shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.src = '/whatsapp.png';
-                        }}
-                      />
-                      <span>Connect on WhatsApp</span>
-                    </button>
-                  </div>
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                    </svg>
+                  </button>
 
                 </div>
               ))}
@@ -566,11 +543,11 @@ export default function SlotMatchesPage() {
 
           {/* Right Illustration: 3 Students PNG */}
           <div className="relative shrink-0 self-end -mb-4 -mr-3 sm:-mb-5 sm:-mr-4 pointer-events-none select-none">
-            <div className="w-32 min-[390px]:w-36 min-[420px]:w-42 sm:w-48 h-24 min-[390px]:h-28 sm:h-32 flex items-end justify-end">
+            <div className="w-32 min-[390px]:w-36 min-[420px]:w-44 sm:w-52 h-28 min-[390px]:h-32 min-[420px]:h-36 sm:h-40 flex items-end justify-end">
               <img
                 src="/slot-matches-students.png"
                 alt="Course Matches Students"
-                className="w-full h-full object-contain object-bottom-right drop-shadow-sm"
+                className="w-full h-full object-contain object-bottom-right drop-shadow-sm shrink-0"
                 onError={(e) => {
                   e.currentTarget.src = '/slot-post-illustration.png';
                 }}
@@ -582,47 +559,80 @@ export default function SlotMatchesPage() {
         {/* ======================================================================= */}
         {/* MATCH FILTERS (3 TABS WITH DYNAMIC COUNTS)                               */}
         {/* ======================================================================= */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+        <div className="grid grid-cols-3 gap-1 p-1 bg-[#FFF8F3] border border-[#F4E3D8] rounded-2xl shadow-2xs">
           {/* Tab 1: All Courses */}
           <button
             type="button"
             onClick={() => setFilterTab('all')}
-            className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+            aria-pressed={filterTab === 'all'}
+            className={`min-h-10 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'all'
-                ? 'bg-[#FEF08A] text-[#78350F] border border-[#FDE047] shadow-2xs'
-                : 'bg-white text-[#6E7587] hover:text-[#17233C] border border-[#F4E3D8]'
+                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                : 'text-[#6E7587] hover:bg-white hover:text-[#17233C]'
             }`}
           >
-            <BookOpen className="w-4 h-4 stroke-[2.2]" />
-            <span>All Courses ({totalCoursesCount})</span>
+            <BookOpen className="hidden sm:block w-4 h-4 stroke-[2.2] shrink-0" />
+            <span className="sm:hidden">All</span>
+            <span className="hidden sm:inline">All Courses</span>
+            <span
+              className={`inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-[10px] sm:text-[11px] font-black leading-none ${
+                filterTab === 'all'
+                  ? 'bg-[#FDE047]/70 text-[#78350F]'
+                  : 'bg-[#F4E3D8]/70 text-[#6E7587]'
+              }`}
+            >
+              {totalCoursesCount}
+            </span>
           </button>
 
           {/* Tab 2: With Matches */}
           <button
             type="button"
             onClick={() => setFilterTab('with-matches')}
-            className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+            aria-pressed={filterTab === 'with-matches'}
+            className={`min-h-10 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'with-matches'
-                ? 'bg-[#FEF08A] text-[#78350F] border border-[#FDE047] shadow-2xs'
-                : 'bg-white text-[#6E7587] hover:text-[#17233C] border border-[#F4E3D8]'
+                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                : 'text-[#6E7587] hover:bg-white hover:text-[#17233C]'
             }`}
           >
-            <Users className="w-4 h-4 stroke-[2.2]" />
-            <span>With Matches ({withMatchesPosts.length})</span>
+            <Users className="hidden sm:block w-4 h-4 stroke-[2.2] shrink-0" />
+            <span className="sm:hidden">Matches</span>
+            <span className="hidden sm:inline">With Matches</span>
+            <span
+              className={`inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-[10px] sm:text-[11px] font-black leading-none ${
+                filterTab === 'with-matches'
+                  ? 'bg-[#FDE047]/70 text-[#78350F]'
+                  : 'bg-[#F4E3D8]/70 text-[#6E7587]'
+              }`}
+            >
+              {withMatchesPosts.length}
+            </span>
           </button>
 
           {/* Tab 3: No Matches */}
           <button
             type="button"
             onClick={() => setFilterTab('no-matches')}
-            className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+            aria-pressed={filterTab === 'no-matches'}
+            className={`min-h-10 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'no-matches'
-                ? 'bg-[#FEF08A] text-[#78350F] border border-[#FDE047] shadow-2xs'
-                : 'bg-white text-[#6E7587] hover:text-[#17233C] border border-[#F4E3D8]'
+                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                : 'text-[#6E7587] hover:bg-white hover:text-[#17233C]'
             }`}
           >
-            <CircleSlash className="w-4 h-4 stroke-[2.2]" />
-            <span>No Matches ({noMatchesPosts.length})</span>
+            <CircleSlash className="hidden sm:block w-4 h-4 stroke-[2.2] shrink-0" />
+            <span className="sm:hidden">No Match</span>
+            <span className="hidden sm:inline">No Matches</span>
+            <span
+              className={`inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-[10px] sm:text-[11px] font-black leading-none ${
+                filterTab === 'no-matches'
+                  ? 'bg-[#FDE047]/70 text-[#78350F]'
+                  : 'bg-[#F4E3D8]/70 text-[#6E7587]'
+              }`}
+            >
+              {noMatchesPosts.length}
+            </span>
           </button>
         </div>
 

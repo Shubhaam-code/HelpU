@@ -201,7 +201,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] font-sans relative overflow-x-hidden selection:bg-[#F59E0B]/20 selection:text-[#D97706] pb-0">
+    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] font-sans relative overflow-x-hidden selection:bg-[#F59E0B]/20 selection:text-[#D97706] pb-6 sm:pb-8">
       
       {/* Decorative ambient background glows */}
       <div 
@@ -210,7 +210,7 @@ export default function AuthPage({ initialMode = 'signIn' }) {
       />
 
       {/* Main Container - Mobile First */}
-      <div className="max-w-md sm:max-w-lg mx-auto px-4 sm:px-6 pt-3 space-y-4 sm:space-y-4.5 relative z-10">
+      <div className="max-w-md sm:max-w-lg mx-auto px-4 sm:px-6 pt-3 pb-4 sm:pb-6 space-y-4 sm:space-y-4.5 relative z-10">
 
         {/* ======================================================================= */}
         {/* 1. TOP BAR: BACK ARROW + CENTERED HELPU LOGO                            */}
@@ -502,22 +502,10 @@ export default function AuthPage({ initialMode = 'signIn' }) {
         {/* ======================================================================= */}
         {/* 6. TRUST SECTION                                                        */}
         {/* ======================================================================= */}
-        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#16A34A] select-none">
+        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#16A34A] select-none pt-1">
           <ShieldCheck className="w-4 h-4 text-[#16A34A] stroke-[2.4]" />
           <span>Verified college students only</span>
         </div>
-
-        {/* ======================================================================= */}
-        {/* 7. BOTTOM FOOTER ILLUSTRATION                                           */}
-        {/* ======================================================================= */}
-        <footer className="w-full pt-1 pb-0 overflow-hidden select-none">
-          <img
-            src="/auth-footer-students.png"
-            alt="Helpu Campus Students Studying Together"
-            className="w-full h-auto object-contain mx-auto block pointer-events-none"
-            loading="eager"
-          />
-        </footer>
 
       </div>
 

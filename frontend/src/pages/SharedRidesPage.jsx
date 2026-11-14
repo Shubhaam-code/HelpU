@@ -545,22 +545,23 @@ export default function SharedRidesPage() {
         </AnimatePresence>
 
         {/* ========================================================================= */}
-        {/* 3. MODERN SEGMENTED TABS: Discover | My Groups | Invitations              */}
+        {/* 3. FULL-WIDTH 4-COLUMN TABS: Discover | My Groups | Sent | Received       */}
         {/* ========================================================================= */}
-        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-1">
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Discover Tab */}
+        <div className="space-y-2 py-1">
+          <div className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 bg-[#F4E3D8]/50 sm:bg-white rounded-2xl border border-[#F4E3D8] shadow-2xs">
+            {/* 1. Discover Tab */}
             <button
+              type="button"
               onClick={() => setActiveTab('discover')}
-              className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+              className={`w-full py-2 px-1 rounded-xl text-xs transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-center ${
                 activeTab === 'discover'
-                  ? 'bg-[#FF572E] text-white shadow-md shadow-[#FF572E]/25 scale-[1.01]'
-                  : 'bg-white text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F4] border border-[#F4E3D8] shadow-2xs'
+                  ? 'bg-[#FF572E] text-white shadow-xs font-black'
+                  : 'text-[#6E7587] hover:text-[#17233C] hover:bg-white/80 font-bold'
               }`}
             >
-              <span>Discover Groups</span>
+              <span className="truncate text-[11px] sm:text-xs">Discover</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${
+                className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-black ${
                   activeTab === 'discover'
                     ? 'bg-white/20 text-white'
                     : 'bg-[#FFF2EA] text-[#FF572E]'
@@ -570,18 +571,19 @@ export default function SharedRidesPage() {
               </span>
             </button>
 
-            {/* My Groups Tab */}
+            {/* 2. My Groups Tab */}
             <button
+              type="button"
               onClick={() => setActiveTab('my-groups')}
-              className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+              className={`w-full py-2 px-1 rounded-xl text-xs transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-center ${
                 activeTab === 'my-groups'
-                  ? 'bg-[#FF572E] text-white shadow-md shadow-[#FF572E]/25 scale-[1.01]'
-                  : 'bg-white text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F4] border border-[#F4E3D8] shadow-2xs'
+                  ? 'bg-[#FF572E] text-white shadow-xs font-black'
+                  : 'text-[#6E7587] hover:text-[#17233C] hover:bg-white/80 font-bold'
               }`}
             >
-              <span>My Groups</span>
+              <span className="truncate text-[11px] sm:text-xs">My Groups</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${
+                className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-black ${
                   activeTab === 'my-groups'
                     ? 'bg-white/20 text-white'
                     : 'bg-[#FFF2EA] text-[#FF572E]'
@@ -591,19 +593,19 @@ export default function SharedRidesPage() {
               </span>
             </button>
 
-            {/* Sent Invitations Tab */}
+            {/* 3. Sent Invitations Tab */}
             <button
+              type="button"
               onClick={() => setActiveTab('sent-invitations')}
-              className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+              className={`w-full py-2 px-1 rounded-xl text-xs transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-center ${
                 activeTab === 'sent-invitations'
-                  ? 'bg-[#FF572E] text-white shadow-md shadow-[#FF572E]/25 scale-[1.01]'
-                  : 'bg-white text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F4] border border-[#F4E3D8] shadow-2xs'
+                  ? 'bg-[#FF572E] text-white shadow-xs font-black'
+                  : 'text-[#6E7587] hover:text-[#17233C] hover:bg-white/80 font-bold'
               }`}
             >
-              <Send className="w-4 h-4" />
-              <span>Sent</span>
+              <span className="truncate text-[11px] sm:text-xs">Sent</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${
+                className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-black ${
                   activeTab === 'sent-invitations'
                     ? 'bg-white/20 text-white'
                     : 'bg-[#FFF2EA] text-[#FF572E]'
@@ -613,24 +615,24 @@ export default function SharedRidesPage() {
               </span>
             </button>
 
-            {/* Received Invitations Tab */}
+            {/* 4. Received Invitations Tab */}
             <button
+              type="button"
               onClick={() => setActiveTab('received-invitations')}
-              className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+              className={`w-full py-2 px-1 rounded-xl text-xs transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-center ${
                 activeTab === 'received-invitations'
-                  ? 'bg-[#FF572E] text-white shadow-md shadow-[#FF572E]/25 scale-[1.01]'
-                  : 'bg-white text-[#6E7587] hover:text-[#17233C] hover:bg-[#FFF8F4] border border-[#F4E3D8] shadow-2xs'
+                  ? 'bg-[#FF572E] text-white shadow-xs font-black'
+                  : 'text-[#6E7587] hover:text-[#17233C] hover:bg-white/80 font-bold'
               }`}
             >
-              <Mail className="w-4 h-4" />
-              <span>Received</span>
+              <span className="truncate text-[11px] sm:text-xs">Received</span>
               {receivedInvitations.length > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white animate-pulse shadow-xs">
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-black bg-rose-500 text-white animate-pulse shadow-xs">
                   {receivedInvitations.length}
                 </span>
               ) : (
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${
+                  className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-black ${
                     activeTab === 'received-invitations'
                       ? 'bg-white/20 text-white'
                       : 'bg-[#FFF2EA] text-[#FF572E]'
@@ -643,7 +645,7 @@ export default function SharedRidesPage() {
           </div>
 
           {activeTab === 'discover' && isFetchingDiscover && !discoverLoading && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3EC] text-[11px] font-bold text-[#FF572E] shrink-0">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3EC] text-[11px] font-bold text-[#FF572E]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#FF572E] animate-ping" />
               <span>Updating matches...</span>
             </div>
@@ -665,12 +667,12 @@ export default function SharedRidesPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-wider">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Live Route Matching
+                        <span>Live Route Matching</span>
                       </span>
                       <span className="text-[11px] font-semibold text-[#8C93A4] hidden sm:inline">
-                        Matching against your active FIND post
+                        • Matching against your active FIND post
                       </span>
                     </div>
 

@@ -1,39 +1,14 @@
-import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Check, User, 
   GraduationCap, Calendar, FileText, Sparkles, Loader2 
 } from 'lucide-react';
-import { useSlotFriend } from '../context/SlotFriendContext';
+import { useSlotMatchDetails } from '../../../hooks/useAppData';
 
 export default function SlotStudentProfilePage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
-  const { fetchMatchDetails } = useSlotFriend();
-
-  const [student, setStudent] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (studentId) {
-      setIsLoading(true);
-      fetchMatchDetails(studentId)
-        .then((data) => {
-          if (isMounted) setStudent(data);
-        })
-        .catch((err) => {
-          console.warn('[SlotMate] Failed to load match profile:', err);
-          if (isMounted) setStudent(null);
-        })
-        .finally(() => {
-          if (isMounted) setIsLoading(false);
-        });
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [studentId, fetchMatchDetails]);
+  const { data: student, isLoading } = useSlotMatchDetails(studentId);
 
   if (isLoading) {
     return (
@@ -102,7 +77,7 @@ export default function SlotStudentProfilePage() {
       {/* ========================================================================= */}
       {/* MAIN CONTENT AREA                                                         */}
       {/* ========================================================================= */}
-      <main className="w-full max-w-xl mx-auto px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] space-y-4 flex-1">
+      <main className="w-full max-w-xl mx-auto px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] space-y-4 flex-1">
         {/* ======================================================================= */}
         {/* 2. PROFILE HEADER CARD (WARM YELLOW GRADIENT)                           */}
         {/* ======================================================================= */}
@@ -155,8 +130,9 @@ export default function SlotStudentProfilePage() {
         {/* ======================================================================= */}
         {/* 3. POST & COURSE DETAILS CARD                                           */}
         {/* ======================================================================= */}
-        <div className="bg-white rounded-[26px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs space-y-3.5">
-          {/* Card Title */}
+        <div className="bg-white rounded-[26px] p-4 sm:p-5 border border-[#F4E3D8] shadow-xs">
+          <div className="space-y-3.5">
+            {/* Card Title */}
           <div className="flex items-center gap-2 pb-2 border-b border-[#F4E3D8]/60">
             <GraduationCap className="w-5 h-5 text-[#D97706] stroke-[2.2]" />
             <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
@@ -203,31 +179,25 @@ export default function SlotStudentProfilePage() {
             </div>
           </div>
 
-          {/* Row 4: Post Note */}
-          <div className="space-y-1.5 pt-2 border-t border-[#F4E3D8]/60">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
-                <FileText className="w-4.5 h-4.5 stroke-[2.2]" />
+            {/* Row 4: Post Note */}
+            <div className="space-y-1.5 pt-2 border-t border-[#F4E3D8]/60">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0">
+                  <FileText className="w-4.5 h-4.5 stroke-[2.2]" />
+                </div>
+                <span className="text-xs text-[#6E7587] font-bold">Post Note</span>
               </div>
-              <span className="text-xs text-[#6E7587] font-bold">Post Note</span>
-            </div>
 
-            <div className="bg-[#FEFCE8] border border-[#FEF08A] rounded-2xl p-3 sm:p-3.5 text-xs sm:text-sm text-[#17233C] font-medium leading-relaxed">
-              {student.additionalNotes || 'Looking for classmates in the same slot to discuss, solve assignments and prepare for exams together.'}
+              <div className="bg-[#FEFCE8] border border-[#FEF08A] rounded-2xl p-3 sm:p-3.5 text-xs sm:text-sm text-[#17233C] font-medium leading-relaxed">
+                {student.additionalNotes || 'Looking for classmates in the same slot to discuss, solve assignments and prepare for exams together.'}
+              </div>
             </div>
           </div>
-        </div>
-      </main>
 
-      {/* ========================================================================= */}
-      {/* 4. FIXED BOTTOM BAR: CONTACT ON WHATSAPP BUTTON                           */}
-      {/* ========================================================================= */}
-      <footer className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#F4E3D8] px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40">
-        <div className="max-w-md mx-auto">
           <button
             type="button"
             onClick={handleWhatsAppClick}
-            className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#FACC15] via-[#FBBF24] to-[#F59E0B] hover:brightness-105 active:scale-98 text-[#17233C] font-black text-sm sm:text-base shadow-md shadow-yellow-500/20 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+            className="mt-5 w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#FACC15] via-[#FBBF24] to-[#F59E0B] hover:brightness-105 active:scale-98 text-[#17233C] font-black text-sm sm:text-base shadow-md shadow-yellow-500/20 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
           >
             <img
               src="/whatsapp.svg"
@@ -240,7 +210,7 @@ export default function SlotStudentProfilePage() {
             <span>Contact on WhatsApp</span>
           </button>
         </div>
-      </footer>
+      </main>
     </div>
   );
 }
