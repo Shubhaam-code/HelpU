@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Percent,
   CalendarDays,
   UserCheck,
-  AlertCircle,
   Plus,
   BookOpen,
-  ArrowRight
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { TimetableGrid } from '../components/TimetableGrid';
@@ -29,12 +26,12 @@ export function FFCSTimeTableScreen() {
       <div className="w-full max-w-lg md:max-w-2xl mx-auto px-3.5 sm:px-4 pt-3 space-y-4">
         {/* Header */}
         <header className="flex items-center justify-between py-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => navigate('/slotmate/ffcs/courses')}
-              className="w-9 h-9 rounded-xl bg-white border border-[#FEEBA4] text-[#17233C] flex items-center justify-center hover:bg-[#FFFBEB] active:scale-95 transition-all shadow-2xs cursor-pointer"
-              title="Back to Added Courses"
+              onClick={() => navigate(-1)}
+              className="w-8 h-8 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-[#17233C] transition-colors cursor-pointer shadow-xs active:scale-95"
+              aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
             </button>
@@ -42,27 +39,29 @@ export function FFCSTimeTableScreen() {
               Time Table
             </h1>
           </div>
-
-          <div className="w-8 h-8 rounded-full bg-[#FEF08A] text-[#854D0E] flex items-center justify-center shadow-2xs border border-[#FDE047]">
-            <Percent className="w-4 h-4 stroke-[2.5]" />
-          </div>
         </header>
 
         {/* Top Segmented Switch: [ Faculty List ]  [ My Time Table ] */}
-        <div className="bg-[#FEF9C3] p-1.5 rounded-2xl border border-[#FEEBA4] flex items-center shadow-2xs">
+        <div className="bg-white p-1 rounded-2xl border border-[#F4E3D8] flex items-center shadow-2xs">
           <button
             type="button"
             onClick={() => setActiveTab('faculties')}
-            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'faculties'
-                ? 'bg-[#FFD426] text-[#17233C] shadow-xs'
-                : 'text-[#854D0E] hover:text-[#17233C]'
+                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                : 'text-[#64748B] hover:text-[#17233C]'
             }`}
           >
-            <UserCheck className="w-4 h-4 stroke-[2.2]" />
+            <UserCheck className={`w-4 h-4 stroke-[2.2] ${activeTab === 'faculties' ? 'text-[#78350F]' : 'text-[#64748B]'}`} />
             <span>Faculty List</span>
             {confirmedList.length > 0 && (
-              <span className="w-5 h-5 rounded-full bg-[#17233C] text-amber-300 text-[10px] font-black flex items-center justify-center ml-1">
+              <span
+                className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ml-1 transition-colors ${
+                  activeTab === 'faculties'
+                    ? 'bg-[#FACC15] text-[#78350F]'
+                    : 'bg-[#F1F5F9] text-[#64748B]'
+                }`}
+              >
                 {confirmedList.length}
               </span>
             )}
@@ -71,13 +70,13 @@ export function FFCSTimeTableScreen() {
           <button
             type="button"
             onClick={() => setActiveTab('timetable')}
-            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'timetable'
-                ? 'bg-[#FFD426] text-[#17233C] shadow-xs'
-                : 'text-[#854D0E] hover:text-[#17233C]'
+                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                : 'text-[#64748B] hover:text-[#17233C]'
             }`}
           >
-            <CalendarDays className="w-4 h-4 stroke-[2.2]" />
+            <CalendarDays className={`w-4 h-4 stroke-[2.2] ${activeTab === 'timetable' ? 'text-[#78350F]' : 'text-[#64748B]'}`} />
             <span>My Time Table</span>
           </button>
         </div>
@@ -140,43 +139,42 @@ export function FFCSTimeTableScreen() {
                 {confirmedList.map((fac) => (
                   <div
                     key={fac.courseCode || fac.facultyId}
-                    className="p-4 rounded-2xl bg-white border border-[#FEEBA4] hover:border-[#FACC15] shadow-xs flex items-center justify-between gap-3 transition-all"
+                    className="p-3.5 sm:p-4 rounded-2xl bg-white border border-[#FEEBA4] hover:border-[#FACC15] shadow-xs transition-all space-y-2"
                   >
-                    {/* Faculty Details: Teacher Name, Slot, Room No */}
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-md bg-[#17233C] text-amber-300 font-black text-[10px] tracking-wider uppercase">
-                          {fac.courseCode}
-                        </span>
-                        <h3 className="font-black text-sm text-[#17233C] truncate">
-                          {fac.name}
-                        </h3>
-                      </div>
-
-                      <div className="flex items-center gap-3 pt-0.5">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] font-bold text-[#854D0E] uppercase">Slot:</span>
-                          <span className="px-1.5 py-0.5 rounded-md bg-[#FEF3C7] text-[#92400E] font-black text-xs border border-[#FDE68A]">
-                            {fac.slot}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] font-bold text-[#64748B] uppercase">Room No:</span>
-                          <span className="font-extrabold text-xs text-[#17233C]">
-                            {fac.roomNo}
-                          </span>
-                        </div>
-                      </div>
+                    {/* Top Row: Course Code Badge + Change Button */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-[#FEF9C3] border border-[#FEF08A] text-[#78350F] font-black text-[10px] sm:text-[11px] tracking-wider uppercase">
+                        {fac.courseCode}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/slotmate/ffcs/faculty/${fac.courseCode}`)}
+                        className="px-3 py-1 rounded-xl bg-[#FFFDF7] hover:bg-[#FEF9C3] border border-[#FEEBA4] text-[#854D0E] font-bold text-xs shrink-0 cursor-pointer active:scale-95 transition-all shadow-2xs"
+                      >
+                        Change
+                      </button>
                     </div>
 
-                    {/* Change Button */}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/slotmate/ffcs/faculty/${fac.courseCode}`)}
-                      className="px-3 py-1.5 rounded-xl bg-[#FFFDF7] hover:bg-[#FEF9C3] border border-[#FEEBA4] text-[#854D0E] font-bold text-xs shrink-0 cursor-pointer active:scale-95 transition-all"
-                    >
-                      Change
-                    </button>
+                    {/* Faculty Name: Full width, clean & bold, never truncated */}
+                    <h3 className="font-black text-sm text-[#17233C] leading-snug break-words">
+                      {fac.name}
+                    </h3>
+
+                    {/* Details: Slot & Room No with whitespace-nowrap */}
+                    <div className="flex items-center gap-3 pt-0.5 text-xs">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-bold text-[#854D0E] uppercase tracking-wide">Slot:</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-[#FEF3C7] text-[#17233C] font-black text-[10px] sm:text-[11px] border border-[#FDE68A]">
+                          {fac.slot}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide whitespace-nowrap">Room No:</span>
+                        <span className="font-extrabold text-xs text-[#17233C] whitespace-nowrap">
+                          {fac.roomNo}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))}
 
