@@ -2,10 +2,50 @@ import {
   searchFaculty,
   listFaculty,
   getFacultyById,
+  getFacultyByName,
   getFacultyReviews,
   submitFacultyRating
 } from '../services/faculty.service.js';
 import mongoose from 'mongoose';
+
+// ─── GET /api/faculty/by-name?name=... ───────────────────────────────────────
+
+/**
+ * Find faculty details and review summary by name.
+ */
+export async function getFacultyByNameHandler(req, res) {
+  try {
+    const name = String(req.query.name || req.query.q || '').trim();
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faculty name is required'
+      });
+    }
+
+    const faculty = await getFacultyByName(name);
+    if (!faculty) {
+      return res.status(200).json({
+        success: true,
+        found: false,
+        data: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      found: true,
+      data: faculty
+    });
+  } catch (error) {
+    console.error('[Faculty] Get by name error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to find faculty by name',
+      error: error.message
+    });
+  }
+}
 
 // ─── GET /api/faculty?limit=20 ───────────────────────────────────────────────
 

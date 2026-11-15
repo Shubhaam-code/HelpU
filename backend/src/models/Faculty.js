@@ -85,10 +85,12 @@ facultySchema.index({ overall_rating: -1 });
  * - Remove punctuation except spaces
  */
 export function normalizeFacultyName(name = '') {
-  return name
+  return String(name || '')
     .toLowerCase()
-    .replace(/\b(dr|prof|mr|mrs|ms)\.\s*/gi, '')
-    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\b(dr|prof|mrs|ms)\b\.?\s+/gi, '')
+    .replace(/\bmr\b\.?\s+/gi, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

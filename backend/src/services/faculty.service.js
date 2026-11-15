@@ -2,6 +2,228 @@ import Faculty, { normalizeFacultyName } from '../models/Faculty.js';
 import FacultyRating from '../models/FacultyRating.js';
 import mongoose from 'mongoose';
 
+// ─── Positive Percentage Helper ─────────────────────────────────────────────
+
+/**
+ * Accurately calculate the percentage of positive reviews (rating >= 3.0 or overall_rating)
+ * from genuine database records. Returns null if no rating information is available.
+ */
+export function calculatePositivePercentage(overallRating, reviews = []) {
+  const validReviews = Array.isArray(reviews)
+    ? reviews.filter((r) => typeof r.rating === 'number' && !Number.isNaN(r.rating))
+    : [];
+
+  if (validReviews.length > 0) {
+    const positiveCount = validReviews.filter((r) => r.rating >= 3.0).length;
+    return Math.round((positiveCount / validReviews.length) * 100);
+  }
+
+  if (typeof overallRating === 'number' && !Number.isNaN(overallRating) && overallRating > 0) {
+    return Math.round((overallRating / 5) * 100);
+  }
+
+  return null;
+}
+
+/**
+ * Retrieve faculty by exact or normalized name with calculated positive percentage and review summary.
+ */
+export async function getFacultyByName(rawName) {
+  const name = String(rawName || '').trim();
+  if (!name) return null;
+
+  const normalized = normalizeFacultyName(name);
+  if (!normalized) return null;
+
+  // 1. Try exact normalized match
+  let doc = await Faculty.findOne({ normalizedName: normalized, isActive: { $ne: false } })
+    .select(
+      'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+    )
+    .lean();
+
+  // 2. Try case-insensitive exact name match
+  if (!doc) {
+    const escaped = escapeRegex(normalized);
+    doc = await Faculty.findOne({
+      $or: [
+        { normalizedName: new RegExp(`^${escaped}$`, 'i') },
+        { name: new RegExp(`^${escapeRegex(name)}$`, 'i') }
+      ],
+      isActive: { $ne: false }
+    })
+      .select(
+        'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+      )
+      .lean();
+  }
+
+  // 3. Fallback: multi-word presence (handles middle names or initial placement)
+  if (!doc && normalized.length >= 4) {
+    const words = normalized.split(' ').filter((w) => w.length > 2);
+    if (words.length >= 2) {
+      const regexPattern = words.map((w) => `(?=.*\\b${escapeRegex(w)})`).join('');
+      doc = await Faculty.findOne({
+        normalizedName: new RegExp(regexPattern, 'i'),
+        isActive: { $ne: false }
+      })
+        .select(
+          'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+        )
+        .lean();
+    }
+  }
+
+  if (!doc) return null;
+
+  const positivePercentage = calculatePositivePercentage(doc.overall_rating, doc.reviews);
+  const reviews = Array.isArray(doc.reviews) ? doc.reviews : [];
+
+  return {
+    ...doc,
+    positivePercentage,
+    totalReviews: doc.totalReviews || reviews.length || 0,
+    reviews: reviews.slice(0, 15)
+  };
+}
+
+/**
+ * Enrich a list of raw teachers (from OCR or CourseCatalog) with review data from Faculty collection.
+ * Uses multi-strategy matching:
+ * 1. Matching by facultyId (if present).
+ * 2. Exact match on normalizedName.
+ * 3. Exact match on name (case-insensitive).
+ * 4. Multi-word lookahead regex for inverted/middle names (e.g. "PATEL ADARSH" <-> "Adarsh Patel").
+ */
+export async function enrichTeachersWithReviews(rawTeachers = []) {
+  if (!Array.isArray(rawTeachers) || rawTeachers.length === 0) {
+    return [];
+  }
+
+  const teacherNormPairs = rawTeachers.map((teacher, index) => {
+    const rawName = String(teacher?.name || '').trim();
+    const normalized = normalizeFacultyName(rawName);
+    return {
+      index,
+      teacher,
+      rawName,
+      normalized,
+      facultyId: teacher?.facultyId ? String(teacher.facultyId).toUpperCase() : null
+    };
+  });
+
+  const normNames = teacherNormPairs.map((p) => p.normalized).filter(Boolean);
+  const facultyIds = teacherNormPairs.map((p) => p.facultyId).filter(Boolean);
+
+  const facultyMap = new Map();
+
+  // Fast Batch Query: Match exact normalized names and facultyIds
+  if (normNames.length > 0 || facultyIds.length > 0) {
+    const conditions = [];
+    if (normNames.length > 0) conditions.push({ normalizedName: { $in: normNames } });
+    if (facultyIds.length > 0) conditions.push({ facultyId: { $in: facultyIds } });
+
+    const matched = await Faculty.find({
+      $or: conditions,
+      isActive: { $ne: false }
+    })
+      .select(
+        'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+      )
+      .lean();
+
+    for (const f of matched) {
+      if (f.normalizedName) facultyMap.set(f.normalizedName, f);
+      if (f.facultyId) facultyMap.set(f.facultyId, f);
+    }
+  }
+
+  // Second pass: For any teachers not matched in the fast batch, use fallback matching
+  const enrichedTeachers = [];
+  for (const pair of teacherNormPairs) {
+    const { teacher, rawName, normalized, facultyId } = pair;
+    let doc =
+      (facultyId && facultyMap.get(facultyId)) ||
+      (normalized && facultyMap.get(normalized)) ||
+      null;
+
+    if (!doc && rawName) {
+      // Fallback 1: Case-insensitive regex on name / normalizedName
+      const escaped = escapeRegex(normalized || rawName.toLowerCase());
+      doc = await Faculty.findOne({
+        $or: [
+          { normalizedName: new RegExp(`^${escaped}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(rawName)}$`, 'i') }
+        ],
+        isActive: { $ne: false }
+      })
+        .select(
+          'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+        )
+        .lean();
+
+      // Fallback 2: Multi-word lookahead (e.g. "Patel Adarsh" <-> "Adarsh Patel")
+      if (!doc && normalized.length >= 4) {
+        const words = normalized.split(' ').filter((w) => w.length > 2);
+        if (words.length >= 2) {
+          const regexPattern = words.map((w) => `(?=.*\\b${escapeRegex(w)})`).join('');
+          doc = await Faculty.findOne({
+            normalizedName: new RegExp(regexPattern, 'i'),
+            isActive: { $ne: false }
+          })
+            .select(
+              'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+            )
+            .lean();
+        }
+      }
+
+      if (doc) {
+        // Cache in memory for subsequent teachers in this run
+        if (doc.normalizedName) facultyMap.set(doc.normalizedName, doc);
+        if (normalized) facultyMap.set(normalized, doc);
+      }
+    }
+
+    if (!doc) {
+      enrichedTeachers.push({
+        ...teacher,
+        hasReview: false
+      });
+      continue;
+    }
+
+    const reviews = Array.isArray(doc.reviews) ? doc.reviews : [];
+    const positivePercentage = calculatePositivePercentage(doc.overall_rating, reviews);
+
+    enrichedTeachers.push({
+      ...teacher,
+      hasReview: true,
+      facultyId: doc.facultyId,
+      reviewSummary: {
+        facultyId: doc.facultyId,
+        facultyMongoId: String(doc._id),
+        name: doc.name,
+        department: doc.department || '',
+        designation: doc.designation || '',
+        overallRating: doc.overall_rating,
+        positivePercentage,
+        totalReviews: doc.totalReviews || reviews.length || 0,
+        teachingRating: doc.teaching_rating,
+        evaluationRating: doc.evaluation_rating,
+        behaviourRating: doc.behaviour_rating,
+        internalsRating: doc.internals_rating,
+        classAverage: doc.classAverage,
+        finalRemark: doc.finalRemark,
+        reviews: reviews.slice(0, 5),
+        hasReview: true
+      }
+    });
+  }
+
+  return enrichedTeachers;
+}
+
 // ─── Rating Status Helper ───────────────────────────────────────────────────
 
 /**

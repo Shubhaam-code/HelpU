@@ -367,6 +367,8 @@ export const listFaculty = (limit = 20) =>
   apiClient.get('/api/faculty', { params: { limit } });
 export const getFacultyById = (id) =>
   apiClient.get(`/api/faculty/${id}`);
+export const getFacultyByName = (name) =>
+  apiClient.get('/api/faculty/by-name', { params: { name } });
 export const getFacultyReviews = (id, page = 1, limit = 10) =>
   apiClient.get(`/api/faculty/${id}/reviews`, { params: { page, limit } });
 export const submitFacultyRating = (id, data) =>
