@@ -3,6 +3,7 @@ import {
   searchFacultyHandler,
   listFacultyHandler,
   getFacultyDetailsHandler,
+  getFacultyByNameHandler,
   getFacultyReviewsHandler,
   submitFacultyRatingHandler
 } from '../controllers/faculty.controller.js';
@@ -14,7 +15,11 @@ const router = express.Router();
 // GET /api/faculty/search?q=vij
 router.get('/search', searchFacultyHandler);
 
-// 2. Initial faculty listing - Public
+// 2. Find faculty by name - Public
+// GET /api/faculty/by-name?name=suchismita
+router.get('/by-name', getFacultyByNameHandler);
+
+// 3. Initial faculty listing - Public
 // GET /api/faculty?limit=20
 router.get('/', listFacultyHandler);
 

@@ -13,6 +13,8 @@ import { CourseSkeletonCard } from '../components/FFCSSkeleton';
 import heroImgSrc from '../../../assets/images/ffcs_background.webp';
 import notebookImgSrc from '../../../assets/images/notebook.webp';
 import bgBubbleWaveSrc from '../../../assets/images/background.webp';
+import sparkLeftSrc from '../../../assets/images/ffcs_spark_left.png';
+import sparkRightSrc from '../../../assets/images/ffcs_spark_right.png';
 
 export function FFCSHome() {
   const navigate = useNavigate();
@@ -93,24 +95,15 @@ export function FFCSHome() {
 
           {/* DYNAMIC COURSE CARDS: Displays Actual Course Code, No "Upload Image" text */}
           <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-amber-200">
-            {loading && coursesList.length === 0 && (
-              <div className="space-y-2.5">
-                <CourseSkeletonCard />
-                <CourseSkeletonCard />
-                <CourseSkeletonCard />
-              </div>
-            )}
-
-            {!loading && coursesList.length === 0 && (
-              <div className="text-center py-6 space-y-1">
+            {coursesList.length === 0 ? (
+              <div className="text-center py-6 px-3 space-y-1">
                 <p className="font-black text-sm text-[#17233C]">No courses added yet</p>
                 <p className="text-[11px] text-[#64748B]">
-                  Tap Add More Course to search the curriculum.
+                  Tap Add More Course below to search and add your courses.
                 </p>
               </div>
-            )}
-
-            {coursesList.map((course, idx) => {
+            ) : (
+              coursesList.map((course, idx) => {
               const isUploaded = course.status === 'completed' || course.status === 'needs_review';
 
               return (
@@ -152,40 +145,50 @@ export function FFCSHome() {
                   )}
                 </div>
               );
-            })}
+            }))}
           </div>
 
           {/* ========================================================================= */}
-          {/* PROBLEM 3: ADD MORE COURSE BUTTON -> Sleek & Compact for Mobile */}
+          {/* ADD MORE COURSE BUTTON -> Capsule with Provided Yellow Decorative PNGs   */}
           {/* ========================================================================= */}
-          <div className="flex items-center justify-center w-full pt-1 pb-0.5">
-            {/* Left burst rays */}
-            <div className="flex flex-col gap-0.5 text-[#FACC15] mr-1.5 shrink-0">
-              <div className="w-2 h-[2px] bg-[#FACC15] rounded-full rotate-[-35deg]" />
-              <div className="w-2.5 h-[2px] bg-[#FACC15] rounded-full" />
-              <div className="w-2 h-[2px] bg-[#FACC15] rounded-full rotate-[35deg]" />
-            </div>
+          <div className="flex items-center justify-center w-full pt-2 pb-1">
+            {/* Left yellow decorative PNG asset */}
+            <img
+              src={sparkLeftSrc}
+              alt=""
+              aria-hidden="true"
+              className="h-7 sm:h-8 w-auto object-contain mr-1.5 sm:mr-2 select-none pointer-events-none shrink-0"
+            />
 
-            {/* Yellow Dashed Button -> Displays: + Add More Course */}
+            {/* Glowing Yellow Pill Button */}
             <button
               type="button"
               onClick={handleUploadClick}
-              className={`py-1.5 px-3.5 sm:px-4 rounded-full bg-[#FFFDF7] hover:bg-[#FEFCE8] border-[1.5px] border-dashed border-[#FACC15] flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 transition-all max-w-[210px] sm:max-w-[230px] ${
-                coursesList.length >= 8 ? 'opacity-60' : ''
+              className={`group pl-1.5 pr-4 py-1.5 sm:pl-2 sm:pr-5 sm:py-2 rounded-full bg-white hover:bg-[#FEFCE8] border-[2px] border-[#FACC15] hover:border-[#EAB308] flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(250,204,21,0.25)] hover:shadow-[0_6px_22px_rgba(234,179,8,0.35)] cursor-pointer active:scale-95 transition-all ${
+                coursesList.length >= 8 ? 'opacity-60 cursor-not-allowed' : ''
               }`}
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.8] text-[#17233C]" />
-              <span className="font-extrabold text-xs sm:text-[13px] text-[#17233C] tracking-tight whitespace-nowrap">
+              {/* Vibrant Golden Circle with Dark Navy Bold Plus */}
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#FFE066] via-[#FFD426] to-[#F59E0B] text-[#17233C] flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(245,158,11,0.35)] group-hover:scale-105 transition-transform">
+                <Plus className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[3.2] text-[#17233C]" />
+              </div>
+
+              {/* Light Yellow Subtle Vertical Divider */}
+              <div className="w-[1.5px] h-5 bg-[#FDE047] shrink-0" />
+
+              {/* Bold Dark Blue / Navy Text */}
+              <span className="font-black text-[13px] sm:text-sm text-[#17233C] tracking-tight whitespace-nowrap pl-0.5">
                 {coursesList.length >= 8 ? 'Limit Reached (8/8)' : 'Add More Course'}
               </span>
             </button>
 
-            {/* Right burst rays */}
-            <div className="flex flex-col gap-0.5 text-[#FACC15] ml-1.5 shrink-0">
-              <div className="w-2 h-[2px] bg-[#FACC15] rounded-full rotate-[35deg]" />
-              <div className="w-2.5 h-[2px] bg-[#FACC15] rounded-full" />
-              <div className="w-2 h-[2px] bg-[#FACC15] rounded-full rotate-[-35deg]" />
-            </div>
+            {/* Right yellow decorative PNG asset */}
+            <img
+              src={sparkRightSrc}
+              alt=""
+              aria-hidden="true"
+              className="h-7 sm:h-8 w-auto object-contain ml-1.5 sm:ml-2 select-none pointer-events-none shrink-0"
+            />
           </div>
         </section>
 

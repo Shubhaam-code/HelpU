@@ -10,18 +10,35 @@ import {
   Loader2,
   Clock,
   MapPin,
-  CalendarDays
+  CalendarDays,
+  Star
 } from 'lucide-react';
 import { useFFCS, teacherToFaculty } from '../context/FFCSContext';
 import { detectSlotClash } from '../utils/slotClashDetector.js';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { TeacherSkeletonRow } from '../components/FFCSSkeleton';
 import { TeacherClassroomIcon } from '../../../components/icons/TeacherClassroomIcon';
+import { FacultyReviewModal } from '../components/FacultyReviewModal';
+import { getFacultyByName } from '../../../lib/api';
 
 export function SelectFacultyScreen() {
   const { courseCode: courseIdParam } = useParams();
   const navigate = useNavigate();
   const { coursesList, confirmedFaculties, confirmFaculty, loading, getCourseTeachers } = useFFCS();
+
+  // Review Modal State
+  const [reviewModalTeacher, setReviewModalTeacher] = useState(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+
+  const handleOpenReview = (teacher) => {
+    setReviewModalTeacher(teacher);
+    setIsReviewModalOpen(true);
+  };
+
+  const handleCloseReview = () => {
+    setIsReviewModalOpen(false);
+    setReviewModalTeacher(null);
+  };
 
   const course = coursesList.find(
     (item) =>
@@ -70,7 +87,9 @@ export function SelectFacultyScreen() {
     setFetchError('');
     try {
       const data = await getCourseTeachers(course.id, force);
-      setTeachers(data.teachers || []);
+      if (Array.isArray(data?.teachers) && data.teachers.length > 0) {
+        setTeachers(data.teachers);
+      }
       setReviewStatus(data.reviewStatus || null);
       setCourseStatus(data.status || null);
     } catch (error) {
@@ -85,14 +104,58 @@ export function SelectFacultyScreen() {
   }, [course?.id, getCourseTeachers]);
 
   useEffect(() => {
-    if (course?.teachers?.length && teachers.length === 0) {
+    // If course in context already has teachers, populate immediately for zero UI flicker
+    if (course?.teachers?.length) {
       setTeachers(course.teachers);
       setReviewStatus(course.reviewStatus || null);
       setCourseStatus(course.status || null);
-    } else if (course && teachers.length === 0) {
-      loadTeachers();
     }
-  }, [course, teachers.length, loadTeachers]);
+    // Always trigger fresh fetch to load enriched faculty review data
+    if (course?.id) {
+      loadTeachers(true);
+    }
+  }, [course?.id, loadTeachers]);
+
+  // Proactive background verification: for any displayed teacher without review status,
+  // query /api/faculty/by-name to verify and load review data on the fly.
+  useEffect(() => {
+    if (!teachers.length) return;
+    let isCancelled = false;
+
+    teachers.forEach(async (teacher, idx) => {
+      if (teacher?.hasReview === true || teacher?.reviewSummary?.hasReview) return;
+      const tName = teacher?.name;
+      if (!tName || tName.trim().length < 2) return;
+
+      try {
+        const res = await getFacultyByName(tName.trim());
+        if (!isCancelled && res?.data?.found && res?.data?.data) {
+          const faculty = res.data.data;
+          setTeachers((prev) =>
+            prev.map((item, i) =>
+              i === idx || item.name === tName
+                ? {
+                    ...item,
+                    hasReview: true,
+                    facultyId: faculty.facultyId,
+                    reviewSummary: {
+                      ...faculty,
+                      hasReview: true
+                    }
+                  }
+                : item
+            )
+          );
+        }
+      } catch {
+        // Safe fail
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [teachers]);
 
   const handleConfirm = () => {
     if (!course || !selectedTeacher) return;
@@ -250,6 +313,11 @@ export function SelectFacultyScreen() {
                     });
                     const isClashing = clashInfo.hasClash;
 
+                    const hasReview =
+                      teacher?.hasReview === true ||
+                      Boolean(teacher?.reviewSummary?.hasReview) ||
+                      (Boolean(teacher?.facultyId) && teacher?.hasReview !== false);
+
                     return (
                       <div
                         key={teacherKey}
@@ -290,10 +358,10 @@ export function SelectFacultyScreen() {
                             <span
                               className={`text-xs sm:text-sm leading-tight block truncate ${
                                 isClashing
-                                  ? 'font-bold text-[#475569]'
-                                  : isSelected
-                                  ? 'font-black text-[#17233C]'
-                                  : 'font-bold text-[#1E293B]'
+                                   ? 'font-bold text-[#475569]'
+                                   : isSelected
+                                   ? 'font-black text-[#17233C]'
+                                   : 'font-bold text-[#1E293B]'
                               }`}
                             >
                               {teacher.name}
@@ -304,15 +372,51 @@ export function SelectFacultyScreen() {
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
                                   CLASH
                                 </span>
+                                {hasReview ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenReview(teacher);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-2xs active:scale-95"
+                                    title="View Faculty Reviews"
+                                  >
+                                    <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                                    <span>Review</span>
+                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-50 text-slate-400 border border-slate-200 select-none">
+                                    Review N/A
+                                  </span>
+                                )}
                                 <span className="text-[11px] font-semibold text-rose-600 line-clamp-1">
                                   {clashInfo.message}
                                 </span>
                               </div>
                             ) : (
-                              <div className="mt-1 flex items-center gap-1.5">
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                                   Available
                                 </span>
+                                {hasReview ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenReview(teacher);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-2xs active:scale-95"
+                                    title="View Faculty Reviews"
+                                  >
+                                    <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                                    <span>Review</span>
+                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-50 text-slate-400 border border-slate-200 select-none">
+                                    Review N/A
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -370,6 +474,13 @@ export function SelectFacultyScreen() {
       </div>
 
       <FFCSBottomNav activeTab="home" />
+
+      {/* Interactive Faculty Review Modal */}
+      <FacultyReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={handleCloseReview}
+        teacher={reviewModalTeacher}
+      />
     </div>
   );
 }

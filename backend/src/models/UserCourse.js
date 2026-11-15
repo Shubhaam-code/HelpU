@@ -61,6 +61,7 @@ userCourseSchema.index(
   },
   { unique: true, name: 'ffcs_user_course_unique_registration' }
 );
+userCourseSchema.index({ userId: 1, courseCode: 1 }, { name: 'ffcs_user_course_code' });
 userCourseSchema.index({ userId: 1, createdAt: -1 }, { name: 'ffcs_user_course_recent' });
 userCourseSchema.index(
   { userId: 1, idempotencyKey: 1 },

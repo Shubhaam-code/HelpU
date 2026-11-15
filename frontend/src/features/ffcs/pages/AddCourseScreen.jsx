@@ -69,6 +69,102 @@ const DEFAULT_SUGGESTIONS = [
   }
 ];
 
+function ExtractionProgressCard({ addInProgress }) {
+  const [progress, setProgress] = useState(12);
+
+  useEffect(() => {
+    if (!addInProgress) {
+      setProgress(12);
+      return;
+    }
+
+    if (addInProgress.state === 'completed' || addInProgress.state === 'success') {
+      setProgress(100);
+      return;
+    }
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsedSeconds = (Date.now() - startTime) / 1000;
+      let nextProgress = 12;
+      if (elapsedSeconds <= 4) {
+        nextProgress = 12 + (elapsedSeconds / 4) * 16;
+      } else if (elapsedSeconds <= 18) {
+        nextProgress = 28 + ((elapsedSeconds - 4) / 14) * 32;
+      } else if (elapsedSeconds <= 36) {
+        nextProgress = 60 + ((elapsedSeconds - 18) / 18) * 26;
+      } else {
+        nextProgress = Math.min(96, 86 + Math.atan((elapsedSeconds - 36) / 8) * 7);
+      }
+      setProgress(Math.round(nextProgress));
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [addInProgress]);
+
+  const displayProgress = addInProgress?.state === 'completed' ? 100 : progress;
+
+  let statusText = 'Extracting teacher details...';
+  if (displayProgress >= 100) {
+    statusText = 'Extraction complete!';
+  } else if (displayProgress >= 75) {
+    statusText = 'Finalizing course catalog...';
+  } else if (displayProgress >= 40) {
+    statusText = 'Extracting faculty names & timetable slots...';
+  } else if (displayProgress >= 20) {
+    statusText = 'Scanning screenshots with AI vision...';
+  } else {
+    statusText = 'Preparing screenshots for AI extraction...';
+  }
+
+  return (
+    <div className="bg-gradient-to-b from-[#FFFDF7] via-white to-[#FEFCE8] border-2 border-[#FDE047] rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-[0_8px_24px_rgba(234,179,8,0.12)] space-y-3.5 animate-in fade-in duration-200">
+      {/* Top Row: Circular Animated Loader + Heading + Percentage Indicator */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#FEF08A] text-[#854D0E] border border-[#FDE047] flex items-center justify-center shrink-0 shadow-2xs">
+            {displayProgress >= 100 ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
+            ) : (
+              <Loader2 className="w-5 h-5 animate-spin text-[#D97706] stroke-[2.5]" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <h4 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight leading-tight">
+              Extracting Teacher Details...
+            </h4>
+            <p className="text-[11px] font-bold text-[#D97706] truncate mt-0.5">
+              {statusText}
+            </p>
+          </div>
+        </div>
+
+        {/* Percentage Indicator Badge */}
+        <div className="shrink-0 px-2.5 py-1 rounded-full bg-[#FEF9C3] border border-[#FDE047] text-[#854D0E] font-black text-xs shadow-2xs">
+          {displayProgress}%
+        </div>
+      </div>
+
+      {/* Horizontal Golden Yellow Progress Bar */}
+      <div className="space-y-1">
+        <div className="w-full h-2.5 sm:h-3 bg-[#FEF3C7] rounded-full overflow-hidden p-0.5 border border-[#FDE68A] shadow-inner">
+          <div
+            className="h-full bg-gradient-to-r from-[#FDE047] via-[#FACC15] to-[#EAB308] rounded-full transition-all duration-300 ease-out shadow-xs relative overflow-hidden"
+            style={{ width: `${displayProgress}%` }}
+          >
+            <div className="absolute inset-0 bg-white/30 animate-pulse" />
+          </div>
+        </div>
+      </div>
+
+      {/* Required English Description */}
+      <p className="text-[11px] sm:text-xs font-medium text-[#475569] leading-relaxed bg-[#FFFDF7] border border-[#FEEBA4] rounded-xl p-2.5 sm:p-3">
+        AI is scanning screenshots and extracting teacher information. This process may take approximately 40–50 seconds. Please wait and do not refresh the page or navigate back.
+      </p>
+    </div>
+  );
+}
+
 export function AddCourseScreen() {
   const navigate = useNavigate();
   const { coursesList, addCourse, addInProgress, getAcademicYear, setAcademicYear } = useFFCS();
@@ -85,6 +181,24 @@ export function AddCourseScreen() {
   const searchContainerRef = useRef(null);
   const searchRequestRef = useRef(0);
   const isSelectingRef = useRef(false);
+
+  // Helper to verify if a course already exists in the user's selected courses list
+  const isCourseAlreadyAdded = (course) => {
+    if (!course || !Array.isArray(coursesList) || coursesList.length === 0) return false;
+    const targetId = String(course._id || course.courseId || '').trim();
+    const targetCode = String(course.courseCode || course.code || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    return coursesList.some((existing) => {
+      const existingId = String(existing.id || '').trim();
+      const existingCurriculumId = String(existing.curriculumCourseId || '').trim();
+      const existingCode = String(existing.code || existing.courseCode || '').trim().toUpperCase().replace(/\s+/g, '');
+
+      return (
+        (targetId && (targetId === existingId || targetId === existingCurriculumId)) ||
+        (targetCode && existingCode && targetCode === existingCode)
+      );
+    });
+  };
 
   // Form State
   const [semester, setSemester] = useState('');
@@ -164,6 +278,10 @@ export function AddCourseScreen() {
   }, [courseSearchQuery]);
 
   const handleSelectSuggestion = (course) => {
+    if (isCourseAlreadyAdded(course)) {
+      setErrorMessage('This course has already been added.');
+      return;
+    }
     isSelectingRef.current = true;
     setSelectedCourse({
       _id: course._id || course.courseId,
@@ -264,12 +382,19 @@ export function AddCourseScreen() {
   };
 
   const handleAddCourseSubmit = async () => {
+    // Prevent duplicate entries even if the user clicks the Add button multiple times quickly
+    if (submitting || busy) return;
+
     if (coursesList.length >= 8) {
       setErrorMessage('Maximum 8 courses allowed in FFCS. You cannot add more than 8 courses.');
       return;
     }
     if (!selectedCourse) {
       setErrorMessage('Please search and select a course from the suggestions.');
+      return;
+    }
+    if (isCourseAlreadyAdded(selectedCourse)) {
+      setErrorMessage('This course has already been added.');
       return;
     }
     if (!semester) {
@@ -305,12 +430,15 @@ export function AddCourseScreen() {
         navigate('/slotmate/ffcs/courses');
       }
     } catch (error) {
+      const apiMsg = error?.response?.data?.message || error?.message;
       setErrorMessage(
         error?.status === 401
           ? 'Please sign in to add a course to your account.'
-          : error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')
-            ? 'Extraction is taking longer than expected. Please check your internet connection and try again.'
-            : error?.message || 'Failed to add course.'
+          : error?.response?.status === 409 || error?.code === 'COURSE_ALREADY_EXISTS' || apiMsg?.includes('already been added')
+            ? 'This course has already been added.'
+            : error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')
+              ? 'Extraction is taking longer than expected. Please check your internet connection and try again.'
+              : apiMsg || 'Failed to add course.'
       );
     } finally {
       setSubmitting(false);
@@ -500,7 +628,11 @@ export function AddCourseScreen() {
                       </p>
                     </div>
 
-                    {isChosen ? (
+                    {isCourseAlreadyAdded(course) ? (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full shrink-0 border border-amber-300">
+                        Added
+                      </span>
+                    ) : isChosen ? (
                       <CheckCircle2 className="w-4 h-4 text-[#EAB308] shrink-0" />
                     ) : (
                       <span className="text-[10px] font-bold text-[#854D0E] bg-[#FEF08A]/70 px-2 py-0.5 rounded-full shrink-0">
@@ -749,19 +881,9 @@ export function AddCourseScreen() {
           </div>
         )}
 
-        {/* Progress Message */}
-        {addInProgress?.message && (
-          <div className="bg-[#FFFDF7] border-2 border-[#FDE047] text-[#17233C] px-3.5 py-3 rounded-2xl text-xs font-bold flex items-start gap-3 shadow-sm animate-in fade-in duration-200">
-            <Loader2 className="w-4 h-4 animate-spin text-[#D97706] shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 space-y-1">
-              <p className="font-black text-xs text-[#17233C] leading-snug">
-                {addInProgress.message}
-              </p>
-              <p className="text-[11px] font-semibold text-[#854D0E] leading-relaxed">
-                Screenshots scan karne me AI ko 40–50 sec lagte hain (agar database me pehle se hua toh turant open ho jayega). Kripya thoda wait karein aur refresh ya back na karein.
-              </p>
-            </div>
-          </div>
+        {/* Modern Extraction Progress Card */}
+        {addInProgress && (
+          <ExtractionProgressCard addInProgress={addInProgress} />
         )}
 
         {/* Error Alert */}
@@ -777,7 +899,7 @@ export function AddCourseScreen() {
           <button
             type="button"
             onClick={handleAddCourseSubmit}
-            disabled={busy || coursesList.length >= 8}
+            disabled={busy || coursesList.length >= 8 || isCourseAlreadyAdded(selectedCourse)}
             className="w-full py-3.5 px-4 rounded-full bg-gradient-to-r from-[#FDE047] to-[#FACC15] hover:from-[#FACC15] hover:to-[#EAB308] disabled:opacity-60 disabled:cursor-not-allowed text-[#17233C] font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-amber-400/30 border border-[#FACC15] transition-all cursor-pointer active:scale-98"
           >
             {busy ? (
@@ -790,7 +912,9 @@ export function AddCourseScreen() {
                 ? 'Processing...'
                 : coursesList.length >= 8
                   ? 'Limit Reached (8/8 Courses)'
-                  : 'Add Course'}
+                  : isCourseAlreadyAdded(selectedCourse)
+                    ? 'Course Already Added'
+                    : 'Add Course'}
             </span>
           </button>
         </div>

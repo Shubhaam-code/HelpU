@@ -5,6 +5,8 @@ import UserCourse from '../models/UserCourse.js';
 import CourseCatalog from '../models/CourseCatalog.js';
 import CourseUpload from '../models/CourseUpload.js';
 import CurriculumCourse from '../models/CurriculumCourse.js';
+import Faculty, { normalizeFacultyName } from '../models/Faculty.js';
+import { calculatePositivePercentage, enrichTeachersWithReviews } from './faculty.service.js';
 import {
   extractTeachersFromImages,
   isGeminiConfigured
@@ -166,6 +168,28 @@ async function readImages(files) {
 }
 
 async function findOrCreateUserCourse({ userId, curriculumCourse, semester, academicYear, curriculumVersion, idempotencyKey }) {
+  const allowed = getEquivalentUserIds(userId);
+  const cleanCode = normalizeCourseCode(curriculumCourse.courseCode);
+  const targetCurriculumId = curriculumCourse._id;
+
+  // Concurrency & race condition guard: check if already exists for this user
+  const existing = await UserCourse.findOne({
+    userId: { $in: allowed },
+    $or: [
+      { curriculumCourseId: targetCurriculumId },
+      { courseCode: cleanCode }
+    ],
+    status: { $ne: 'failed' }
+  });
+
+  if (existing) {
+    throw new FfcsError(
+      'This course has already been added.',
+      409,
+      'COURSE_ALREADY_EXISTS'
+    );
+  }
+
   const filter = {
     userId,
     curriculumCourseId: curriculumCourse._id,
@@ -174,13 +198,10 @@ async function findOrCreateUserCourse({ userId, curriculumCourse, semester, acad
     curriculumVersion
   };
 
-  let userCourse = await UserCourse.findOne(filter);
-  if (userCourse) return userCourse;
-
   try {
-    userCourse = await UserCourse.create({
+    const userCourse = await UserCourse.create({
       ...filter,
-      courseCode: curriculumCourse.courseCode,
+      courseCode: cleanCode,
       courseName: curriculumCourse.courseName,
       institution: curriculumCourse.institution,
       status: 'validating',
@@ -190,8 +211,11 @@ async function findOrCreateUserCourse({ userId, curriculumCourse, semester, acad
     return userCourse;
   } catch (error) {
     if (error?.code === 11000) {
-      const existing = await UserCourse.findOne(filter);
-      if (existing) return existing;
+      throw new FfcsError(
+        'This course has already been added.',
+        409,
+        'COURSE_ALREADY_EXISTS'
+      );
     }
     throw error;
   }
@@ -464,17 +488,35 @@ export async function addCourseForUser({
     userId: { $in: getEquivalentUserIds(userId) }
   }).lean();
 
-  if (existingUserCourses.length >= MAX_FFCS_COURSES) {
-    const isAlreadyAdded = existingUserCourses.some(
-      (c) => String(c.curriculumCourseId) === String(curriculumCourse._id)
+  const cleanCourseCode = normalizeCourseCode(curriculumCourse.courseCode);
+  const targetCurriculumId = String(curriculumCourse._id);
+
+  // 1. Duplicate Validation: A user must be able to add a particular course only once.
+  // Uses both unique curriculumCourseId and normalized courseCode to verify.
+  const duplicateCourse = existingUserCourses.find((existing) => {
+    const existingCurriculumId = String(existing.curriculumCourseId || '');
+    const existingCode = normalizeCourseCode(existing.courseCode);
+    const isSameCourse =
+      (targetCurriculumId && existingCurriculumId === targetCurriculumId) ||
+      (cleanCourseCode && existingCode === cleanCourseCode);
+
+    return isSameCourse && existing.status !== 'failed';
+  });
+
+  if (duplicateCourse) {
+    throw new FfcsError(
+      'This course has already been added.',
+      409,
+      'COURSE_ALREADY_EXISTS'
     );
-    if (!isAlreadyAdded) {
-      throw new FfcsError(
-        'Maximum 8 courses allowed in FFCS. You cannot add more than 8 courses.',
-        400,
-        'COURSE_LIMIT_EXCEEDED'
-      );
-    }
+  }
+
+  if (existingUserCourses.length >= MAX_FFCS_COURSES) {
+    throw new FfcsError(
+      'Maximum 8 courses allowed in FFCS. You cannot add more than 8 courses.',
+      400,
+      'COURSE_LIMIT_EXCEEDED'
+    );
   }
 
   const userCourse = await findOrCreateUserCourse({
@@ -749,13 +791,35 @@ export async function listUserCourses(userId) {
   const userCourses = await UserCourse.find({ userId: { $in: allowed } }).sort({ createdAt: -1 }).lean();
   if (userCourses.length === 0) return [];
 
-  const catalogIds = userCourses.map((course) => course.catalogId).filter(Boolean);
+  // Deduplicate by courseCode and curriculumCourseId so each course appears only once
+  const seen = new Set();
+  const uniqueUserCourses = [];
+  for (const course of userCourses) {
+    const codeKey = normalizeCourseCode(course.courseCode);
+    const idKey = String(course.curriculumCourseId || '');
+    if ((codeKey && seen.has(codeKey)) || (idKey && seen.has(idKey))) {
+      continue;
+    }
+    if (codeKey) seen.add(codeKey);
+    if (idKey) seen.add(idKey);
+    uniqueUserCourses.push(course);
+  }
+
+  const catalogIds = uniqueUserCourses.map((course) => course.catalogId).filter(Boolean);
   const catalogs = catalogIds.length
     ? await CourseCatalog.find({ _id: { $in: catalogIds } }).lean()
     : [];
+
+  // Enrich teachers in all catalogs with reviews so coursesList has reviews pre-loaded
+  for (const cat of catalogs) {
+    if (Array.isArray(cat.teachers) && cat.teachers.length > 0) {
+      cat.teachers = await enrichTeachersWithReviews(cat.teachers);
+    }
+  }
+
   const catalogMap = new Map(catalogs.map((catalog) => [String(catalog._id), catalog]));
 
-  return userCourses.map((course) =>
+  return uniqueUserCourses.map((course) =>
     serializeUserCourse(course, catalogMap.get(String(course.catalogId)))
   );
 }
@@ -777,6 +841,9 @@ export async function getUserCourse(userId, userCourseId) {
   const catalog = userCourse.catalogId
     ? await CourseCatalog.findById(userCourse.catalogId).lean()
     : null;
+  if (catalog && Array.isArray(catalog.teachers) && catalog.teachers.length > 0) {
+    catalog.teachers = await enrichTeachersWithReviews(catalog.teachers);
+  }
   return serializeUserCourse(userCourse, catalog);
 }
 
@@ -818,6 +885,9 @@ export async function getUserCourseTeachers(userId, userCourseId) {
     );
   }
 
+  const rawTeachers = catalog.teachers || [];
+  const enrichedTeachers = await enrichTeachersWithReviews(rawTeachers);
+
   return {
     courseId: String(userCourse._id),
     courseCode: userCourse.courseCode,
@@ -828,7 +898,7 @@ export async function getUserCourseTeachers(userId, userCourseId) {
     extractionStatus: catalog.extractionStatus,
     reviewStatus: catalog.reviewStatus,
     confidence: catalog.confidence ?? null,
-    teachers: catalog.teachers || []
+    teachers: enrichedTeachers
   };
 }
 
@@ -885,7 +955,16 @@ export async function deleteUserCourse(userId, userCourseId) {
   }
 
   await CourseUpload.deleteMany({ userCourseId: userCourse._id });
-  await UserCourse.deleteOne({ _id: userCourse._id });
+
+  const allowed = getEquivalentUserIds(userId);
+  await UserCourse.deleteMany({
+    userId: { $in: allowed },
+    $or: [
+      { _id: userCourse._id },
+      { curriculumCourseId: userCourse.curriculumCourseId },
+      { courseCode: normalizeCourseCode(userCourse.courseCode) }
+    ]
+  });
 
   return { courseId: String(userCourse._id), deleted: true };
 }

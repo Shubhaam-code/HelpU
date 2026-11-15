@@ -26,7 +26,20 @@ function readStoredCourses() {
     const raw = localStorage.getItem(COURSES_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set();
+    const unique = [];
+    for (const c of parsed) {
+      const codeKey = (c.code || c.courseCode || '').trim().toUpperCase().replace(/\s+/g, '');
+      const idKey = String(c.id || c.curriculumCourseId || '').trim();
+      if ((codeKey && seen.has(codeKey)) || (idKey && seen.has(idKey))) {
+        continue;
+      }
+      if (codeKey) seen.add(codeKey);
+      if (idKey) seen.add(idKey);
+      unique.push(c);
+    }
+    return unique;
   } catch {
     return [];
   }
@@ -132,7 +145,7 @@ function normalizeCourse(course, index) {
 export function FFCSProvider({ children }) {
   const [coursesList, setCoursesList] = useState(readStoredCourses);
   const [confirmedFaculties, setConfirmedFaculties] = useState(readSelections);
-  const [isInitialLoading, setIsInitialLoading] = useState(() => readStoredCourses().length === 0);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
   const [isBackgroundFetching, setIsBackgroundFetching] = useState(false);
   const [error, setError] = useState(null);
   const [addInProgress, setAddInProgress] = useState(null);
@@ -156,31 +169,40 @@ export function FFCSProvider({ children }) {
       const cached = queryClient.getQueryData(queryKey);
       const queryState = queryClient.getQueryState(queryKey);
       const isFresh = queryState && (Date.now() - queryState.dataUpdatedAt < 5 * 60 * 1000);
-      if (cached && Array.isArray(cached) && cached.length > 0 && isFresh) {
+      if (cached && Array.isArray(cached) && isFresh) {
         setCoursesList(cached);
         setIsInitialLoading(false);
         return cached;
       }
     }
 
-    if (coursesList.length > 0) {
-      setIsBackgroundFetching(true);
-    } else {
-      setIsInitialLoading(true);
-    }
+    setIsBackgroundFetching(true);
 
     const fetchPromise = (async () => {
       try {
         const response = await getMyFFCSCourses();
         const rawCourses = response?.data?.courses || [];
-        const normalizedList = rawCourses.map(normalizeCourse);
+        const seen = new Set();
+        const deduplicatedRaw = [];
+        for (const c of rawCourses) {
+          const codeKey = (c.courseCode || c.code || '').trim().toUpperCase().replace(/\s+/g, '');
+          const idKey = String(c.curriculumCourseId || c.courseId || c.id || '').trim();
+          if ((codeKey && seen.has(codeKey)) || (idKey && seen.has(idKey))) {
+            continue;
+          }
+          if (codeKey) seen.add(codeKey);
+          if (idKey) seen.add(idKey);
+          deduplicatedRaw.push(c);
+        }
+        const normalizedList = deduplicatedRaw.map(normalizeCourse);
 
         setCoursesList(normalizedList);
         queryClient.setQueryData(queryKey, normalizedList);
         return normalizedList;
       } catch (err) {
-        if (err?.status === 401) {
-          // If not logged in, keep local stored courses
+        const statusCode = err?.response?.status || err?.status;
+        if (statusCode === 401 || statusCode === 403) {
+          // If not logged in, keep local stored courses and do not show an error
         } else {
           setError(err?.message || 'Unable to load your FFCS courses.');
         }
@@ -216,8 +238,18 @@ export function FFCSProvider({ children }) {
       queryFn: async () => {
         const response = await getFFCSCourseTeachers(courseId);
         const data = response?.data || {};
+        const teachers = data.teachers || [];
+        if (teachers.length > 0) {
+          setCoursesList((prev) =>
+            prev.map((c) =>
+              c.id === courseId
+                ? { ...c, teachers, reviewStatus: data.reviewStatus }
+                : c
+            )
+          );
+        }
         return {
-          teachers: data.teachers || [],
+          teachers,
           reviewStatus: data.reviewStatus || null,
           status: data.status || null
         };
@@ -310,8 +342,34 @@ export function FFCSProvider({ children }) {
     files = [],
     screenshots = []
   }) => {
+    if (addInProgress) {
+      throw new Error('A course is already being processed. Please wait.');
+    }
+
     if (coursesList.length >= 8) {
       throw new Error('Maximum 8 courses allowed in FFCS. You cannot add more than 8 courses.');
+    }
+
+    // Duplicate Validation: Check by unique course ID and normalized courseCode
+    const targetId = String(curriculumCourseId || '').trim();
+    const targetCode = String(courseCode || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    const alreadyAdded = coursesList.some((existing) => {
+      const existingId = String(existing.id || '').trim();
+      const existingCurriculumId = String(existing.curriculumCourseId || '').trim();
+      const existingCode = String(existing.code || existing.courseCode || '').trim().toUpperCase().replace(/\s+/g, '');
+
+      return (
+        (targetId && (targetId === existingId || targetId === existingCurriculumId)) ||
+        (targetCode && existingCode && targetCode === existingCode)
+      );
+    });
+
+    if (alreadyAdded) {
+      const err = new Error('This course has already been added.');
+      err.code = 'COURSE_ALREADY_EXISTS';
+      err.status = 409;
+      throw err;
     }
 
     const uploadFiles = files.length

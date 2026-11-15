@@ -17,6 +17,7 @@ export function FFCSSettingsScreen() {
   const { resetSelections, confirmedFaculties, courses } = useFFCS();
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success'); // 'success' | 'error'
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
@@ -24,19 +25,18 @@ export function FFCSSettingsScreen() {
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  const handleReset = () => {
+  const handleResetClick = () => {
     const selectedCount = Object.keys(confirmedFaculties).length;
     if (selectedCount === 0) {
       showToast('No teacher selections to reset.', 'error');
       return;
     }
+    setShowResetModal(true);
+  };
 
-    const confirmed = window.confirm(
-      'Are you sure you want to remove all selected teachers and clear your timetable? This cannot be undone.'
-    );
-    if (!confirmed) return;
-
+  const handleConfirmReset = () => {
     resetSelections();
+    setShowResetModal(false);
     showToast('All selected teachers and timetable entries have been removed.');
   };
 
@@ -120,7 +120,7 @@ export function FFCSSettingsScreen() {
             {/* Reset Selections */}
             <button
               type="button"
-              onClick={handleReset}
+              onClick={handleResetClick}
               className="w-full p-3 rounded-xl bg-[#FFFDF7] hover:bg-rose-50 border border-[#FEEBA4] flex items-center justify-between text-left transition-all active:scale-[0.99] cursor-pointer"
             >
               <div className="flex items-center gap-3">
@@ -179,6 +179,52 @@ export function FFCSSettingsScreen() {
 
       {/* 3-tab Bottom Navigation */}
       <FFCSBottomNav activeTab="settings" />
+
+      {/* Modern Reset Confirmation Modal */}
+      {showResetModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowResetModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl max-w-sm w-full border border-amber-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 flex items-center justify-center mx-auto shadow-xs">
+              <RotateCcw className="w-7 h-7 stroke-[2.2]" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-black text-lg text-[#17233C]">
+                Reset All Selections?
+              </h3>
+              <p className="text-xs font-medium text-[#64748B] pt-1 leading-relaxed">
+                Are you sure you want to remove all selected teachers and clear your timetable? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-[#475569] font-bold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmReset}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs sm:text-sm shadow-md shadow-rose-500/25 transition-all cursor-pointer active:scale-95"
+              >
+                Yes, Reset All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
