@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
-  Star,
+  BookOpen,
   ThumbsUp,
-  Users,
+  GraduationCap,
+  BarChart3,
   AlertCircle,
   Loader2,
-  CheckCircle2,
   Sparkles
 } from 'lucide-react';
-import { getFacultyByName, getFacultyReviews } from '../../../lib/api';
+import { getFacultyByName } from '../../../lib/api';
 
 // In-memory module cache to prevent duplicate network calls across opens
 const facultyReviewCache = new Map();
@@ -42,25 +42,6 @@ export function FacultyReviewModal({ isOpen, onClose, teacher }) {
     if (initialSummary && initialSummary.hasReview !== false) {
       setData(initialSummary);
       facultyReviewCache.set(cacheKey, initialSummary);
-
-      // Asynchronously fetch extra detailed reviews if available
-      if (initialSummary.facultyId) {
-        getFacultyReviews(initialSummary.facultyId, 1, 10)
-          .then((res) => {
-            if (Array.isArray(res?.data?.data) && res.data.data.length > 0) {
-              const merged = {
-                ...initialSummary,
-                reviews: res.data.data,
-                totalReviews: res.data.pagination?.total || initialSummary.totalReviews
-              };
-              setData(merged);
-              facultyReviewCache.set(cacheKey, merged);
-            }
-          })
-          .catch(() => {
-            // keep initialSummary on error
-          });
-      }
       return;
     }
 
@@ -74,7 +55,6 @@ export function FacultyReviewModal({ isOpen, onClose, teacher }) {
           const faculty = res.data.data;
           const reviews = Array.isArray(faculty.reviews) ? faculty.reviews : [];
 
-          // Actual positive percentage calculation from genuine review ratings
           const reviewsWithRating = reviews.filter(
             (r) => typeof r.rating === 'number' && !Number.isNaN(r.rating)
           );
@@ -98,8 +78,7 @@ export function FacultyReviewModal({ isOpen, onClose, teacher }) {
             behaviourRating: faculty.behaviour_rating,
             internalsRating: faculty.internals_rating,
             classAverage: faculty.classAverage,
-            finalRemark: faculty.finalRemark,
-            reviews
+            finalRemark: faculty.finalRemark
           };
           setData(resolved);
           facultyReviewCache.set(cacheKey, resolved);
@@ -131,178 +110,163 @@ export function FacultyReviewModal({ isOpen, onClose, teacher }) {
   if (!isOpen) return null;
 
   const hasReviewData = data && data.hasReview !== false;
-  const overallRating = typeof data?.overallRating === 'number' ? data.overallRating : null;
-  const positivePercentage =
-    typeof data?.positivePercentage === 'number' ? data.positivePercentage : null;
-  const totalReviews = data?.totalReviews || data?.reviews?.length || 0;
+  const facultyDisplayName = data?.name || teacherName || 'Faculty Review';
+  const overallRating =
+    typeof data?.overallRating === 'number' && !Number.isNaN(data.overallRating)
+      ? data.overallRating
+      : null;
 
-  const categories = [
-    { label: 'Teaching Quality', score: data?.teachingRating },
-    { label: 'Grading / Evaluation', score: data?.evaluationRating },
-    { label: 'Behaviour & Approach', score: data?.behaviourRating },
-    { label: 'Internal Marks', score: data?.internalsRating }
-  ].filter((c) => typeof c.score === 'number' && c.score > 0);
+  const formatScore = (val) => {
+    if (typeof val === 'number' && !Number.isNaN(val) && val > 0) {
+      return val.toFixed(1);
+    }
+    return 'N/A';
+  };
+
+  const hasScore = (val) => typeof val === 'number' && !Number.isNaN(val) && val > 0;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="faculty-review-title"
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-amber-100 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250"
+        className="w-full max-w-[385px] sm:max-w-[430px] bg-[#FFFDF7] rounded-3xl shadow-[0_20px_50px_rgba(23,35,60,0.18)] border border-amber-200/80 p-4 sm:p-5 animate-in zoom-in-95 duration-200 relative overflow-hidden"
       >
-        {/* Mobile Drag Indicator */}
-        <div className="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mt-2.5 sm:hidden" />
-
-        {/* Modal Header */}
-        <header className="px-5 pt-3.5 pb-3 border-b border-slate-100 flex items-center justify-between gap-3">
+        {/* Top Header: Title + Close Button (overall rating removed as requested) */}
+        <div className="flex items-start justify-between gap-2.5 pb-3 border-b border-amber-100">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#D97706]">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Faculty Review & Feedback</span>
+            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#D97706]">
+              <Sparkles className="w-3 h-3 text-[#D97706]" />
+              <span>Faculty Ratings</span>
             </div>
-            <h2
+            <h3
               id="faculty-review-title"
-              className="text-base sm:text-lg font-black text-[#17233C] truncate leading-tight mt-0.5"
+              className="text-base sm:text-lg font-black text-[#17233C] tracking-tight leading-snug truncate mt-0.5"
+              title={facultyDisplayName}
             >
-              {data?.name || teacherName}
-            </h2>
+              {facultyDisplayName}
+            </h3>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-[#475569] flex items-center justify-center shrink-0 cursor-pointer transition-colors active:scale-95"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer shadow-2xs shrink-0"
             aria-label="Close"
           >
-            <X className="w-4 h-4 stroke-[2.5]" />
+            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
           </button>
-        </header>
+        </div>
 
-        {/* Modal Body: Scrollable */}
-        <div className="overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin scrollbar-thumb-amber-200">
+        {/* Content Body */}
+        <div className="pt-3.5">
           {loading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#854D0E]">
-              <Loader2 className="w-7 h-7 animate-spin text-[#D97706]" />
-              <span className="text-xs font-bold">Loading faculty feedback...</span>
+            <div className="flex flex-col items-center justify-center py-6 space-y-2">
+              <Loader2 className="w-6 h-6 animate-spin text-[#D97706]" />
+              <p className="text-xs font-bold text-slate-400">Loading rating metrics...</p>
             </div>
           ) : error ? (
-            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-xs font-bold text-amber-900 flex items-center gap-2.5">
-              <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
-              <span>{error}</span>
+            <div className="text-center py-4 space-y-2">
+              <AlertCircle className="w-7 h-7 text-rose-500 mx-auto" />
+              <p className="text-xs font-bold text-rose-600">{error}</p>
             </div>
           ) : !hasReviewData ? (
-            <div className="py-10 text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
-                <AlertCircle className="w-6 h-6 stroke-[2]" />
+            <div className="text-center py-5 space-y-1.5">
+              <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-5 h-5" />
               </div>
-              <h3 className="font-black text-sm text-[#17233C]">Faculty Review Not Available</h3>
-              <p className="text-xs font-medium text-[#64748B] max-w-xs mx-auto">
-                No verified student feedback or rating records found for {teacherName}.
+              <h4 className="text-xs sm:text-sm font-black text-[#17233C]">
+                Faculty Review Not Available
+              </h4>
+              <p className="text-[11px] text-slate-500 max-w-[220px] mx-auto leading-relaxed">
+                No ratings or review data recorded for this faculty yet.
               </p>
             </div>
           ) : (
-            <>
-              {/* Highlight Metrics Card */}
-              <div className="bg-gradient-to-br from-[#FFFDF7] to-[#FEFCE8] border border-[#FEEBA4] rounded-2xl p-3.5 shadow-xs flex items-center justify-between gap-3">
-                {/* Positive Review Percentage */}
-                {positivePercentage !== null ? (
-                  <div className="flex flex-col items-center justify-center px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 shrink-0 shadow-2xs">
-                    <div className="flex items-center gap-1">
-                      <ThumbsUp className="w-3.5 h-3.5 stroke-[2.8] text-emerald-600" />
-                      <span className="font-black text-lg sm:text-xl leading-none">
-                        {positivePercentage}%
-                      </span>
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 mt-0.5">
-                      Positive
-                    </span>
+            <div className="space-y-3">
+              {/* Clean Horizontal 4-Column Rating Layout */}
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                {/* 1. Review Teaching: Soft blue circular icon + BookOpen */}
+                <div className="flex flex-col items-center text-center p-2 sm:p-2.5 rounded-2xl bg-white border border-blue-100/90 shadow-2xs transition-all hover:border-blue-200">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mb-1.5 shadow-2xs">
+                    <BookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
                   </div>
-                ) : (
-                  <div className="px-3 py-2 rounded-xl bg-slate-100 text-[#64748B] text-xs font-bold shrink-0">
-                    Rating N/A
+                  <div className="text-xs sm:text-sm font-black text-[#17233C] tracking-tight leading-tight">
+                    {formatScore(data?.teachingRating)}
+                    {hasScore(data?.teachingRating) && (
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 ml-0.5">/5</span>
+                    )}
                   </div>
-                )}
+                  <span className="text-[9.5px] sm:text-[10.5px] font-bold text-[#64748B] mt-1 leading-tight line-clamp-2">
+                    Review Teaching
+                  </span>
+                </div>
 
-                {/* Overall Rating & Review Count */}
-                <div className="text-right flex-1 min-w-0">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Star className="w-5 h-5 fill-[#FACC15] text-[#EAB308] shrink-0" />
-                    <span className="font-black text-2xl text-[#17233C] leading-none">
-                      {overallRating !== null ? overallRating.toFixed(1) : '—'}
-                    </span>
-                    <span className="text-xs font-bold text-[#64748B]">/ 5.0</span>
+                {/* 2. Behavior: Green circular icon + ThumbsUp */}
+                <div className="flex flex-col items-center text-center p-2 sm:p-2.5 rounded-2xl bg-white border border-emerald-100/90 shadow-2xs transition-all hover:border-emerald-200">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mb-1.5 shadow-2xs">
+                    <ThumbsUp className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
                   </div>
-                  <div className="text-[11px] font-bold text-[#64748B] flex items-center justify-end gap-1 mt-1 truncate">
-                    <Users className="w-3 h-3 text-[#94A3B8]" />
-                    <span>
-                      {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
-                    </span>
+                  <div className="text-xs sm:text-sm font-black text-[#17233C] tracking-tight leading-tight">
+                    {formatScore(data?.behaviourRating)}
+                    {hasScore(data?.behaviourRating) && (
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 ml-0.5">/5</span>
+                    )}
                   </div>
+                  <span className="text-[9.5px] sm:text-[10.5px] font-bold text-[#64748B] mt-1 leading-tight line-clamp-2">
+                    Behavior
+                  </span>
+                </div>
+
+                {/* 3. Internal Rating: Soft orange circular icon + GraduationCap */}
+                <div className="flex flex-col items-center text-center p-2 sm:p-2.5 rounded-2xl bg-white border border-amber-100/90 shadow-2xs transition-all hover:border-amber-200">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center mb-1.5 shadow-2xs">
+                    <GraduationCap className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
+                  </div>
+                  <div className="text-xs sm:text-sm font-black text-[#17233C] tracking-tight leading-tight">
+                    {formatScore(data?.internalsRating)}
+                    {hasScore(data?.internalsRating) && (
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 ml-0.5">/5</span>
+                    )}
+                  </div>
+                  <span className="text-[9.5px] sm:text-[10.5px] font-bold text-[#64748B] mt-1 leading-tight line-clamp-2">
+                    Internal Rating
+                  </span>
+                </div>
+
+                {/* 4. Review Evaluation: Soft purple circular icon + BarChart3 */}
+                <div className="flex flex-col items-center text-center p-2 sm:p-2.5 rounded-2xl bg-white border border-purple-100/90 shadow-2xs transition-all hover:border-purple-200">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center mb-1.5 shadow-2xs">
+                    <BarChart3 className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
+                  </div>
+                  <div className="text-xs sm:text-sm font-black text-[#17233C] tracking-tight leading-tight">
+                    {formatScore(data?.evaluationRating)}
+                    {hasScore(data?.evaluationRating) && (
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 ml-0.5">/5</span>
+                    )}
+                  </div>
+                  <span className="text-[9.5px] sm:text-[10.5px] font-bold text-[#64748B] mt-1 leading-tight line-clamp-2">
+                    Review Evaluation
+                  </span>
                 </div>
               </div>
 
-              {/* Class Average & Final Remark Badges */}
-              {(data?.finalRemark || data?.classAverage) && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {data.finalRemark && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100/80 text-[#854D0E] border border-amber-300/80 shadow-2xs">
-                      <span>{data.finalRemark}</span>
-                    </span>
-                  )}
-                  {data.classAverage && (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-[#475569] border border-slate-200">
-                      Class Average: <strong className="ml-1 text-[#17233C]">{data.classAverage}</strong>
-                    </span>
-                  )}
+              {/* Optional Subtle Remarks Tag (if available) */}
+              {data?.finalRemark && (
+                <div className="text-center pt-0.5">
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-[#854D0E] border border-amber-200">
+                    {data.finalRemark}
+                  </span>
                 </div>
               )}
-
-              {/* Category Breakdown Bars */}
-              {categories.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <h4 className="text-[11px] font-black uppercase tracking-wider text-[#854D0E]">
-                    Rating Breakdown
-                  </h4>
-                  <div className="space-y-2 bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3">
-                    {categories.map((cat) => {
-                      const pct = Math.min(100, Math.max(0, (cat.score / 5) * 100));
-                      return (
-                        <div key={cat.label} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="text-[#334155]">{cat.label}</span>
-                            <span className="text-[#17233C] font-black">{cat.score.toFixed(1)} / 5</span>
-                          </div>
-                          <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#FDE047] to-[#EAB308] rounded-full transition-all"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
-
-        {/* Modal Footer */}
-        <footer className="p-3.5 border-t border-slate-100 bg-slate-50/50">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-[#17233C] font-black text-xs cursor-pointer active:scale-98 transition-colors shadow-2xs"
-          >
-            Close
-          </button>
-        </footer>
       </div>
     </div>
   );
