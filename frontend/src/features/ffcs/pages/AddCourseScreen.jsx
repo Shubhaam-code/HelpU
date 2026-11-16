@@ -158,7 +158,7 @@ function ExtractionProgressCard({ addInProgress }) {
 
       {/* Required English Description */}
       <p className="text-[11px] sm:text-xs font-medium text-[#475569] leading-relaxed bg-[#FFFDF7] border border-[#FEEBA4] rounded-xl p-2.5 sm:p-3">
-        AI is scanning screenshots and extracting teacher information. This ultra-fast process takes only 3–5 seconds. Please wait while we process your schedule.
+        AI is scanning screenshots and extracting teacher information. This process takes only 7 to 10 seconds. Please wait while we process your schedule.
       </p>
     </div>
   );
