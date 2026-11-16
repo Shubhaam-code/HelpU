@@ -1,4 +1,14 @@
 import { useState, useEffect } from 'react';
+import defaultAvatarImg from '../../assets/images/default-avatar-opt.png';
+
+// Global cache of broken image URLs to prevent network re-fetching on component re-renders
+const failedImageUrls = new Set();
+
+// Preload into browser memory once on load
+if (typeof window !== 'undefined') {
+  const preloader = new Image();
+  preloader.src = defaultAvatarImg;
+}
 
 const sizes = {
   xs: 28,
@@ -18,15 +28,29 @@ export function Avatar({
   className = '', 
   ring = false 
 }) {
-  const [imgError, setImgError] = useState(false);
+  const isBroken = src ? failedImageUrls.has(src) : true;
+  const initialValid = Boolean(src && !isBroken);
+  const [imgError, setImgError] = useState(!initialValid);
+
   const isFull = size === 'full' || (className.includes('w-full') && className.includes('h-full'));
   const px = typeof size === 'number' ? size : sizes[size] || 48;
 
   useEffect(() => {
-    setImgError(false);
+    if (src && !failedImageUrls.has(src)) {
+      setImgError(false);
+    } else {
+      setImgError(true);
+    }
   }, [src]);
 
-  const hasValidImage = Boolean(src && !imgError);
+  const handleError = () => {
+    if (src) {
+      failedImageUrls.add(src);
+    }
+    setImgError(true);
+  };
+
+  const showCustomSrc = Boolean(src && !imgError && !failedImageUrls.has(src));
 
   return (
     <div
@@ -35,28 +59,25 @@ export function Avatar({
       } ${className}`}
       style={isFull ? { width: '100%', height: '100%' } : { width: px, height: px }}
     >
-      {hasValidImage ? (
+      {showCustomSrc ? (
         <img 
           src={src} 
           alt={name || 'User Profile'} 
           referrerPolicy="no-referrer"
+          loading="eager"
+          decoding="async"
           className="w-full h-full object-cover rounded-full aspect-square block" 
-          onError={() => setImgError(true)}
+          onError={handleError}
         />
       ) : (
-        /* Premium Helpu Default User Avatar (Clean silhouette, no ST initials) */
-        <div 
-          className="w-full h-full rounded-full bg-gradient-to-b from-[#FDF3EE] to-[#F5E5DC] flex items-center justify-center text-[#8A786B] border border-coral/10 shadow-inner"
-          aria-label={name || 'Default User Avatar'}
-        >
-          <svg 
-            className="w-[56%] h-[56%] text-[#8A786B]" 
-            viewBox="0 0 24 24" 
-            fill="currentColor"
-          >
-            <path d="M12 12c2.485 0 4.5-2.015 4.5-4.5S14.485 3 12 3 7.5 5.015 7.5 7.5 9.515 12 12 12zm0 2.25c-3.007 0-9 1.51-9 4.5V21h18v-2.25c0-2.99-5.993-4.5-9-4.5z" />
-          </svg>
-        </div>
+        /* Bundled, Preloaded & Cached Default User Avatar */
+        <img 
+          src={defaultAvatarImg} 
+          alt={name || 'Default User Avatar'} 
+          loading="eager"
+          decoding="async"
+          className="w-full h-full object-cover rounded-full aspect-square block select-none"
+        />
       )}
     </div>
   );
