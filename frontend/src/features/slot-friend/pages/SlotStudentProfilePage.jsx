@@ -4,6 +4,7 @@ import {
   GraduationCap, Calendar, FileText, Sparkles, Loader2 
 } from 'lucide-react';
 import { useSlotMatchDetails } from '../../../hooks/useAppData';
+import { Avatar } from '../../../components/ui/Avatar';
 
 export default function SlotStudentProfilePage() {
   const { studentId } = useParams();
@@ -89,13 +90,11 @@ export default function SlotStudentProfilePage() {
             {/* Avatar with Sunburst & Active Green Dot */}
             <div className="relative shrink-0">
               <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full border-3 border-white shadow-md overflow-hidden bg-white">
-                <img
-                  src={student.profileImage || '/image.png'}
-                  alt={studentName}
-                  className="w-full h-full object-cover select-none"
-                  onError={(e) => {
-                    e.currentTarget.src = '/image.png';
-                  }}
+                <Avatar
+                  src={student.profileImage}
+                  name={studentName}
+                  size="full"
+                  className="w-full h-full"
                 />
               </div>
 

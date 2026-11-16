@@ -22,6 +22,7 @@ import { timeAgo } from '../../../lib/utils';
 import { getCourseSubjectTheme } from '../utils/courseIconHelper';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { useUser } from '../../../context/FirebaseAuthContext';
+import { Avatar } from '../../../components/ui/Avatar';
 
 export default function SlotMateNotificationsPage() {
   const navigate = useNavigate();
@@ -302,7 +303,7 @@ export default function SlotMateNotificationsPage() {
               const courseName = metadata.courseName || '';
               const slot = metadata.slot || '';
               const studentName = metadata.matchedStudentName || 'Classmate';
-              const studentAvatar = metadata.matchedStudentAvatar || item.imageUrl || '/image.png';
+              const studentAvatar = metadata.matchedStudentAvatar || item.imageUrl || '/default-avatar.png';
               const subjectTheme = getCourseSubjectTheme(courseCode, courseName);
               const SubjectIcon = subjectTheme.icon;
 
@@ -341,14 +342,11 @@ export default function SlotMateNotificationsPage() {
                     {/* Matched Student Avatar */}
                     <div className="relative shrink-0">
                       <div className="w-12 h-12 rounded-full border-2 border-white shadow-xs overflow-hidden bg-[#FEF9C3] flex items-center justify-center">
-                        <img
+                        <Avatar
                           src={studentAvatar}
-                          alt={studentName}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover select-none"
-                          onError={(e) => {
-                            e.currentTarget.src = '/image.png';
-                          }}
+                          name={studentName}
+                          size="full"
+                          className="w-full h-full"
                         />
                       </div>
                       {/* Mini subject icon badge */}
