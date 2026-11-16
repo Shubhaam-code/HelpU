@@ -217,7 +217,7 @@ export function SelectFacultyScreen() {
         ) : (
           <>
             <div className="bg-[#FFFDF7] rounded-2xl border border-[#FEEBA4] p-4 flex items-center gap-3.5 shadow-xs">
-              <div className="w-12 h-12 rounded-2xl bg-[#FEF08A] border border-[#FDE047] text-[#EA580C] flex items-center justify-center shrink-0 shadow-xs p-1.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0 shadow-xs p-1.5">
                 <TeacherClassroomIcon className="w-9 h-9" />
               </div>
               <div className="min-w-0 flex-1">

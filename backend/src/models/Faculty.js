@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 // Embedded review sub-document schema
 const reviewSchema = new mongoose.Schema(
   {
+    course: { type: String, default: '', trim: true },
     text: { type: String, default: '' },
     rating: { type: Number, default: null },
     date: { type: Date, default: null }
@@ -19,6 +20,14 @@ const facultySchema = new mongoose.Schema(
       unique: true,
       trim: true,
       uppercase: true,
+      index: true
+    },
+
+    // --- External identifier (e.g. from vitbpl-facultymeter) ---
+    externalId: {
+      type: String,
+      default: '',
+      trim: true,
       index: true
     },
 
@@ -87,8 +96,7 @@ facultySchema.index({ overall_rating: -1 });
 export function normalizeFacultyName(name = '') {
   return String(name || '')
     .toLowerCase()
-    .replace(/\b(dr|prof|mrs|ms)\b\.?\s+/gi, '')
-    .replace(/\bmr\b\.?\s+/gi, '')
+    .replace(/\b(dr|prof|mrs|ms|mr)\b\.?\s*/gi, '')
     .replace(/\([^)]*\)/g, ' ')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')

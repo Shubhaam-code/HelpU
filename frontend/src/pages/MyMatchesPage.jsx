@@ -409,47 +409,61 @@ export default function MyMatchesPage() {
         {/* ACTIVE TRAVELS CONTEXT & FILTER BAR                                       */}
         {/* ========================================================================= */}
         {myTravels.length > 0 && (
-          <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-[#F4E3D8]/90 shadow-2xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-xs font-black text-[#17233C] flex items-center gap-1.5">
-                <Car className="w-4 h-4 text-[#FF572E]" />
-                <span>Your Active Travel Posts ({myTravels.length}):</span>
-              </span>
-              <span className="text-[11px] text-[#6E7587]">
+          <div className="bg-white rounded-2xl sm:rounded-[20px] p-3.5 sm:p-4 border border-[#F0E4DA] shadow-xs space-y-2.5 sm:space-y-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-[#FFF2EB] text-[#FF572E] flex items-center justify-center shrink-0">
+                  <Car className="w-3.5 h-3.5" />
+                </div>
+                <h3 className="text-xs sm:text-[13px] font-black text-[#17233C] tracking-tight">
+                  Your Active Travel Posts ({myTravels.length})
+                </h3>
+              </div>
+              <p className="text-[11px] sm:text-xs text-[#717A8C] leading-relaxed">
                 Matches are evaluated strictly for the same route, calendar date, and 4–5h departure window.
-              </span>
+              </p>
             </div>
 
             {/* Filter Pills with Normalized Unique Routes */}
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-0.5">
               <button
                 type="button"
                 onClick={() => setSelectedRouteFilter('all')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`inline-flex items-center justify-center px-3 py-1.5 min-h-[32px] sm:min-h-[34px] rounded-xl text-xs font-bold transition-all cursor-pointer select-none active:scale-95 ${
                   selectedRouteFilter === 'all'
                     ? 'bg-[#17233C] text-white shadow-xs font-black'
-                    : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
+                    : 'bg-[#F8F9FA] text-[#6E7587] border border-[#E9ECEF] hover:bg-[#EEF1F5] hover:text-[#17233C]'
                 }`}
               >
                 All Matches ({allCombinedMatches.length})
               </button>
               {uniqueRouteFilters.map((route) => {
                 const isSel = selectedRouteFilter === route.routeKey;
+                const sourceName = route.source || route.displayRoute?.split('→')[0]?.trim() || 'Start';
+                const destName = route.destination || route.displayRoute?.split('→')[1]?.trim() || 'End';
                 return (
                   <button
                     key={route.routeKey}
                     type="button"
                     onClick={() => setSelectedRouteFilter(route.routeKey)}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer truncate max-w-[280px] ${
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 min-h-[32px] sm:min-h-[34px] rounded-xl text-xs font-bold transition-all cursor-pointer select-none active:scale-95 max-w-full ${
                       isSel
                         ? 'bg-[#FF572E] text-white shadow-xs font-black'
-                        : 'bg-[#FFFBF8] text-[#6E7587] border border-[#F4E3D8] hover:bg-[#FFF4ED]'
+                        : 'bg-[#FFFBF8] text-[#555E70] border border-[#F4E3D8] hover:bg-[#FFF4ED] hover:border-[#F2D7C6]'
                     }`}
                   >
-                    <span className="truncate capitalize">{route.displayRoute}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                      isSel ? 'bg-white text-[#FF572E]' : 'bg-[#FFF4ED] text-[#FF572E]'
-                    }`}>
+                    <span className="capitalize truncate max-w-[85px] min-[360px]:max-w-[105px] min-[390px]:max-w-[125px] sm:max-w-[160px]">
+                      {sourceName}
+                    </span>
+                    <ArrowRight className={`w-3 h-3 shrink-0 ${isSel ? 'text-white/90' : 'text-[#FF572E]'}`} />
+                    <span className="capitalize truncate max-w-[85px] min-[360px]:max-w-[105px] min-[390px]:max-w-[125px] sm:max-w-[160px]">
+                      {destName}
+                    </span>
+                    <span
+                      className={`ml-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
+                        isSel ? 'bg-white text-[#FF572E]' : 'bg-[#FFE8DC] text-[#FF572E]'
+                      }`}
+                    >
                       {route.matchCount}
                     </span>
                   </button>

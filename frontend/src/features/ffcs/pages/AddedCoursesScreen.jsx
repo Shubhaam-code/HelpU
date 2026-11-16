@@ -11,6 +11,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { TeacherClassroomIcon } from '../../../components/icons/TeacherClassroomIcon';
+import celebrationImg from '../../../assets/images/ffcs_celebration_opt.png';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { CourseSkeletonCard } from '../components/FFCSSkeleton';
@@ -96,19 +97,24 @@ export function AddedCoursesScreen() {
         </header>
 
         {coursesList.length > 0 && (
-          <div className="bg-gradient-to-r from-[#FEF08A] to-[#FFFBEB] rounded-2xl border border-[#FEEBA4] p-3.5 flex items-center justify-between shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-[#FEF08A] border border-[#FDE047] text-[#EA580C] flex items-center justify-center font-black shadow-xs p-1">
-                <TeacherClassroomIcon className="w-7 h-7" />
-              </div>
-              <div>
-                <p className="font-extrabold text-xs text-[#17233C]">
-                  {confirmedCount} of {coursesList.length} Faculties Selected
-                </p>
-                <p className="text-[10px] text-[#854D0E] font-medium">
-                  Tap any course to choose or update faculty
-                </p>
-              </div>
+          <div className="relative bg-gradient-to-r from-[#FFFDF0] via-[#FFFBEB] to-[#FEF9E7] rounded-2xl sm:rounded-3xl border border-[#FDE68A]/80 shadow-2xs overflow-hidden">
+            {/* Left Side: Clean Text Information Vertically Centered */}
+            <div className="relative z-10 py-3 sm:py-3.5 pl-3.5 sm:pl-4 pr-32 min-[360px]:pr-36 sm:pr-40 flex flex-col justify-center min-h-[76px] sm:min-h-[86px] space-y-0.5">
+              <p className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#17233C] tracking-tight leading-snug">
+                {confirmedCount} of {coursesList.length} Faculties Selected
+              </p>
+              <p className="text-[10.5px] min-[360px]:text-[11px] sm:text-xs text-[#854D0E] font-medium leading-tight">
+                Tap any course to choose or update faculty
+              </p>
+            </div>
+
+            {/* Right Side: Larger Boy-Girl Illustration Anchored Exactly to Bottom-Right */}
+            <div className="absolute bottom-0 right-0 h-[76px] sm:h-[86px] w-[130px] min-[360px]:w-[145px] sm:w-[160px] flex items-end justify-end pointer-events-none select-none z-10">
+              <img
+                src={celebrationImg}
+                alt="Faculty Selection Status"
+                className="h-full w-auto object-contain object-bottom drop-shadow-xs"
+              />
             </div>
           </div>
         )}
@@ -123,7 +129,7 @@ export function AddedCoursesScreen() {
 
         {coursesList.length === 0 ? (
           <div className="bg-white rounded-3xl border border-[#FEEBA4]/70 p-8 text-center space-y-3 shadow-xs">
-            <div className="w-14 h-14 rounded-2xl bg-[#FEF08A] border border-[#FDE047] text-[#EA580C] flex items-center justify-center mx-auto shadow-xs p-2.5">
+            <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center mx-auto shadow-xs p-2.5">
               <TeacherClassroomIcon className="w-8 h-8" />
             </div>
             <h3 className="font-black text-base text-[#17233C]">No Courses Added Yet</h3>

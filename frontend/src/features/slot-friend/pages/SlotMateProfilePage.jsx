@@ -13,6 +13,7 @@ import { saveProfile } from '../../../lib/api';
 import { queryClient, QUERY_KEYS, invalidateProfileQueries } from '../../../lib/queryClient';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { getProfileDraft } from '../../../utils/guestDraft';
+import { Avatar } from '../../../components/ui/Avatar';
 
 export default function SlotMateProfilePage() {
   const navigate = useNavigate();
@@ -40,9 +41,9 @@ export default function SlotMateProfilePage() {
     ? 'Unverified'
     : (rawWhatsApp || 'Not added yet');
   
-  // Real Google Profile Photo from authentication (or user's saved avatar)
+  // Real Google Profile Photo from authentication (or user's saved avatar, with custom fallback)
   const googlePhoto = user?.imageUrl || firebaseUser?.photoURL || profile?.avatar || profile?.imageUrl || profile?.photoURL;
-  const displayAvatar = isGuest ? '/image.png' : (googlePhoto || '/image.png');
+  const displayAvatar = isGuest ? '/default-avatar.png' : (googlePhoto || '/default-avatar.png');
 
   // Real calculated statistics from actual application data
   const postsCount = isGuest ? 0 : (Array.isArray(myPosts) ? myPosts.length : 0);
@@ -232,14 +233,11 @@ export default function SlotMateProfilePage() {
                       {isGuest ? (
                         <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-[#9CA3AF] stroke-[1.8]" />
                       ) : (
-                        <img
+                        <Avatar
                           src={displayAvatar}
-                          alt={displayName}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover select-none"
-                          onError={(e) => {
-                            e.currentTarget.src = '/image.png';
-                          }}
+                          name={displayName}
+                          size="full"
+                          className="w-full h-full"
                         />
                       )}
                     </div>
