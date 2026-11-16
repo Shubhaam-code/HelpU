@@ -15,7 +15,7 @@ import {
   Search, Check, Sparkles, ChevronDown, User,
   ShieldCheck, ArrowRight, IndianRupee,
   CheckCircle2, X, FileText, Car, CarTaxiFront,
-  Pencil, Trash2, Ban, RefreshCw, AlertCircle, Eye
+  Pencil, Trash2, Ban, RefreshCw, AlertCircle, Eye, Loader2
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -196,6 +196,10 @@ export default function OfferRidePage() {
   // Post success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdSummary, setCreatedSummary] = useState(null);
+
+  // Delete confirmation modal state
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { isSignedIn } = useUser();
   const { hasWhatsApp } = useAuthProfile();
@@ -409,18 +413,38 @@ export default function OfferRidePage() {
     }
   };
 
-  // Delete ride post
-  const handleDeletePost = async (travelId) => {
-    if (!window.confirm('Are you sure you want to delete this ride post completely?')) {
-      return;
-    }
+  // Support Escape key to close delete confirmation modal
+  useEffect(() => {
+    if (!postToDelete) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isDeleting) {
+        setPostToDelete(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [postToDelete, isDeleting]);
+
+  // Open custom delete confirmation modal
+  const handleDeletePost = (travelId) => {
+    setPostToDelete(travelId);
+  };
+
+  // Execute ride deletion from custom confirmation modal
+  const handleConfirmDelete = async () => {
+    if (!postToDelete || isDeleting) return;
+    const travelId = typeof postToDelete === 'string' ? postToDelete : postToDelete._id;
     try {
+      setIsDeleting(true);
       await deleteTravel(travelId);
       invalidateRideQueries();
       refetchTravels();
       setFeedbackMsg({ type: 'success', text: 'Ride post deleted.' });
+      setPostToDelete(null);
     } catch (err) {
       setFeedbackMsg({ type: 'error', text: err.response?.data?.message || 'Failed to delete post.' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1159,6 +1183,75 @@ export default function OfferRidePage() {
                 >
                   Find Matches
                 </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* CUSTOM DELETE RIDE POST CONFIRMATION MODAL                                */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {postToDelete && (
+          <div
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isDeleting) {
+                setPostToDelete(null);
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.15 }}
+              className="bg-white rounded-2xl sm:rounded-[24px] w-[88%] max-w-[380px] p-5 sm:p-6 border border-[#F4E3D8] shadow-2xl text-center space-y-4 relative"
+            >
+              {/* Soft Red Circular Background with Trash Icon */}
+              <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto border border-red-100 shadow-2xs">
+                <Trash2 className="w-5 h-5 stroke-[2.2]" />
+              </div>
+
+              {/* Heading & Description */}
+              <div className="space-y-1.5">
+                <h3 className="font-black text-lg sm:text-xl text-[#17233C] tracking-tight">
+                  Delete Ride Post?
+                </h3>
+                <p className="text-xs sm:text-[13px] text-[#6E7587] leading-relaxed font-medium max-w-xs mx-auto">
+                  Are you sure you want to delete this ride post? This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Action Buttons: Cancel & Delete Post */}
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setPostToDelete(null)}
+                  disabled={isDeleting}
+                  className="w-full py-2.5 px-3 min-h-[42px] rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-[#F3F4F6] text-[#4B5563] text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="w-full py-2.5 px-3 min-h-[42px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:pointer-events-none"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 shrink-0" />
+                      <span>Delete Post</span>
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           </div>
