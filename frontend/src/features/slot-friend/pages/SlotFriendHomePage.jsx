@@ -183,7 +183,7 @@ export default function SlotFriendHomePage() {
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#FEF08A] border border-[#FDE047] text-[#EA580C] flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform p-1.5">
+              <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform p-1.5">
                 <TeacherClassroomIcon className="w-8.5 h-8.5 sm:w-9 sm:h-9" />
               </div>
               <div className="min-w-0 flex-1">
