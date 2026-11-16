@@ -138,88 +138,87 @@ export async function enrichTeachersWithReviews(rawTeachers = []) {
     }
   }
 
-  // Second pass: For any teachers not matched in the fast batch, use fallback matching
-  const enrichedTeachers = [];
-  for (const pair of teacherNormPairs) {
-    const { teacher, rawName, normalized, facultyId } = pair;
-    let doc =
-      (facultyId && facultyMap.get(facultyId)) ||
-      (normalized && facultyMap.get(normalized)) ||
-      null;
+  // Second pass: For any teachers not matched in the fast batch, resolve concurrently
+  const enrichedTeachers = await Promise.all(
+    teacherNormPairs.map(async (pair) => {
+      const { teacher, rawName, normalized, facultyId } = pair;
+      let doc =
+        (facultyId && facultyMap.get(facultyId)) ||
+        (normalized && facultyMap.get(normalized)) ||
+        null;
 
-    if (!doc && rawName) {
-      // Fallback 1: Case-insensitive regex on name / normalizedName
-      const escaped = escapeRegex(normalized || rawName.toLowerCase());
-      doc = await Faculty.findOne({
-        $or: [
-          { normalizedName: new RegExp(`^${escaped}$`, 'i') },
-          { name: new RegExp(`^${escapeRegex(rawName)}$`, 'i') }
-        ],
-        isActive: { $ne: false }
-      })
-        .select(
-          'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
-        )
-        .lean();
+      if (!doc && rawName) {
+        // Fallback 1: Case-insensitive regex on name / normalizedName
+        const escaped = escapeRegex(normalized || rawName.toLowerCase());
+        doc = await Faculty.findOne({
+          $or: [
+            { normalizedName: new RegExp(`^${escaped}$`, 'i') },
+            { name: new RegExp(`^${escapeRegex(rawName)}$`, 'i') }
+          ],
+          isActive: { $ne: false }
+        })
+          .select(
+            'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+          )
+          .lean();
 
-      // Fallback 2: Multi-word lookahead (e.g. "Patel Adarsh" <-> "Adarsh Patel")
-      if (!doc && normalized.length >= 4) {
-        const words = normalized.split(' ').filter((w) => w.length > 2);
-        if (words.length >= 2) {
-          const regexPattern = words.map((w) => `(?=.*\\b${escapeRegex(w)})`).join('');
-          doc = await Faculty.findOne({
-            normalizedName: new RegExp(regexPattern, 'i'),
-            isActive: { $ne: false }
-          })
-            .select(
-              'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
-            )
-            .lean();
+        // Fallback 2: Multi-word lookahead (e.g. "Patel Adarsh" <-> "Adarsh Patel")
+        if (!doc && normalized.length >= 4) {
+          const words = normalized.split(' ').filter((w) => w.length > 2);
+          if (words.length >= 2) {
+            const regexPattern = words.map((w) => `(?=.*\\b${escapeRegex(w)})`).join('');
+            doc = await Faculty.findOne({
+              normalizedName: new RegExp(regexPattern, 'i'),
+              isActive: { $ne: false }
+            })
+              .select(
+                'facultyId name normalizedName department designation overall_rating teaching_rating evaluation_rating behaviour_rating internals_rating totalReviews classAverage finalRemark reviews'
+              )
+              .lean();
+          }
+        }
+
+        if (doc) {
+          if (doc.normalizedName) facultyMap.set(doc.normalizedName, doc);
+          if (normalized) facultyMap.set(normalized, doc);
         }
       }
 
-      if (doc) {
-        // Cache in memory for subsequent teachers in this run
-        if (doc.normalizedName) facultyMap.set(doc.normalizedName, doc);
-        if (normalized) facultyMap.set(normalized, doc);
+      if (!doc) {
+        return {
+          ...teacher,
+          hasReview: false
+        };
       }
-    }
 
-    if (!doc) {
-      enrichedTeachers.push({
+      const reviews = Array.isArray(doc.reviews) ? doc.reviews : [];
+      const positivePercentage = calculatePositivePercentage(doc.overall_rating, reviews);
+
+      return {
         ...teacher,
-        hasReview: false
-      });
-      continue;
-    }
-
-    const reviews = Array.isArray(doc.reviews) ? doc.reviews : [];
-    const positivePercentage = calculatePositivePercentage(doc.overall_rating, reviews);
-
-    enrichedTeachers.push({
-      ...teacher,
-      hasReview: true,
-      facultyId: doc.facultyId,
-      reviewSummary: {
+        hasReview: true,
         facultyId: doc.facultyId,
-        facultyMongoId: String(doc._id),
-        name: doc.name,
-        department: doc.department || '',
-        designation: doc.designation || '',
-        overallRating: doc.overall_rating,
-        positivePercentage,
-        totalReviews: doc.totalReviews || reviews.length || 0,
-        teachingRating: doc.teaching_rating,
-        evaluationRating: doc.evaluation_rating,
-        behaviourRating: doc.behaviour_rating,
-        internalsRating: doc.internals_rating,
-        classAverage: doc.classAverage,
-        finalRemark: doc.finalRemark,
-        reviews: reviews.slice(0, 5),
-        hasReview: true
-      }
-    });
-  }
+        reviewSummary: {
+          facultyId: doc.facultyId,
+          facultyMongoId: String(doc._id),
+          name: doc.name,
+          department: doc.department || '',
+          designation: doc.designation || '',
+          overallRating: doc.overall_rating,
+          positivePercentage,
+          totalReviews: doc.totalReviews || reviews.length || 0,
+          teachingRating: doc.teaching_rating,
+          evaluationRating: doc.evaluation_rating,
+          behaviourRating: doc.behaviour_rating,
+          internalsRating: doc.internals_rating,
+          classAverage: doc.classAverage,
+          finalRemark: doc.finalRemark,
+          reviews: reviews.slice(0, 5),
+          hasReview: true
+        }
+      };
+    })
+  );
 
   return enrichedTeachers;
 }
