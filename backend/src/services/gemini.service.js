@@ -20,7 +20,7 @@ export function isGeminiConfigured() {
 }
 
 function getModel() {
-  return String(process.env.GEMINI_MODEL || 'gemini-4-hydrogen').trim();
+  return String(process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
 }
 
 async function callGemini(parts, { responseMimeType = 'application/json' } = {}) {
@@ -47,7 +47,8 @@ async function callGemini(parts, { responseMimeType = 'application/json' } = {})
         contents: [{ role: 'user', parts }],
         generationConfig: {
           temperature: 0.1,
-          responseMimeType
+          responseMimeType,
+          thinkingConfig: { thinkingBudget: 0 }
         }
       }),
       signal: controller.signal

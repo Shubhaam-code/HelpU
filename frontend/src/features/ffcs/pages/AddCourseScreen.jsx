@@ -18,6 +18,7 @@ import {
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { searchCurriculumCourses } from '../../../lib/api';
+import { compressImage } from '../utils/compressImage';
 import addCourseHeroSrc from '../../../assets/images/ffcs_hero_banner.webp';
 
 const SEMESTER_OPTIONS = [
@@ -86,18 +87,16 @@ function ExtractionProgressCard({ addInProgress }) {
     const startTime = Date.now();
     const interval = setInterval(() => {
       const elapsedSeconds = (Date.now() - startTime) / 1000;
-      let nextProgress = 12;
-      if (elapsedSeconds <= 4) {
-        nextProgress = 12 + (elapsedSeconds / 4) * 16;
-      } else if (elapsedSeconds <= 18) {
-        nextProgress = 28 + ((elapsedSeconds - 4) / 14) * 32;
-      } else if (elapsedSeconds <= 36) {
-        nextProgress = 60 + ((elapsedSeconds - 18) / 18) * 26;
+      let nextProgress = 15;
+      if (elapsedSeconds <= 1.5) {
+        nextProgress = 15 + (elapsedSeconds / 1.5) * 35; // 15% -> 50%
+      } else if (elapsedSeconds <= 3.5) {
+        nextProgress = 50 + ((elapsedSeconds - 1.5) / 2) * 35; // 50% -> 85%
       } else {
-        nextProgress = Math.min(96, 86 + Math.atan((elapsedSeconds - 36) / 8) * 7);
+        nextProgress = Math.min(96, 85 + (elapsedSeconds - 3.5) * 2);
       }
       setProgress(Math.round(nextProgress));
-    }, 250);
+    }, 150);
 
     return () => clearInterval(interval);
   }, [addInProgress]);
@@ -159,7 +158,7 @@ function ExtractionProgressCard({ addInProgress }) {
 
       {/* Required English Description */}
       <p className="text-[11px] sm:text-xs font-medium text-[#475569] leading-relaxed bg-[#FFFDF7] border border-[#FEEBA4] rounded-xl p-2.5 sm:p-3">
-        AI is scanning screenshots and extracting teacher information. This process may take approximately 40–50 seconds. Please wait and do not refresh the page or navigate back.
+        AI is scanning screenshots and extracting teacher information. This ultra-fast process takes only 3–5 seconds. Please wait while we process your schedule.
       </p>
     </div>
   );
@@ -329,9 +328,9 @@ export function AddCourseScreen() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+  const handleFileChange = async (e) => {
+    const rawFiles = Array.from(e.target.files || []);
+    if (!rawFiles.length) return;
 
     setErrorMessage('');
     const remainingSlots = 3 - screenshots.length;
@@ -342,11 +341,14 @@ export function AddCourseScreen() {
       return;
     }
 
-    if (files.length > remainingSlots) {
+    if (rawFiles.length > remainingSlots) {
       setErrorMessage(`Only ${remainingSlots} more screenshot(s) allowed (Max 3 total).`);
     }
 
-    const filesToAdd = files.slice(0, remainingSlots).map((file) => ({
+    const selectedFiles = rawFiles.slice(0, remainingSlots);
+    const compressedFiles = await Promise.all(selectedFiles.map((f) => compressImage(f)));
+
+    const filesToAdd = compressedFiles.map((file) => ({
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       name: file.name,
       file,
