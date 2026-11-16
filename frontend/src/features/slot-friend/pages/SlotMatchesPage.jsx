@@ -4,7 +4,7 @@ import {
   ArrowLeft, BookOpen, Users, ChevronRight, Check, 
   Calendar, User, Plus, Loader2, Trash2, Edit3, 
   Bookmark, MoreHorizontal, Building2, GraduationCap, 
-  ArrowRight, CheckCircle2, CheckCircle, CircleSlash
+  ArrowRight, CheckCircle2, CheckCircle, CircleSlash, Clock
 } from 'lucide-react';
 import { useSlotFriend } from '../context/SlotFriendContext';
 import { useSlotPostMatches } from '../../../hooks/useAppData';
@@ -12,6 +12,7 @@ import { useUser } from '../../../context/FirebaseAuthContext';
 import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { getCourseSubjectTheme } from '../utils/courseIconHelper';
+import { Avatar } from '../../../components/ui/Avatar';
 
 export default function SlotMatchesPage() {
   const navigate = useNavigate();
@@ -172,9 +173,13 @@ export default function SlotMatchesPage() {
   if (isViewingSpecificCourse) {
     const courseCode = getCourseCode(effectivePost);
     const courseTitle = getCourseTitle(effectivePost);
-    const slotCode = effectivePost?.slot || slotFilterParam || '';
+    const rawSlot = effectivePost?.slot || slotFilterParam || '';
+    const slotTokens = effectivePost?.slotTokens?.length 
+      ? effectivePost.slotTokens 
+      : rawSlot.split(/[,/;+]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const formattedSlots = slotTokens.length > 0 ? slotTokens.join(' + ') : rawSlot || 'N/A';
+    const slotCode = rawSlot || formattedSlots;
     const teacherName = cleanTeacherName(effectivePost?.teacherName || effectivePost?.teacher || '');
-    const courseCredits = effectivePost?.credits || 4;
 
     return (
       <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col pb-28">
@@ -248,107 +253,78 @@ export default function SlotMatchesPage() {
         <main className="w-full max-w-xl mx-auto px-3.5 sm:px-4 pt-3.5 space-y-4 flex-1">
           
           {/* =================================================================== */}
-          {/* 1. TOP COURSE INFORMATION CARD (EXACT MATCH TO REFERENCE IMAGE 1)   */}
+          {/* 1. TOP COURSE INFORMATION CARD (EXACT MATCH TO REFERENCE DESIGN)    */}
           {/* =================================================================== */}
-          <div className="bg-white rounded-[28px] sm:rounded-[32px] p-4 min-[390px]:p-5 border border-[#F4E3D8] shadow-[0_6px_24px_rgba(250,204,21,0.06)] relative overflow-hidden space-y-3.5">
+          <div className="relative bg-white rounded-3xl sm:rounded-[32px] p-2.5 min-[360px]:p-3 sm:p-3.5 border border-[#FDE68A]/80 shadow-[0_4px_24px_rgba(245,158,11,0.08)] overflow-hidden">
             
-            {/* Matched Students Handshake PNG Illustration */}
-            <div className="absolute right-1 top-2 sm:right-2 sm:top-2 w-28 h-28 min-[390px]:w-32 min-[390px]:h-32 sm:w-36 sm:h-36 pointer-events-none select-none overflow-hidden flex items-center justify-end opacity-95">
+            {/* Soft Warm Yellow / Golden Wave Backdrops */}
+            <div className="absolute top-0 right-0 w-48 sm:w-60 h-full bg-gradient-to-l from-[#FDE047]/25 via-[#FACC15]/15 to-transparent rounded-r-3xl pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-36 sm:w-48 h-24 bg-[#FEF08A]/30 rounded-tl-full pointer-events-none" />
+            <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-amber-100/35 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Right-Anchored Boy & Girl High-Five Illustration (Fills Full Height, Flush at Bottom & Top) */}
+            <div className="absolute bottom-0 right-0 h-full w-[135px] min-[360px]:w-[155px] min-[390px]:w-[175px] sm:w-[210px] flex items-end justify-end select-none pointer-events-none z-10">
               <img
-                src="/slot-handshake.png"
-                alt="Matched Study Partners"
-                className="w-full h-full object-contain object-right drop-shadow-sm select-none"
+                src="/course-students-highfive.png"
+                alt="Study Partners"
+                className="h-full w-full object-contain object-bottom-right drop-shadow-xs"
               />
             </div>
 
-            {/* Top Section: 3D Book Icon + Course Details */}
-            <div className="relative z-10 flex items-start gap-3 min-[390px]:gap-3.5 pr-24 min-[390px]:pr-28 sm:pr-32">
+            {/* Main Left Content Column: Book + Course Details + Unified Pill */}
+            <div className="relative z-20 flex flex-col justify-between min-h-[82px] min-[360px]:min-h-[88px] sm:min-h-[96px] pr-[130px] min-[360px]:pr-[150px] min-[390px]:pr-[170px] sm:pr-[205px] space-y-2 sm:space-y-2.5">
               
-              {/* Left Column: 3D Book PNG inside Squircle */}
-              <div className="w-18 h-18 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
-                <img
-                  src="/course-3d-book.png"
-                  alt={courseCode}
-                  className="w-full h-full object-contain select-none drop-shadow-md"
-                />
+              {/* Top Row: 3D Book Icon + Course Details */}
+              <div className="flex items-center gap-2 min-[360px]:gap-2.5 sm:gap-3 min-w-0">
+                {/* 3D Book Icon */}
+                <div className="w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
+                  <img
+                    src="/course-3d-book.png"
+                    alt={courseCode}
+                    className="w-full h-full object-contain select-none drop-shadow-xs"
+                  />
+                </div>
+
+                {/* Course Info */}
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  {/* Small Yellow 'Course' Badge */}
+                  <span className="inline-block px-2 py-0.5 rounded-full bg-[#FEF08A] text-[#92400E] font-black text-[9.5px] min-[360px]:text-[10px] tracking-wide border border-[#FDE68A]">
+                    Course
+                  </span>
+
+                  {/* Course Code (Reduced ~25% from 24-30px to 17-20px for ideal balance) */}
+                  <h2 className="font-black text-[16px] min-[360px]:text-[18px] sm:text-xl text-[#0F172A] tracking-tight leading-none truncate">
+                    {courseCode}
+                  </h2>
+
+                  {/* Course Name (e.g. Lateral Thinking / Operating System) */}
+                  <p className="text-[11px] min-[360px]:text-xs sm:text-[13px] font-semibold text-[#64748B] leading-tight truncate">
+                    {courseTitle}
+                  </p>
+                </div>
               </div>
 
-              {/* Course Texts & Metadata */}
-              <div className="min-w-0 flex-1 space-y-1">
-                
-                {/* 'Course' Pill */}
-                <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] font-black text-[11px] tracking-wide border border-[#FDE68A]/60">
-                  Course
-                </span>
+              {/* Bottom: 2-Row Stacked Information (Slots on Row 1, Teacher on Row 2) */}
+              <div className="flex flex-col gap-1 sm:gap-1.5 w-fit max-w-full">
+                {/* Row 1: Slot Information Pill */}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 min-[360px]:py-1 rounded-full bg-[#FFFBEB] text-[#78350F] border border-[#FDE68A] shadow-2xs w-fit">
+                  <Clock className="w-3 h-3 min-[360px]:w-3.5 min-[360px]:h-3.5 text-[#B45309] shrink-0 stroke-[2.2]" />
+                  <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-semibold text-[#92400E]">Slots:</span>
+                  <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-black text-[#1E293B] tracking-tight">
+                    {formattedSlots}
+                  </span>
+                </div>
 
-                {/* Course Code */}
-                <h2 className="font-black text-xl sm:text-2xl text-[#17233C] tracking-tight leading-tight">
-                  {courseCode}
-                </h2>
-
-                {/* Course Name */}
-                <p className="text-xs sm:text-sm font-bold text-[#4B5563] leading-snug line-clamp-2">
-                  {courseTitle}
-                </p>
-
-                {/* Teacher Pill & Credits */}
-                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                  {teacherName && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#78350F] text-xs font-bold border border-[#FDE68A]">
-                      <User className="w-3.5 h-3.5 text-[#78350F]" />
-                      <span>Teacher: <span className="font-black text-[#17233C]">{teacherName}</span></span>
-                    </div>
-                  )}
-
-                  <span className="text-[#D1D5DB] font-light">|</span>
-
-                  <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#17233C]">
-                    <GraduationCap className="w-4 h-4 text-[#17233C] stroke-[2.2]" />
-                    <span>{courseCredits} Credits</span>
+                {/* Row 2: Teacher Information Pill */}
+                {teacherName && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 min-[360px]:py-1 rounded-full bg-[#FFFBEB] text-[#78350F] border border-[#FDE68A] shadow-2xs w-fit">
+                    <User className="w-3 h-3 min-[360px]:w-3.5 min-[360px]:h-3.5 text-[#B45309] shrink-0 stroke-[2.2]" />
+                    <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-semibold text-[#92400E]">Teacher:</span>
+                    <span className="text-[9.5px] min-[360px]:text-[10.5px] sm:text-xs font-black text-[#1E293B] tracking-tight truncate max-w-[120px] min-[360px]:max-w-[145px] sm:max-w-[170px]">
+                      {teacherName}
+                    </span>
                   </div>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Horizontal Divider Line */}
-            <div className="border-t border-[#F4E3D8]/70" />
-
-            {/* Bottom Row: Class Slots | Posted By: You */}
-            <div className="relative z-10 flex items-center gap-5 sm:gap-6 pt-0.5">
-              
-              {/* Group 1: Class Slots */}
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0 border border-[#FEF08A]">
-                  <Calendar className="w-4 h-4 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-[#6E7587] block leading-none">
-                    Class Slots
-                  </span>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#854D0E] font-black text-xs mt-1 border border-[#FDE68A]/70 truncate">
-                    {slotCode}
-                  </span>
-                </div>
-              </div>
-
-              {/* Vertical Divider */}
-              <div className="h-7 w-[1px] bg-[#F4E3D8] shrink-0" />
-
-              {/* Group 2: Posted By: You */}
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0 border border-[#FEF08A]">
-                  <Users className="w-4 h-4 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-[#6E7587] block leading-none">
-                    Posted By
-                  </span>
-                  <span className="inline-block px-3 py-0.5 rounded-full bg-[#FEF08A] text-[#854D0E] font-black text-xs mt-1 border border-[#FDE047]/70">
-                    You
-                  </span>
-                </div>
+                )}
               </div>
 
             </div>
@@ -382,77 +358,84 @@ export default function SlotMatchesPage() {
               <p className="text-xs text-[#6E7587]">Finding matching classmates...</p>
             </div>
           ) : matchedStudents.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {matchedStudents.map((student) => (
                 <div
                   key={student.matchId || student.postId}
                   onClick={() => handleStudentClick(student.matchId || student.postId)}
-                  className="bg-white rounded-[26px] sm:rounded-[28px] p-4 min-[390px]:p-4.5 border border-[#F4E3D8] shadow-[0_4px_16px_rgba(250,204,21,0.06)] hover:border-[#FACC15] transition-all cursor-pointer relative overflow-hidden flex items-center justify-between gap-3.5 group active:scale-[0.99]"
+                  className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-3.5 border border-[#F4E3D8] shadow-[0_2px_12px_rgba(250,204,21,0.06)] hover:border-[#FACC15] transition-all cursor-pointer relative overflow-hidden flex items-center justify-between gap-3 group active:scale-[0.99]"
                 >
                   {/* Left Side: Student Avatar + Details + Badges */}
-                  <div className="relative z-10 flex items-center gap-3.5 min-w-0 flex-1">
+                  <div className="relative z-10 flex items-center gap-3 min-w-0 flex-1">
                     
                     {/* Student Avatar with Online/Verified Indicator */}
                     <div className="relative shrink-0">
-                      <div className="w-12 h-12 min-[390px]:w-13 min-[390px]:h-13 rounded-full overflow-hidden border-2 border-white shadow-xs bg-[#FEF3C7]">
-                        <img
-                          src={student.profileImage || '/image.png'}
-                          alt={student.studentName}
-                          className="w-full h-full object-cover select-none"
-                          onError={(e) => {
-                            e.currentTarget.src = '/image.png';
-                          }}
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white shadow-xs bg-[#FEF3C7]">
+                        <Avatar
+                          src={student.profileImage}
+                          name={student.studentName}
+                          size="full"
+                          className="w-full h-full"
                         />
                       </div>
                       {/* Green Verified / Active Dot */}
-                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#22C55E] border-2 border-white shadow-2xs" />
+                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#22C55E] border-2 border-white shadow-2xs" />
                     </div>
 
                     {/* Student Details */}
-                    <div className="min-w-0 flex-1 space-y-1">
+                    <div className="min-w-0 flex-1 space-y-0.5">
                       
                       {/* Name */}
-                      <h4 className="font-black text-base min-[390px]:text-lg text-[#17233C] group-hover:text-[#D97706] transition-colors truncate leading-tight">
+                      <h4 className="font-black text-sm sm:text-base text-[#17233C] group-hover:text-[#D97706] transition-colors truncate leading-snug">
                         {student.studentName}
                       </h4>
 
                       {/* Teacher Row (clean) */}
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#6E7587] leading-tight">
-                        <GraduationCap className="w-3.5 h-3.5 text-[#17233C]" />
-                        <span>Teacher: <span className="text-[#D97706] font-black">{cleanTeacherName(student.teacherName)}</span></span>
+                      <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-[#6E7587] leading-tight truncate">
+                        <GraduationCap className="w-3.5 h-3.5 text-[#D97706] shrink-0" />
+                        <span className="truncate">
+                          Teacher: <span className="text-[#17233C] font-black">{cleanTeacherName(student.teacherName)}</span>
+                        </span>
                       </div>
 
-                      {/* Bottom Pills Row: [ Slot Match ✓ ]  [ C11, C12 ] */}
-                      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                      {/* Bottom Pills Row: [ Slot Match ✓ ]  [ Slot ] */}
+                      <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
                         {/* Mint Green Slot Match Badge */}
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCFCE7] text-[#16A34A] text-xs font-black border border-[#BBF7D0]">
-                          <Calendar className="w-3.5 h-3.5 stroke-[2.4]" />
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] text-[10.5px] sm:text-xs font-black border border-[#BBF7D0] shadow-2xs">
+                          <Calendar className="w-3 h-3 stroke-[2.4]" />
                           <span>Slot Match</span>
-                          <CheckCircle className="w-3.5 h-3.5 fill-[#16A34A] text-white" />
+                          <CheckCircle className="w-3 h-3 fill-[#16A34A] text-white" />
                         </div>
 
                         {/* Soft Warm Yellow Slot Pill */}
-                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-black border border-[#FDE68A]">
-                          <Calendar className="w-3.5 h-3.5 text-[#92400E]" />
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] text-[10.5px] sm:text-xs font-black border border-[#FDE68A]">
+                          <Calendar className="w-3 h-3 text-[#92400E]" />
                           <span>{student.slot || slotCode}</span>
                         </div>
+
+                        {/* Optional Subject/Course Code Pill */}
+                        {student.courseCode && student.courseCode !== courseCode && (
+                          <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10.5px] sm:text-xs font-black border border-slate-200">
+                            <span>{student.courseCode}</span>
+                          </div>
+                        )}
                       </div>
 
                     </div>
                   </div>
 
-                  {/* Right Side: Compact WhatsApp Icon */}
+                  {/* Right Side: Sleek Compact WhatsApp Icon */}
                   <button
                     type="button"
                     onClick={(e) => handleOpenWhatsApp(e, student)}
-                    className="relative z-10 shrink-0 w-10 h-10 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 transition-all cursor-pointer"
+                    className="relative z-10 shrink-0 w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center justify-center shadow-xs hover:shadow-sm active:scale-95 transition-all cursor-pointer self-center"
                     aria-label={`Connect with ${student.studentName} on WhatsApp`}
                     title={`Connect with ${student.studentName} on WhatsApp`}
                   >
                     <svg
                       viewBox="0 0 24 24"
                       aria-hidden="true"
-                      className="w-5 h-5 fill-current"
+                      className="w-4.5 h-4.5 fill-current"
                     >
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                     </svg>
