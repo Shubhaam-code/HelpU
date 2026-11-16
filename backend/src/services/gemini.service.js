@@ -295,22 +295,15 @@ export function validateTeacherExtraction(payload, context = {}) {
 
 export async function extractTeachersFromImages({ images = [], context = {} }) {
   const prompt = [
-    'You are extracting FFCS (faculty & course selection) timetable data from university screenshots.',
-    'All screenshots belong to the SAME course registration. Merge information across screenshots.',
-    'Screenshots may be timetable grids OR "VIEW SLOTS" course lists with columns: Course Type, Slot, Venue, Faculty, Seats.',
-    'Return ONLY valid JSON matching this structure:',
-    '{"courseCode": string|null, "courseName": string|null, "semester": number|null, "academicYear": string|null, "teachers": [{"name": string|null, "subject": string|null, "slot": string|null, "venue": string|null, "courseType": string|null, "availableSeats": number|null, "totalSeats": number|null, "schedule": [{"slot": string|null, "day": string|null, "startTime": "HH:MM"|null, "endTime": "HH:MM"|null, "room": string|null}]}]}',
+    'Extract FFCS university faculty and timetable slot data from screenshot(s).',
+    'Return ONLY valid, compact JSON matching this exact structure:',
+    '{"courseCode": string|null, "courseName": string|null, "semester": number|null, "academicYear": string|null, "teachers": [{"name": string, "slot": string|null, "venue": string|null, "courseType": string|null, "schedule": [{"slot": string|null, "day": string|null, "startTime": "HH:MM"|null, "endTime": "HH:MM"|null, "room": string|null}]}]}',
     `Expected course code: ${context.courseCode || 'unknown'}`,
     `Expected course name: ${context.courseName || 'unknown'}`,
-    `Expected semester: ${context.semester ?? 'unknown'}`,
-    `Expected academic year: ${context.academicYear || 'unknown'}`,
     'Rules:',
-    '- Never invent a teacher name. Use null if unreadable.',
-    '- Extract slot (e.g. A11+A12+A13) and venue (e.g. AB02-320) if present.',
-    '- Never guess unreadable times, days or rooms. Use null.',
-    '- Extract all teacher/faculty rows visible in the screenshot table or timetable, even if the screenshot title differs from expected.',
-    '- Deduplicate teachers and schedule rows.',
-    '- Use 24-hour HH:MM time format if explicit times are present.'
+    '- Extract every faculty/teacher row visible in the timetable or table.',
+    '- Never invent teacher names. Deduplicate rows.',
+    '- Keep output compact and do not include unnecessary verbose explanation.'
   ].join('\n');
 
   const parts = [{ text: prompt }];

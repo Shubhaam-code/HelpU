@@ -690,11 +690,11 @@ export async function addCourseForUser({
   }
 
   try {
-    await setUserCourseStatus(
+    setUserCourseStatus(
       userCourse._id,
       'extracting_with_gemini',
       'AI is extracting teacher details...'
-    );
+    ).catch(() => {});
 
     const images = await readImages(validatedFiles);
     const extraction = await extractTeachersFromImages({
@@ -715,11 +715,11 @@ export async function addCourseForUser({
       );
     }
 
-    await setUserCourseStatus(
+    setUserCourseStatus(
       userCourse._id,
       'saving_to_database',
       'Saving extracted teacher data to MongoDB.'
-    );
+    ).catch(() => {});
 
     const catalog = await CourseCatalog.findByIdAndUpdate(
       claim.catalog._id,

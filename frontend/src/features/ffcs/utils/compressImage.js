@@ -2,7 +2,7 @@
  * Fast client-side image compression for screenshot OCR uploads.
  * Reduces 5-10MB mobile screenshots down to ~150-250KB while preserving razor-sharp text readability.
  */
-export async function compressImage(file, maxWidth = 1280, quality = 0.85) {
+export async function compressImage(file, maxWidth = 1080, quality = 0.82) {
   if (!file || !file.type.startsWith('image/')) return file;
 
   return new Promise((resolve) => {
