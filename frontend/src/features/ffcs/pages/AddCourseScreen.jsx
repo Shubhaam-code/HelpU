@@ -191,6 +191,8 @@ export function AddCourseScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [currentSubmittingIndex, setCurrentSubmittingIndex] = useState(0);
+  const [extractedSuccess, setExtractedSuccess] = useState(false);
+  const [addedCourseIds, setAddedCourseIds] = useState([]);
 
   // Refs maps
   const rowFileInputRefs = useRef({});
@@ -288,6 +290,8 @@ export function AddCourseScreen() {
   // Handle row input change
   const handleRowInputChange = (index, value) => {
     setErrorMessage('');
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     setCourseRows((prev) =>
       prev.map((r, i) => (i === index ? { ...r, searchQuery: value, selectedCourse: null } : r))
     );
@@ -313,6 +317,8 @@ export function AddCourseScreen() {
       return;
     }
 
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     setCourseRows((prev) =>
       prev.map((r, i) =>
         i === index
@@ -338,6 +344,8 @@ export function AddCourseScreen() {
 
   // Clear a row's selected course
   const handleClearRow = (index) => {
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     setCourseRows((prev) =>
       prev.map((r, i) =>
         i === index ? { ...r, searchQuery: '', selectedCourse: null } : r
@@ -348,6 +356,8 @@ export function AddCourseScreen() {
 
   // Delete a row
   const handleDeleteRow = (index) => {
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     setCourseRows((prev) => {
       if (prev.length <= 1) {
         return [{ id: 'row-1', searchQuery: '', selectedCourse: null, screenshots: [] }];
@@ -368,6 +378,8 @@ export function AddCourseScreen() {
       setErrorMessage('You can add up to 8 courses at a time.');
       return;
     }
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     const newId = `row-${Date.now()}`;
     setCourseRows((prev) => [
       ...prev,
@@ -391,6 +403,8 @@ export function AddCourseScreen() {
     if (!rawFiles.length) return;
 
     setErrorMessage('');
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     const currentRow = courseRows[index];
     const existingCount = currentRow.screenshots?.length || 0;
     const remainingSlots = 3 - existingCount;
@@ -426,6 +440,8 @@ export function AddCourseScreen() {
 
   // Remove a specific file from a row
   const handleRemoveRowFile = (rowIndex, fileId) => {
+    setExtractedSuccess(false);
+    setAddedCourseIds([]);
     setCourseRows((prev) =>
       prev.map((r, i) => {
         if (i !== rowIndex) return r;
@@ -439,8 +455,18 @@ export function AddCourseScreen() {
     );
   };
 
-  // Submit all valid rows when Continue is clicked
+  // Submit all valid rows when Continue is clicked (Concurrent Batch Extraction)
   const handleContinueSubmit = async () => {
+    // If extraction was already completed, proceed to Show Courses / Choose Faculty
+    if (extractedSuccess && addedCourseIds.length > 0) {
+      if (addedCourseIds.length === 1) {
+        navigate(`/slotmate/ffcs/faculty/${addedCourseIds[0]}`);
+      } else {
+        navigate('/slotmate/ffcs/courses');
+      }
+      return;
+    }
+
     if (submitting || addInProgress) return;
 
     if (!semester) {
@@ -467,16 +493,13 @@ export function AddCourseScreen() {
 
     setSubmitting(true);
     setErrorMessage('');
-
-    let firstAddedCourseId = null;
+    setExtractedSuccess(false);
 
     try {
       setAcademicYear(academicYear);
 
-      for (let i = 0; i < validRows.length; i++) {
-        const row = validRows[i];
-        setCurrentSubmittingIndex(i);
-
+      // Concurrent Parallel Extraction for all valid course rows
+      const extractionPromises = validRows.map((row) => {
         const coursePayload = row.selectedCourse
           ? {
               curriculumCourseId: row.selectedCourse._id || row.selectedCourse.courseId,
@@ -494,25 +517,41 @@ export function AddCourseScreen() {
               files: (row.screenshots || []).map((s) => s.file).filter(Boolean)
             };
 
-        const res = await addCourse(coursePayload);
-        const targetId = res?.course?.courseId || res?.courseId;
-        if (!firstAddedCourseId && targetId) {
-          firstAddedCourseId = targetId;
-        }
-      }
+        return addCourse(coursePayload);
+      });
 
-      // Success: Navigate to faculty selection if 1 course, else to courses list
-      if (validRows.length === 1 && firstAddedCourseId) {
-        navigate(`/slotmate/ffcs/faculty/${firstAddedCourseId}`);
+      const results = await Promise.allSettled(extractionPromises);
+
+      const successfulIds = [];
+      const errors = [];
+
+      results.forEach((res, i) => {
+        if (res.status === 'fulfilled') {
+          const targetId = res.value?.course?.courseId || res.value?.courseId;
+          if (targetId) successfulIds.push(targetId);
+        } else {
+          const msg = res.reason?.response?.data?.message || res.reason?.message;
+          errors.push(`${validRows[i].selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`);
+        }
+      });
+
+      if (successfulIds.length > 0) {
+        setAddedCourseIds(successfulIds);
+        setExtractedSuccess(true);
+        if (errors.length > 0) {
+          setErrorMessage(
+            `${successfulIds.length} course(s) extracted successfully, but some had issues: ${errors.join('; ')}`
+          );
+        }
       } else {
-        navigate('/slotmate/ffcs/courses');
+        setErrorMessage(errors[0] || 'Failed to extract courses. Please check your files and connection.');
       }
     } catch (err) {
       const apiMsg = err?.response?.data?.message || err?.message;
       setErrorMessage(
         err?.status === 401
           ? 'Please sign in to add courses.'
-          : apiMsg || 'Failed to add course. Please try again.'
+          : apiMsg || 'Failed to extract courses. Please try again.'
       );
     } finally {
       setSubmitting(false);
@@ -888,9 +927,6 @@ export function AddCourseScreen() {
                   <span className="font-black text-xs sm:text-sm text-[#2563EB]">
                     + Add More Courses
                   </span>
-                  <span className="text-[11px] font-semibold text-[#64748B]">
-                    ({courseRows.length}/8 Courses)
-                  </span>
                 </button>
               )}
             </div>
@@ -914,18 +950,53 @@ export function AddCourseScreen() {
             </div>
           )}
 
-          {/* Bottom Gradient Continue Button matching Image 2 mockup */}
+          {/* Extracted Courses Ready Banner */}
+          {extractedSuccess && addedCourseIds.length > 0 && (
+            <div className="bg-emerald-50 border-2 border-emerald-300 text-emerald-800 p-3.5 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs animate-in fade-in">
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-5 h-5 stroke-[2.8]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-black text-xs sm:text-sm text-[#0F172A] leading-tight">
+                    {addedCourseIds.length} Course{addedCourseIds.length > 1 ? 's' : ''} Extracted Successfully!
+                  </p>
+                  <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 truncate">
+                    Tap below to view courses &amp; choose faculties.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleContinueSubmit}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shrink-0 transition-colors shadow-2xs cursor-pointer active:scale-95"
+              >
+                Show Courses
+              </button>
+            </div>
+          )}
+
+          {/* Action Button: Continue / Show Courses & Choose Faculty */}
           <div className="pt-1">
             <button
               type="button"
               onClick={handleContinueSubmit}
               disabled={busy}
-              className="w-full py-3.5 sm:py-4 px-6 rounded-full bg-gradient-to-r from-[#2563EB] via-[#1D4ED8] to-[#1E40AF] hover:brightness-105 active:scale-[0.98] text-white font-black text-base shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className={`w-full py-3.5 sm:py-4 px-6 rounded-full text-white font-black text-base shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                extractedSuccess
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/30'
+                  : 'bg-gradient-to-r from-[#2563EB] via-[#1D4ED8] to-[#1E40AF] hover:brightness-105 shadow-blue-500/30 active:scale-[0.98]'
+              }`}
             >
               {busy ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Processing Courses...</span>
+                  <span>Extracting Courses Simultaneously...</span>
+                </>
+              ) : extractedSuccess ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-200 stroke-[2.8]" />
+                  <span>Show Courses &amp; Choose Faculty →</span>
                 </>
               ) : (
                 <span>Continue →</span>

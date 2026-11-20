@@ -301,7 +301,8 @@ export async function extractTeachersFromImages({ images = [], context = {} }) {
     `Expected course code: ${context.courseCode || 'unknown'}`,
     `Expected course name: ${context.courseName || 'unknown'}`,
     'Rules:',
-    '- Extract every faculty/teacher row visible in the timetable or table.',
+    '- Extract every faculty/teacher row visible in the timetable, table, or PDF pages.',
+    '- For PDF documents, parse the course timetable schedules and classroom venues.',
     '- Never invent teacher names. Deduplicate rows.',
     '- Keep output compact and do not include unnecessary verbose explanation.'
   ].join('\n');

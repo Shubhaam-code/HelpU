@@ -47,7 +47,7 @@ export function ServiceSwitcher({ activeService = 'poolmate', className = '' }) 
           <div 
             className={`w-7 h-7 min-[360px]:w-8 min-[360px]:h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-200 ${
               isSlotActive 
-                ? 'bg-white text-[#17233C] shadow-2xs border border-[#FDE68A]' 
+                ? 'bg-[#FEF9C3] text-[#17233C] shadow-2xs border border-[#FDE047]' 
                 : 'bg-[#FEF3C7] text-[#D97706]'
             }`}
           >
