@@ -12,13 +12,18 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Search
+  Search,
+  FileText,
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { searchCurriculumCourses } from '../../../lib/api';
 import { compressImage } from '../utils/compressImage';
 import addCourseHeroSrc from '../../../assets/images/ffcs_add_courses_hero.png';
+import bgArcTopLeft from '../../../assets/images/ffcs_bg_arc_top_left.png';
+import bgCirclesTopRight from '../../../assets/images/ffcs_bg_circles_top_right.png';
 
 const SEMESTER_OPTIONS = [
   'Winter Semester 2026-27',
@@ -179,6 +184,9 @@ export function AddCourseScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const searchRequestRef = useRef(0);
 
+  // File Preview Modal State (for both Images and PDFs)
+  const [previewFile, setPreviewFile] = useState(null);
+
   // Submission State
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -227,6 +235,7 @@ export function AddCourseScreen() {
       if (e.key === 'Escape') {
         setActiveRowIndex(null);
         setSemesterDropdownOpen(false);
+        setPreviewFile(null);
       }
     };
 
@@ -331,7 +340,7 @@ export function AddCourseScreen() {
   const handleClearRow = (index) => {
     setCourseRows((prev) =>
       prev.map((r, i) =>
-        i === index ? { ...r, searchQuery: '', selectedCourse: null, screenshots: [] } : r
+        i === index ? { ...r, searchQuery: '', selectedCourse: null } : r
       )
     );
     setActiveRowIndex(null);
@@ -341,7 +350,6 @@ export function AddCourseScreen() {
   const handleDeleteRow = (index) => {
     setCourseRows((prev) => {
       if (prev.length <= 1) {
-        // If only 1 row left, reset it rather than removing
         return [{ id: 'row-1', searchQuery: '', selectedCourse: null, screenshots: [] }];
       }
       return prev.filter((_, i) => i !== index);
@@ -377,7 +385,7 @@ export function AddCourseScreen() {
     }
   };
 
-  // Handle files attached to a row
+  // Handle files attached to a row (supports both Images and PDFs)
   const handleRowFileChange = async (index, e) => {
     const rawFiles = Array.from(e.target.files || []);
     if (!rawFiles.length) return;
@@ -388,26 +396,46 @@ export function AddCourseScreen() {
     const remainingSlots = 3 - existingCount;
 
     if (remainingSlots <= 0) {
-      setErrorMessage(`Row ${index + 1}: Maximum 3 screenshots allowed.`);
+      setErrorMessage(`Row ${index + 1}: Maximum 3 files (images or PDFs) allowed.`);
       return;
     }
 
-    const filesToCompress = rawFiles.slice(0, remainingSlots);
-    const compressed = await Promise.all(filesToCompress.map((f) => compressImage(f)));
-
-    const newScreenshots = compressed.map((file) => ({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name: file.name,
-      file,
-      url: URL.createObjectURL(file)
-    }));
+    const filesToProcess = rawFiles.slice(0, remainingSlots);
+    const processedFiles = await Promise.all(
+      filesToProcess.map(async (f) => {
+        const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+        const processed = isPdf ? f : await compressImage(f);
+        return {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: f.name,
+          file: processed,
+          type: isPdf ? 'pdf' : 'image',
+          url: URL.createObjectURL(processed)
+        };
+      })
+    );
 
     setCourseRows((prev) =>
       prev.map((r, i) =>
         i === index
-          ? { ...r, screenshots: [...(r.screenshots || []), ...newScreenshots] }
+          ? { ...r, screenshots: [...(r.screenshots || []), ...processedFiles] }
           : r
       )
+    );
+  };
+
+  // Remove a specific file from a row
+  const handleRemoveRowFile = (rowIndex, fileId) => {
+    setCourseRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== rowIndex) return r;
+        const target = (r.screenshots || []).find((s) => s.id === fileId);
+        if (target?.url) URL.revokeObjectURL(target.url);
+        return {
+          ...r,
+          screenshots: (r.screenshots || []).filter((s) => s.id !== fileId)
+        };
+      })
     );
   };
 
@@ -495,10 +523,29 @@ export function AddCourseScreen() {
 
   return (
     <div className="min-h-[100dvh] bg-[#F0F6FF] flex justify-center selection:bg-blue-200">
-      <div className="w-full max-w-[440px] min-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F5F9FF] to-[#EBF3FE] text-[#0F172A] flex flex-col justify-between pb-28 relative overflow-x-hidden sm:shadow-xl sm:border-x sm:border-blue-100">
+      <div className="w-full max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F4F9FF] to-[#EAF2FE] text-[#0F172A] flex flex-col justify-between pb-28 relative overflow-x-hidden sm:shadow-xl sm:border-x sm:border-blue-100">
         
-        {/* Soft Ambient Glows */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[340px] h-[220px] bg-blue-300/20 blur-3xl rounded-full pointer-events-none" />
+        {/* Decorative Background PNG: Top-Left Concentric Arcs matching Image 3 */}
+        <img
+          src={bgArcTopLeft}
+          alt=""
+          aria-hidden="true"
+          className="absolute -top-3 -left-6 w-36 sm:w-44 h-auto pointer-events-none select-none z-0 opacity-80 drop-shadow-xs"
+          onError={(e) => { e.currentTarget.src = '/ffcs-bg-arc-top-left.png'; }}
+        />
+
+        {/* Decorative Background PNG: Top-Right Overlapping Circles matching Image 3 */}
+        <img
+          src={bgCirclesTopRight}
+          alt=""
+          aria-hidden="true"
+          className="absolute -top-4 -right-6 w-36 sm:w-44 h-auto pointer-events-none select-none z-0 opacity-80 drop-shadow-xs"
+          onError={(e) => { e.currentTarget.src = '/ffcs-bg-circles-top-right.png'; }}
+        />
+
+        {/* Bottom Ambient Glows / Subtle Curved Bubbles matching Image 3 */}
+        <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-blue-200/40 blur-xl pointer-events-none select-none z-0" />
+        <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-blue-300/35 blur-xl pointer-events-none select-none z-0" />
 
         <main className="w-full px-4 pt-2 space-y-4 relative z-10 flex-1">
           
@@ -514,20 +561,8 @@ export function AddCourseScreen() {
             </button>
           </header>
 
-          {/* Hero Illustration: Center matching Image 2 */}
-          <div className="w-full flex justify-center items-center select-none pointer-events-none pt-0.5">
-            <img
-              src={addCourseHeroSrc}
-              alt="Add Courses"
-              className="w-full max-w-[340px] h-auto max-h-[190px] object-contain drop-shadow-sm"
-              onError={(e) => {
-                e.currentTarget.src = '/ffcs-add-courses-hero.png';
-              }}
-            />
-          </div>
-
-          {/* Title & Subtitle with Graduation Cap Icon matching Image 2 */}
-          <div className="text-center space-y-1">
+          {/* Title & Subtitle on Top matching user request */}
+          <div className="text-center space-y-1 pt-0.5">
             <div className="flex items-center justify-center gap-2">
               <span className="text-[#3B82F6] text-xs font-black tracking-widest">
                 ‹‹
@@ -547,8 +582,22 @@ export function AddCourseScreen() {
             </p>
           </div>
 
-          {/* Main White Card Container matching Image 2 mockup */}
-          <div className="bg-white rounded-[28px] border border-[#BFDBFE] shadow-[0_10px_30px_rgba(37,99,235,0.06)] p-4 sm:p-5 space-y-4">
+          {/* Connected Hero Illustration & White Card Box (Zero Gap) */}
+          <div className="space-y-0 pt-0.5">
+            {/* Hero Illustration: Below text, directly touching the card */}
+            <div className="w-full flex justify-center items-end select-none pointer-events-none -mb-2.5 relative z-10">
+              <img
+                src={addCourseHeroSrc}
+                alt="Add Courses"
+                className="w-full max-w-[380px] h-auto max-h-[220px] object-contain drop-shadow-xs block"
+                onError={(e) => {
+                  e.currentTarget.src = '/ffcs-add-courses-hero.png';
+                }}
+              />
+            </div>
+
+            {/* Main White Card Container directly connected */}
+            <div className="bg-white rounded-[28px] border border-[#BFDBFE] shadow-[0_10px_30px_rgba(37,99,235,0.06)] p-4 sm:p-5 space-y-4 relative z-20">
             
             {/* Section 1: Select Semester */}
             <div ref={semesterDropdownRef} className="space-y-2 relative">
@@ -621,7 +670,7 @@ export function AddCourseScreen() {
               </div>
 
               {/* Rows List */}
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {courseRows.map((row, index) => {
                   const isRowActive = activeRowIndex === index;
                   const hasSelected = Boolean(row.selectedCourse);
@@ -630,148 +679,197 @@ export function AddCourseScreen() {
                   return (
                     <div
                       key={row.id}
-                      className="relative flex items-center gap-2 sm:gap-2.5"
+                      className="relative space-y-1.5"
                     >
-                      {/* Hidden File Input for this row */}
+                      {/* Hidden File Input for this row (accepts images & PDFs) */}
                       <input
                         type="file"
                         ref={(el) => (rowFileInputRefs.current[index] = el)}
                         onChange={(e) => handleRowFileChange(index, e)}
-                        accept="image/jpeg,image/png,image/webp"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
                         multiple
                         className="hidden"
                       />
 
-                      {/* 1. Blue Number Badge */}
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#E0EDFF] text-[#1D4ED8] font-black text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-2xs">
-                        {index + 1}
-                      </div>
+                      <div className="flex items-center gap-2 sm:gap-2.5">
+                        {/* 1. Blue Number Badge */}
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#E0EDFF] text-[#1D4ED8] font-black text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                          {index + 1}
+                        </div>
 
-                      {/* 2. Course Name Input Box with Autocomplete */}
-                      <div
-                        ref={(el) => (courseInputRefs.current[index] = el)}
-                        className="flex-1 min-w-0 bg-white rounded-2xl border border-[#BFDBFE] p-2 sm:p-2.5 shadow-2xs relative focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-blue-100 transition-all"
-                      >
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-black text-[#1E293B] block leading-none">
-                            Course Name <span className="text-rose-500 font-bold">*</span>
-                          </label>
-                          {hasSelected && (
-                            <button
-                              type="button"
-                              onClick={() => handleClearRow(index)}
-                              className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-0.5 cursor-pointer"
-                              title="Clear course"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                        {/* 2. Course Name Input Box with Autocomplete */}
+                        <div
+                          ref={(el) => (courseInputRefs.current[index] = el)}
+                          className="flex-1 min-w-0 bg-white rounded-2xl border border-[#BFDBFE] p-2 sm:p-2.5 shadow-2xs relative focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-blue-100 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-[#1E293B] block leading-none">
+                              Course Name <span className="text-rose-500 font-bold">*</span>
+                            </label>
+                            {hasSelected && (
+                              <button
+                                type="button"
+                                onClick={() => handleClearRow(index)}
+                                className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-0.5 cursor-pointer"
+                                title="Clear course"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            value={row.searchQuery}
+                            onChange={(e) => handleRowInputChange(index, e.target.value)}
+                            onFocus={() => setActiveRowIndex(index)}
+                            placeholder="Enter course name"
+                            className="w-full text-xs font-bold text-[#0F172A] placeholder:text-[#94A3B8] bg-transparent focus:outline-none mt-1"
+                          />
+
+                          {/* Autocomplete Dropdown attached to this row */}
+                          {isRowActive && (
+                            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-[#BFDBFE] shadow-2xl z-50 divide-y divide-slate-100 max-h-52 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
+                              {/* Header with Title and Close Button */}
+                              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-100">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  Suggestions
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveRowIndex(null);
+                                  }}
+                                  className="w-5 h-5 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+                                  title="Close"
+                                >
+                                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
+                              </div>
+
+                              {isSearching && (
+                                <div className="px-3 py-2 flex items-center gap-2 text-xs font-bold text-[#2563EB]">
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Searching courses...</span>
+                                </div>
+                              )}
+
+                              {!isSearching && suggestions.length === 0 && (
+                                <div className="px-3 py-2 text-center text-xs text-[#64748B]">
+                                  No curriculum match found.
+                                </div>
+                              )}
+
+                              {!isSearching &&
+                                suggestions.map((course) => {
+                                  const isAdded = isCourseAlreadyAdded(course);
+                                  return (
+                                    <button
+                                      key={course._id || course.courseId || course.courseCode}
+                                      type="button"
+                                      onClick={() => handleSelectSuggestion(index, course)}
+                                      className="w-full text-left px-3 py-2 hover:bg-[#EFF6FF] transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="font-black text-xs text-[#0F172A] truncate">
+                                          <span className="text-[#2563EB] mr-1.5">
+                                            {course.courseCode}
+                                          </span>
+                                          {course.courseName}
+                                        </p>
+                                        <p className="text-[10px] text-[#64748B] font-semibold truncate">
+                                          {course.credits ?? 3} Credits • {course.category || 'Elective'}
+                                        </p>
+                                      </div>
+                                      {isAdded ? (
+                                        <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
+                                          Added
+                                        </span>
+                                      ) : (
+                                        <span className="text-[9px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
+                                          Select
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                            </div>
                           )}
                         </div>
 
-                        <input
-                          type="text"
-                          value={row.searchQuery}
-                          onChange={(e) => handleRowInputChange(index, e.target.value)}
-                          onFocus={() => setActiveRowIndex(index)}
-                          placeholder="Enter course name"
-                          className="w-full text-xs font-bold text-[#0F172A] placeholder:text-[#94A3B8] bg-transparent focus:outline-none mt-1"
-                        />
+                        {/* 3. Blue Upload Button (Image & PDF) matching Image 2 */}
+                        <button
+                          type="button"
+                          onClick={() => triggerRowUpload(index)}
+                          className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-dashed border-[#60A5FA] bg-[#EFF6FF] hover:bg-[#DBEAFE] flex items-center justify-center cursor-pointer transition-colors shrink-0 shadow-2xs relative active:scale-95"
+                          title="Upload timetable screenshot or PDF for this course"
+                        >
+                          <BlueCloudUploadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          {screenshotCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
+                              {screenshotCount}
+                            </span>
+                          )}
+                        </button>
 
-                        {/* Autocomplete Dropdown attached to this row */}
-                        {isRowActive && (
-                          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-[#BFDBFE] shadow-2xl z-50 divide-y divide-slate-100 max-h-52 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
-                            {/* Header with Title and Close Button */}
-                            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-100">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                Suggestions
+                        {/* 4. Delete Trash Button matching Image 2 */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRow(index)}
+                          className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FEE2E2]/70 hover:bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center cursor-pointer transition-colors shrink-0 shadow-2xs active:scale-95"
+                          title="Delete row"
+                        >
+                          <Trash2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
+                        </button>
+                      </div>
+
+                      {/* Attached Files Preview Chips (Images & PDFs) */}
+                      {row.screenshots && row.screenshots.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pl-10 pr-1">
+                          {row.screenshots.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex items-center gap-1.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-2 py-1 shadow-2xs hover:border-[#60A5FA] transition-all"
+                            >
+                              {item.type === 'pdf' ? (
+                                <div className="w-5 h-5 rounded-md bg-rose-500 text-white flex items-center justify-center font-black text-[8px] shrink-0">
+                                  PDF
+                                </div>
+                              ) : (
+                                <img
+                                  src={item.url}
+                                  alt={item.name}
+                                  className="w-5 h-5 rounded-md object-cover border border-[#BFDBFE] shrink-0"
+                                />
+                              )}
+                              <span
+                                onClick={() => setPreviewFile(item)}
+                                className="text-[10px] font-bold text-[#1E293B] max-w-[90px] sm:max-w-[120px] truncate cursor-pointer hover:text-[#2563EB]"
+                                title={`Click to preview: ${item.name}`}
+                              >
+                                {item.name}
                               </span>
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveRowIndex(null);
-                                }}
-                                className="w-5 h-5 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
-                                title="Close"
+                                onClick={() => setPreviewFile(item)}
+                                className="w-4 h-4 rounded-full text-[#2563EB] hover:bg-blue-100 flex items-center justify-center cursor-pointer"
+                                title="Preview file"
                               >
-                                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <Eye className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRowFile(index, item.id)}
+                                className="w-4 h-4 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-100 flex items-center justify-center cursor-pointer"
+                                title="Remove file"
+                              >
+                                <X className="w-3 h-3" />
                               </button>
                             </div>
-
-                            {isSearching && (
-                              <div className="px-3 py-2 flex items-center gap-2 text-xs font-bold text-[#2563EB]">
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Searching courses...</span>
-                              </div>
-                            )}
-
-                            {!isSearching && suggestions.length === 0 && (
-                              <div className="px-3 py-2 text-center text-xs text-[#64748B]">
-                                No curriculum match found.
-                              </div>
-                            )}
-
-                            {!isSearching &&
-                              suggestions.map((course) => {
-                                const isAdded = isCourseAlreadyAdded(course);
-                                return (
-                                  <button
-                                    key={course._id || course.courseId || course.courseCode}
-                                    type="button"
-                                    onClick={() => handleSelectSuggestion(index, course)}
-                                    className="w-full text-left px-3 py-2 hover:bg-[#EFF6FF] transition-colors cursor-pointer flex items-center justify-between gap-2"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="font-black text-xs text-[#0F172A] truncate">
-                                        <span className="text-[#2563EB] mr-1.5">
-                                          {course.courseCode}
-                                        </span>
-                                        {course.courseName}
-                                      </p>
-                                      <p className="text-[10px] text-[#64748B] font-semibold truncate">
-                                        {course.credits ?? 3} Credits • {course.category || 'Elective'}
-                                      </p>
-                                    </div>
-                                    {isAdded ? (
-                                      <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
-                                        Added
-                                      </span>
-                                    ) : (
-                                      <span className="text-[9px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
-                                        Select
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 3. Blue Upload Screenshot Button matching Image 2 */}
-                      <button
-                        type="button"
-                        onClick={() => triggerRowUpload(index)}
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-dashed border-[#60A5FA] bg-[#EFF6FF] hover:bg-[#DBEAFE] flex items-center justify-center cursor-pointer transition-colors shrink-0 shadow-2xs relative active:scale-95"
-                        title="Upload timetable screenshot for this course"
-                      >
-                        <BlueCloudUploadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                        {screenshotCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
-                            {screenshotCount}
-                          </span>
-                        )}
-                      </button>
-
-                      {/* 4. Delete Trash Button matching Image 2 */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRow(index)}
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FEE2E2]/70 hover:bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center cursor-pointer transition-colors shrink-0 shadow-2xs active:scale-95"
-                        title="Delete row"
-                      >
-                        <Trash2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
-                      </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -797,6 +895,7 @@ export function AddCourseScreen() {
               )}
             </div>
           </div>
+        </div>
 
           {/* AI Vision Extraction Progress Card */}
           {addInProgress && (
@@ -836,6 +935,93 @@ export function AddCourseScreen() {
         </main>
 
         <FFCSBottomNav activeTab="add" />
+
+        {/* ========================================================================= */}
+        {/* FULLSCREEN / RESPONSIVE FILE PREVIEW MODAL (IMAGE & PDF SUPPORT)         */}
+        {/* ========================================================================= */}
+        {previewFile && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
+            onClick={() => setPreviewFile(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150 border border-slate-100"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  {previewFile.type === 'pdf' ? (
+                    <div className="px-2 py-0.5 rounded-md bg-rose-500 text-white font-black text-[10px] shrink-0">
+                      PDF
+                    </div>
+                  ) : (
+                    <div className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] shrink-0">
+                      IMAGE
+                    </div>
+                  )}
+                  <h3 className="font-black text-xs sm:text-sm text-[#0F172A] truncate">
+                    {previewFile.name}
+                  </h3>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a
+                    href={previewFile.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-600 transition-colors"
+                    title="Open in new window"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile(null)}
+                    className="w-7 h-7 rounded-xl hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                    title="Close preview"
+                  >
+                    <X className="w-4 h-4 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-3 sm:p-4 overflow-y-auto flex-1 flex items-center justify-center bg-slate-100/50">
+                {previewFile.type === 'image' ? (
+                  <img
+                    src={previewFile.url}
+                    alt={previewFile.name}
+                    className="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-sm border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-full h-[65vh] flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                    <iframe
+                      src={previewFile.url}
+                      title={previewFile.name}
+                      className="w-full h-full flex-1"
+                    />
+                    <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-bold truncate pr-2">
+                        PDF Preview ({previewFile.name})
+                      </span>
+                      <a
+                        href={previewFile.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Full Tab
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
