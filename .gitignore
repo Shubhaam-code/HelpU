@@ -1,44 +1,55 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Environment files and credentials
+# Environment files and credentials (CRITICAL: NEVER COMMIT SECRETS)
 .env
 .env.*
-!.env.example
+*.env
+*.env.*
+**/.env
+**/.env.*
+!**/.env.example
 *.pem
 *.key
 *service-account*.json
 *firebase*.json
 serviceAccountKey.json
-
 *render_fcm_base64*.txt
+*.log
 
-# Build and dist outputs
+# Build, Bundler & Native outputs
 dist/
 dist-ssr/
 build/
 .gradle/
 *.apk
 *.aab
+capacitor.config.json.timestamp*
 
 # Editor & OS files
 .idea/
 .vscode/
-*.log
 .DS_Store
 Thumbs.db
 make_hero.ps1
-test_search_error.js
 
-# FFCS uploaded screenshots / curriculum files
+# Temporary Scratch & Test Artifacts
+scratch/
+scratch_test_*.mjs
+scratch_index_*.mjs
+test_*.mjs
+test_*.js
+*.test.log
+ffcs-test-output.log
+live_extracted_teachers.json
+extracted_course_data.json
+update_test.py
+live_test*.mjs
+backend/scripts/live_test*.mjs
+
+# FFCS uploads & local test files
 backend/uploads/
 *.pdf
-scratch_test_pdf.mjs
-test_pdf.js
-extracted_course_data.json
-live_extracted_teachers.json
-live_test*.mjs
-test_image_extraction.mjs
-
-
-
+backend/circulam.pdf
