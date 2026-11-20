@@ -229,10 +229,9 @@ export function FFCSHome() {
             {coursesList.length === 0 ? (
               <div className="py-6 sm:py-8 px-3 text-center flex flex-col items-center justify-center space-y-2.5">
                 <img
-                  src="/ffcs-book-empty.jpg"
+                  src="/ffcs-book-empty.png"
                   alt="No courses yet"
-                  className="w-20 h-20 sm:w-24 sm:h-24 object-contain select-none pointer-events-none"
-                  style={{ mixBlendMode: 'multiply' }}
+                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain select-none pointer-events-none drop-shadow-sm"
                 />
 
                 <div className="space-y-0.5">
