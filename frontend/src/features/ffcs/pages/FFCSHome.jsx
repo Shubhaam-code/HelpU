@@ -53,7 +53,7 @@ export function FFCSHome() {
       <AppHeader
         theme="blue"
         avatarId={profile?.avatarId}
-        profileRoute="/slotmate/profile"
+        onAvatar={() => {}}
       />
 
       {/* Decorative Ambient Top Glows */}
@@ -228,9 +228,12 @@ export function FFCSHome() {
             {/* Empty State vs Added Courses */}
             {coursesList.length === 0 ? (
               <div className="py-6 sm:py-8 px-3 text-center flex flex-col items-center justify-center space-y-2.5">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shadow-2xs">
-                  <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2]" />
-                </div>
+                <img
+                  src="/ffcs-book-empty.jpg"
+                  alt="No courses yet"
+                  className="w-20 h-20 sm:w-24 sm:h-24 object-contain select-none pointer-events-none"
+                  style={{ mixBlendMode: 'multiply' }}
+                />
 
                 <div className="space-y-0.5">
                   <h4 className="font-extrabold text-xs min-[360px]:text-sm sm:text-base text-[#17233C]">
