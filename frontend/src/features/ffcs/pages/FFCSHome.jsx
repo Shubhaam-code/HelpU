@@ -1,26 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
-  UploadCloud,
+  BookOpen,
+  CalendarDays,
+  Clock,
+  Megaphone,
   Plus,
-  ArrowLeft,
+  ArrowRight,
   Check,
-  ChevronRight
+  ChevronRight,
+  Zap,
+  X
 } from 'lucide-react';
-import { useFFCS } from '../context/FFCSContext';
-import { FFCSBottomNav } from '../components/FFCSBottomNav';
-import { CourseSkeletonCard } from '../components/FFCSSkeleton';
-import heroImgSrc from '../../../assets/images/ffcs_background.webp';
-import notebookImgSrc from '../../../assets/images/notebook.webp';
-import bgBubbleWaveSrc from '../../../assets/images/background.webp';
-import sparkLeftSrc from '../../../assets/images/ffcs_spark_left.png';
-import sparkRightSrc from '../../../assets/images/ffcs_spark_right.png';
 
+import { AppHeader } from '../../../components/layout/AppHeader';
+import { ServiceSwitcher } from '../../../components/layout/ServiceSwitcher';
+import { useFFCS } from '../context/FFCSContext';
+import { useUser } from '../../../context/FirebaseAuthContext';
+import { useUserProfile, useUnreadNotificationsCount } from '../../../hooks/useAppData';
+import { FFCSBottomNav } from '../components/FFCSBottomNav';
+
+/**
+ * Universal Mobile & Desktop Screen: FFCSHome
+ * Pixel-accurate to Image 1:
+ * - On Mobile (Android Capacitor): Compact, touch targets, safe-area insets, 100% native feel.
+ * - On Desktop / Web: Centered responsive max-w container, scalable typography, elegant hover states.
+ */
 export function FFCSHome() {
   const navigate = useNavigate();
-  const { coursesList, loading, isBackgroundFetching } = useFFCS();
+  const { user } = useUser();
+  const { data: profile } = useUserProfile();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount({ module: 'slotmate' });
+  const { coursesList, isBackgroundFetching, confirmedFaculties } = useFFCS();
 
-  const handleUploadClick = () => {
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+
+  const firstName = profile?.name ? profile.name.split(' ')[0] : (user?.firstName || 'Student');
+
+  const handleAddCourseClick = () => {
     if (coursesList.length >= 8) {
       window.alert('Maximum 8 courses allowed in FFCS. Please remove an existing course to add a new one.');
       return;
@@ -29,216 +47,328 @@ export function FFCSHome() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#F8FAFC] flex justify-center">
-      <div className="w-full max-w-[420px] min-h-[100dvh] bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between relative overflow-x-hidden selection:bg-[#FDE047] sm:shadow-xl sm:border-x sm:border-amber-100/70">
-        {/* Decorative Golden Ambient Gradients at Top */}
-        <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#FEF08A]/40 via-[#FFFBEB]/20 to-transparent pointer-events-none" />
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#FDE047]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-24 -left-12 w-40 h-40 bg-[#FEF08A]/25 rounded-full blur-2xl pointer-events-none" />
+    <div className="min-h-screen bg-[#F0F7FF] text-[#17233C] flex flex-col justify-between selection:bg-[#93C5FD]">
+      
+      {/* 1. APP HEADER (Responsive + Light Blue Theme, Notification Bell Removed as requested) */}
+      <AppHeader
+        theme="blue"
+        avatarId={profile?.avatarId}
+        profileRoute="/slotmate/profile"
+      />
 
-        {/* Main Container: Mobile First */}
-        <main className="w-full px-4 pt-2 space-y-3.5 relative z-10 flex-1">
-        
-        {/* Top Navigation Header */}
-        <header className="flex items-center justify-between py-1">
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => navigate('/slotmate')}
-              className="w-8 h-8 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-[#17233C] transition-colors cursor-pointer shadow-xs active:scale-95"
-              aria-label="Back to SlotMate"
-            >
-              <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-            </button>
-            <h1 className="font-black text-lg text-[#17233C] tracking-tight">
-              SlotMate
-            </h1>
+      {/* Decorative Ambient Top Glows */}
+      <div className="fixed top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#DBEAFE]/40 via-[#EFF6FF]/20 to-transparent pointer-events-none" />
+      <div className="fixed -top-12 -right-12 w-56 h-56 bg-[#93C5FD]/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-24 -left-12 w-48 h-48 bg-[#BFDBFE]/25 rounded-full blur-2xl pointer-events-none" />
+
+      {/* ========================================================================= */}
+      {/* MAIN CONTENT CONTAINER (Universal: Phone + Desktop Responsive)           */}
+      {/* ========================================================================= */}
+      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-[54px] min-[360px]:pb-[60px] sm:pb-[66px] relative z-10 flex-1 flex flex-col justify-between">
+
+        <div className="space-y-4 sm:space-y-5">
+          {/* 2. WELCOME GREETING */}
+          <div className="px-0.5 space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-black text-[#17233C] text-[19px] min-[360px]:text-[21px] sm:text-2xl md:text-3xl tracking-tight">
+                Welcome back, {firstName}
+              </h2>
+              <span className="text-lg sm:text-2xl">👋</span>
+            </div>
+            <p className="text-[11px] min-[360px]:text-xs sm:text-sm text-[#64748B] font-medium">
+              Let's plan your FFCS journey together
+            </p>
           </div>
-        </header>
 
-        {/* HERO SECTION: 3D STUDENTS DESK ILLUSTRATION (ffcs_background.webp) */}
-        <div className="w-full flex justify-center items-center select-none pointer-events-none -mt-1 -mb-1 px-1">
-          <div className="w-full max-w-[370px] flex justify-center items-center">
-            <img
-              src={heroImgSrc}
-              alt="FFCS Course Registration"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              width="370"
-              height="190"
-              className="w-full h-auto max-h-[190px] sm:max-h-[205px] object-contain drop-shadow-sm"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
+          {/* 3. TRIPLE SERVICE SWITCHER (SlotMate | PoolMate | FFCS Mate) */}
+          <ServiceSwitcher activeService="ffcs" />
+
+          {/* 4. HERO BANNER: MAKE YOUR FFCS SMARTER (FLUSH BOTTOM CONNECTION) */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative bg-gradient-to-br from-[#EFF6FF] via-[#F0F7FF] to-[#DBEAFE]/90 rounded-[22px] min-[360px]:rounded-[26px] sm:rounded-[30px] border border-[#BFDBFE] pt-3.5 px-3.5 min-[360px]:pt-4 min-[360px]:px-4 sm:pt-6 sm:px-6 pb-0 overflow-hidden shadow-xs hover:shadow-sm transition-shadow"
+          >
+            {/* Decorative Glow */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-[#93C5FD]/30 to-transparent pointer-events-none rounded-full" />
+
+            <div className="relative z-10 flex items-end justify-between gap-2 sm:gap-6">
+              {/* Left Content */}
+              <div className="flex-1 min-w-0 pr-0.5 sm:pr-2 space-y-1 sm:space-y-2 pb-3.5 min-[360px]:pb-4 sm:pb-6">
+                <h1 className="font-black text-[#17233C] text-[19px] min-[360px]:text-[21px] sm:text-2xl md:text-3xl leading-[1.15] tracking-tight">
+                  Make Your <br />
+                  <span className="text-[#2563EB]">FFCS Smarter</span>
+                </h1>
+                <p className="text-[10.5px] min-[360px]:text-[11.5px] sm:text-xs md:text-sm text-[#475569] font-medium leading-relaxed max-w-[220px] sm:max-w-md">
+                  Explore courses, compare faculty and plan your perfect schedule.
+                </p>
+              </div>
+
+              {/* Right Illustration (Connected flush to bottom edge, zero gap) */}
+              <div
+                className="shrink-0 w-[130px] min-[360px]:w-[150px] sm:w-[210px] md:w-[250px] flex justify-end items-end self-end -mr-1 sm:mr-0"
+                style={{ maxWidth: '50%' }}
+              >
+                <img
+                  src="/ffcs-students-duo.png"
+                  alt="Smart FFCS Course Planning"
+                  className="w-full h-auto max-h-[140px] min-[360px]:max-h-[155px] sm:max-h-[195px] md:max-h-[220px] object-contain object-bottom select-none pointer-events-none drop-shadow-xs block"
+                  onError={(e) => {
+                    e.currentTarget.src = '/ffcs-campus-hero.png';
+                    e.currentTarget.onerror = null;
+                  }}
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* 5. QUICK ACTIONS SECTION (4 CIRCULAR ITEMS) */}
+          <div className="bg-white rounded-[22px] min-[360px]:rounded-[24px] sm:rounded-[28px] p-3.5 min-[360px]:p-4 sm:p-5 border border-[#DBEAFE] shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#17233C] tracking-tight">
+                Quick Actions
+              </h3>
+              <button
+                type="button"
+                onClick={() => navigate('/slotmate/ffcs/courses')}
+                className="text-[11px] sm:text-xs font-black text-[#2563EB] hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 pt-1">
+              {/* 1. My Courses */}
+              <button
+                type="button"
+                onClick={() => navigate('/slotmate/ffcs/courses')}
+                className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+              >
+                <div className="w-12 h-12 min-[360px]:w-13.5 min-[360px]:h-13.5 sm:w-16 sm:h-16 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] flex items-center justify-center shadow-2xs group-hover:scale-105 group-hover:shadow-xs transition-all">
+                  <BookOpen className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] min-[360px]:text-[11px] sm:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+                  My Courses
+                </span>
+              </button>
+
+              {/* 2. Add Course (Clean vector icon matching palette) */}
+              <button
+                type="button"
+                onClick={handleAddCourseClick}
+                className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+              >
+                <div className="w-12 h-12 min-[360px]:w-13.5 min-[360px]:h-13.5 sm:w-16 sm:h-16 rounded-full bg-[#F3E8FF] text-[#9333EA] border border-[#DDD6FE] flex items-center justify-center shadow-2xs group-hover:scale-105 group-hover:shadow-xs transition-all">
+                  <Plus className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 sm:w-7 sm:h-7 stroke-[2.4]" />
+                </div>
+                <span className="text-[10px] min-[360px]:text-[11px] sm:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+                  Add Course
+                </span>
+              </button>
+
+              {/* 3. Time Table */}
+              <button
+                type="button"
+                onClick={() => navigate('/slotmate/ffcs/timetable')}
+                className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+              >
+                <div className="w-12 h-12 min-[360px]:w-13.5 min-[360px]:h-13.5 sm:w-16 sm:h-16 rounded-full bg-[#ECFDF5] text-[#10B981] border border-[#A7F3D0] flex items-center justify-center shadow-2xs group-hover:scale-105 group-hover:shadow-xs transition-all">
+                  <Clock className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] min-[360px]:text-[11px] sm:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+                  Time Table
+                </span>
+              </button>
+
+              {/* 4. Notices */}
+              <button
+                type="button"
+                onClick={() => setShowNoticeModal(true)}
+                className="flex flex-col items-center text-center cursor-pointer group active:scale-95 transition-transform"
+              >
+                <div className="w-12 h-12 min-[360px]:w-13.5 min-[360px]:h-13.5 sm:w-16 sm:h-16 rounded-full bg-[#FFF7ED] text-[#EA580C] border border-[#FED7AA] flex items-center justify-center shadow-2xs group-hover:scale-105 group-hover:shadow-xs transition-all">
+                  <Megaphone className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] min-[360px]:text-[11px] sm:text-xs font-bold text-[#17233C] mt-1.5 leading-tight whitespace-nowrap">
+                  Notices
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* 6. YOUR COURSES SECTION */}
+          <div className="bg-white rounded-[22px] min-[360px]:rounded-[24px] sm:rounded-[28px] p-3.5 min-[360px]:p-4 sm:p-5 border border-[#DBEAFE] shadow-2xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[#F1F5F9]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
+                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.4]" />
+                </div>
+                <h3 className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#17233C]">
+                  Your Courses
+                </h3>
+                {isBackgroundFetching && (
+                  <span className="text-[9px] sm:text-[10px] font-bold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded-full border border-[#BFDBFE] animate-pulse">
+                    Syncing...
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate('/slotmate/ffcs/courses')}
+                className="text-[11px] sm:text-xs font-black text-[#2563EB] hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Empty State vs Added Courses */}
+            {coursesList.length === 0 ? (
+              <div className="py-6 sm:py-8 px-3 text-center flex flex-col items-center justify-center space-y-2.5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shadow-2xs">
+                  <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2]" />
+                </div>
+
+                <div className="space-y-0.5">
+                  <h4 className="font-extrabold text-xs min-[360px]:text-sm sm:text-base text-[#17233C]">
+                    No courses added yet
+                  </h4>
+                  <p className="text-[10.5px] min-[360px]:text-xs text-[#64748B] max-w-[240px] leading-relaxed">
+                    Add your courses to get started
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddCourseClick}
+                  className="mt-1 inline-flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-black text-xs sm:text-sm rounded-full shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Add Course</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+                  {coursesList.slice(0, 2).map((course, idx) => {
+                    const isSelected = Boolean(confirmedFaculties[course.id]);
+
+                    return (
+                      <div
+                        key={course.id || idx}
+                        onClick={() => navigate(`/slotmate/ffcs/faculty/${course.id}`)}
+                        className="p-3 sm:p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#3B82F6]/50 hover:bg-[#F0F7FF] flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] transition-all group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[#EFF6FF] text-[#2563EB] font-black text-xs sm:text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
+                            {course.sequence || idx + 1}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-black text-xs sm:text-sm text-[#17233C] truncate group-hover:text-[#2563EB] transition-colors">
+                              {course.code || 'Course'}
+                            </h4>
+                            <p className="text-[10px] sm:text-[11px] text-[#64748B] font-medium truncate mt-0.5">
+                              {course.name || 'Curriculum Course'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isSelected ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black bg-[#FFEDD5] text-[#EA580C] border border-[#FED7AA]">
+                              <Check className="w-2.5 h-2.5 stroke-[3] mr-1" /> Selected
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                              Choose Faculty
+                            </span>
+                          )}
+                          <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#17233C] transition-all" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* YOUR COURSES SECTION: Full-Width Edge-to-Edge Left & Right Cover          */}
-        {/* ========================================================================= */}
-        <section className="-mx-4 w-[calc(100%+2rem)] bg-white rounded-t-[32px] rounded-b-[32px] p-4 sm:p-5 shadow-[0_10px_28px_rgba(23,35,60,0.05)] border-y border-[#F1F5F9] space-y-3">
-          
-          {/* Section Header: Yellow Vertical Indicator + Heading */}
-          <div className="flex items-center justify-between px-1 pt-0.5">
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-[#FACC15] rounded-full" />
-              <h2 className="font-black text-[19px] text-[#17233C] tracking-tight">
-                Your Courses
-              </h2>
-            </div>
-            {isBackgroundFetching && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 animate-pulse">
-                Syncing...
-              </span>
-            )}
-          </div>
-
-          {/* DYNAMIC COURSE CARDS: Displays Actual Course Code, No "Upload Image" text */}
-          <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-amber-200">
-            {coursesList.length === 0 ? (
-              <div className="text-center py-6 px-3 space-y-1">
-                <p className="font-black text-sm text-[#17233C]">No courses added yet</p>
-                <p className="text-[11px] text-[#64748B]">
-                  Tap Add More Course below to search and add your courses.
-                </p>
-              </div>
-            ) : (
-              coursesList.map((course, idx) => {
-              const isUploaded = course.status === 'completed' || course.status === 'needs_review';
-
-              return (
-                <div
-                  key={course.id || idx}
-                  className="bg-white rounded-2xl p-2.5 sm:p-3 shadow-[0_4px_16px_rgba(23,35,60,0.03)] border border-[#F1F5F9] flex items-center justify-between gap-2.5 transition-all hover:shadow-[0_8px_20px_rgba(250,204,21,0.1)]"
-                >
-                  {/* Left: Compact Circular Number Badge + Course Details */}
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFD426] text-[#17233C] font-black text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-2xs">
-                      {course.sequence || idx + 1}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-black text-sm text-[#17233C] leading-tight truncate">
-                        {course.code || `CSE${2000 + (course.sequence || idx + 1)}`}
-                      </h3>
-                      <p className="text-[11px] text-[#64748B] font-medium truncate mt-0.5">
-                        {course.name || ''}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Right: Compact Done Badge or Upload Button */}
-                  {isUploaded ? (
-                    <div className="px-2.5 py-1 rounded-full text-[11px] font-black flex items-center gap-1 shrink-0 bg-[#10B981] text-white shadow-2xs">
-                      <Check className="w-3 h-3 stroke-[3] text-white" />
-                      <span>Done</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleUploadClick}
-                      className="px-3 py-1 rounded-full text-[11px] font-black flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs shrink-0 bg-[#FFD426] hover:bg-[#FACC15] text-[#17233C] border border-[#FACC15]"
-                    >
-                      <UploadCloud className="w-3 h-3 stroke-[2.4]" />
-                      <span>Upload</span>
-                    </button>
-                  )}
-                </div>
-              );
-            }))}
-          </div>
-
-          {/* ========================================================================= */}
-          {/* ADD MORE COURSE BUTTON -> Capsule with Provided Yellow Decorative PNGs   */}
-          {/* ========================================================================= */}
-          <div className="flex items-center justify-center w-full pt-2 pb-1">
-            {/* Left yellow decorative PNG asset */}
-            <img
-              src={sparkLeftSrc}
-              alt=""
-              aria-hidden="true"
-              className="h-7 sm:h-8 w-auto object-contain mr-1.5 sm:mr-2 select-none pointer-events-none shrink-0"
-            />
-
-            {/* Glowing Yellow Pill Button */}
-            <button
-              type="button"
-              onClick={handleUploadClick}
-              className={`group pl-1.5 pr-4 py-1.5 sm:pl-2 sm:pr-5 sm:py-2 rounded-full bg-white hover:bg-[#FEFCE8] border-[2px] border-[#FACC15] hover:border-[#EAB308] flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(250,204,21,0.25)] hover:shadow-[0_6px_22px_rgba(234,179,8,0.35)] cursor-pointer active:scale-95 transition-all ${
-                coursesList.length >= 8 ? 'opacity-60 cursor-not-allowed' : ''
-              }`}
-            >
-              {/* Vibrant Golden Circle with Dark Navy Bold Plus */}
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#FFE066] via-[#FFD426] to-[#F59E0B] text-[#17233C] flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(245,158,11,0.35)] group-hover:scale-105 transition-transform">
-                <Plus className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[3.2] text-[#17233C]" />
-              </div>
-
-              {/* Light Yellow Subtle Vertical Divider */}
-              <div className="w-[1.5px] h-5 bg-[#FDE047] shrink-0" />
-
-              {/* Bold Dark Blue / Navy Text */}
-              <span className="font-black text-[13px] sm:text-sm text-[#17233C] tracking-tight whitespace-nowrap pl-0.5">
-                {coursesList.length >= 8 ? 'Limit Reached (8/8)' : 'Add More Course'}
-              </span>
-            </button>
-
-            {/* Right yellow decorative PNG asset */}
-            <img
-              src={sparkRightSrc}
-              alt=""
-              aria-hidden="true"
-              className="h-7 sm:h-8 w-auto object-contain ml-1.5 sm:ml-2 select-none pointer-events-none shrink-0"
-            />
-          </div>
-        </section>
-
-      </main>
-
-      {/* ========================================================================= */}
-      {/* BOTTOM SECTION: ANDROID MOBILE PROPORTIONS                                */}
-      {/* ========================================================================= */}
-      <section className="relative w-full flex flex-col items-center justify-end pt-2 pb-16 sm:pb-18 overflow-hidden mt-auto min-h-[195px]">
-        {/* Full-width transparent yellow-cream bubble/wave background.webp (Fitted to Android phone) */}
-        <div className="absolute inset-x-0 bottom-0 w-full h-[185px] sm:h-[210px] pointer-events-none select-none overflow-hidden flex items-end justify-center">
+        {/* 7. BOTTOM CAMPUS HERO (EDGE-TO-EDGE, NO BOX, ZERO GAP TO BOTTOM NAV) */}
+        <div className="mt-auto pt-3 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] overflow-hidden select-none pointer-events-none flex items-end justify-center">
           <img
-            src={bgBubbleWaveSrc}
-            alt=""
-            aria-hidden="true"
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-fill object-bottom"
+            src="/ffcs-campus-hero.png"
+            alt="VIT Campus and FFCS Planning"
+            className="w-full h-auto max-h-[175px] sm:max-h-[230px] md:max-h-[280px] object-cover sm:object-contain object-bottom block"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
           />
         </div>
 
-        {/* Centered Calendar / Notebook Illustration & Explanatory Text */}
-        <div className="relative z-10 w-full px-4 flex flex-col items-center justify-center text-center pb-1">
-          {/* Calendar/Notebook Logo */}
-          <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center mb-1 drop-shadow-md mx-auto">
-            <img
-              src={notebookImgSrc}
-              alt="Course Timetable"
-              loading="lazy"
-              decoding="async"
-              width="96"
-              height="96"
-              className="w-full h-full object-contain select-none pointer-events-none"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          </div>
+      </main>
 
-          {/* Explanatory Text (Shifted up with proper breathing room) */}
-          <p className="-mt-0.5 -translate-y-1 font-extrabold text-xs sm:text-[13px] text-[#17233C] leading-snug drop-shadow-2xs">
-            Upload your courses to <br />
-            generate your timetable
-          </p>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* FIXED 3-TAB BOTTOM NAVIGATION: HOME | TIME TABLE | SETTINGS               */}
-      {/* ========================================================================= */}
+      {/* 8. RESPONSIVE BOTTOM NAVIGATION */}
       <FFCSBottomNav activeTab="home" />
-      </div>
+
+      {/* Notices Dialog Modal */}
+      {showNoticeModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowNoticeModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3 shadow-xl border border-[#DBEAFE]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[#F1F5F9]">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center">
+                  <Megaphone className="w-3.5 h-3.5 stroke-[2.4]" />
+                </div>
+                <h4 className="font-black text-xs sm:text-sm text-[#17233C]">FFCS Notices</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNoticeModal(false)}
+                className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 text-[#64748B] flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs text-[#475569] leading-relaxed">
+              <div className="p-2.5 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE]/60">
+                <p className="font-bold text-[#17233C] text-[11.5px]">Winter Semester 2026-27 Registration</p>
+                <p className="text-[10.5px] text-[#64748B] mt-0.5">
+                  Verify timetable slots before finalizing courses. Check slot clashes in Time Table tab.
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                <p className="font-bold text-[#17233C] text-[11.5px]">AI Timetable Scanner Active</p>
+                <p className="text-[10.5px] text-[#64748B] mt-0.5">
+                  Upload screenshots to extract faculty names and slots in 7–10 seconds.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowNoticeModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
+export default FFCSHome;
