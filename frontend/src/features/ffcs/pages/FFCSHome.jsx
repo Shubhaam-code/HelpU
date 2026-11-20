@@ -68,16 +68,13 @@ export function FFCSHome() {
 
         <div className="space-y-4 sm:space-y-5">
           {/* 2. WELCOME GREETING */}
-          <div className="px-0.5 space-y-0.5">
+          <div className="px-0.5">
             <div className="flex items-center gap-1.5">
               <h2 className="font-black text-[#17233C] text-[19px] min-[360px]:text-[21px] sm:text-2xl md:text-3xl tracking-tight">
                 Welcome back, {firstName}
               </h2>
               <span className="text-lg sm:text-2xl">👋</span>
             </div>
-            <p className="text-[11px] min-[360px]:text-xs sm:text-sm text-[#64748B] font-medium">
-              Let's plan your FFCS journey together
-            </p>
           </div>
 
           {/* 3. TRIPLE SERVICE SWITCHER (SlotMate | PoolMate | FFCS Mate) */}
