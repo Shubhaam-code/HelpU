@@ -198,14 +198,14 @@ export function FFCSHome() {
             </div>
           </div>
 
-          {/* 6. YOUR COURSES SECTION */}
-          <div className="bg-white rounded-[22px] min-[360px]:rounded-[24px] sm:rounded-[28px] p-3.5 min-[360px]:p-4 sm:p-5 border border-[#DBEAFE] shadow-2xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-[#F1F5F9]">
+          {/* 6. YOUR COURSES SECTION (Compact Box) */}
+          <div className="bg-white rounded-[20px] min-[360px]:rounded-[22px] sm:rounded-[26px] p-3 min-[360px]:p-3.5 sm:p-4 border border-[#DBEAFE] shadow-2xs space-y-2">
+            <div className="flex items-center justify-between pb-1.5 border-b border-[#F1F5F9]">
               <div className="flex items-center gap-1.5">
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
-                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.4]" />
+                <div className="w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0">
+                  <BookOpen className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.4]" />
                 </div>
-                <h3 className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#17233C]">
+                <h3 className="font-black text-xs min-[360px]:text-[13px] sm:text-sm text-[#17233C]">
                   Your Courses
                 </h3>
                 {isBackgroundFetching && (
@@ -227,18 +227,20 @@ export function FFCSHome() {
 
             {/* Empty State vs Added Courses */}
             {coursesList.length === 0 ? (
-              <div className="py-3 sm:py-4 px-3 text-center flex flex-col items-center justify-center space-y-2">
+              <div className="py-2 px-2 text-center flex flex-col items-center justify-center space-y-1.5">
                 <img
                   src="/ffcs-book-empty.png"
                   alt="No courses yet"
-                  className="w-20 h-20 sm:w-24 sm:h-24 object-contain select-none pointer-events-none drop-shadow-sm"
+                  className="w-13 h-13 min-[360px]:w-14 min-[360px]:h-14 sm:w-16 sm:h-16 object-contain select-none pointer-events-none drop-shadow-sm"
+                  loading="eager"
+                  decoding="sync"
                 />
 
                 <div className="space-y-0.5">
-                  <h4 className="font-extrabold text-xs min-[360px]:text-sm sm:text-base text-[#17233C]">
+                  <h4 className="font-extrabold text-[11.5px] min-[360px]:text-xs sm:text-sm text-[#17233C]">
                     No courses added yet
                   </h4>
-                  <p className="text-[10.5px] min-[360px]:text-xs text-[#64748B] max-w-[240px] leading-relaxed">
+                  <p className="text-[10px] min-[360px]:text-[10.5px] text-[#64748B] max-w-[220px] leading-tight">
                     Add your courses to get started
                   </p>
                 </div>
@@ -246,9 +248,9 @@ export function FFCSHome() {
                 <button
                   type="button"
                   onClick={handleAddCourseClick}
-                  className="mt-1 inline-flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-black text-xs sm:text-sm rounded-full shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+                  className="mt-0.5 inline-flex items-center gap-1 px-4 py-1.5 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-black text-[11px] min-[360px]:text-xs rounded-full shadow-sm shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
                 >
-                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   <span>Add Course</span>
                 </button>
               </div>
@@ -298,12 +300,14 @@ export function FFCSHome() {
               </div>
             )}
           </div>
-          {/* 7. BOTTOM CAMPUS HERO (EDGE-TO-EDGE, always visible, shifts down with content) */}
-          <div className="pt-2 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] overflow-hidden select-none pointer-events-none flex items-end justify-center">
+          {/* 7. BOTTOM CAMPUS HERO (Full image preserved, boy hair never cut off) */}
+          <div className="pt-1 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] select-none pointer-events-none flex items-end justify-center">
             <img
               src="/ffcs-campus-hero.png"
               alt="VIT Campus and FFCS Planning"
-              className="w-full h-auto max-h-[160px] sm:max-h-[210px] md:max-h-[260px] object-cover sm:object-contain object-bottom block"
+              className="w-full h-auto max-h-[220px] object-contain object-bottom block"
+              loading="eager"
+              decoding="sync"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}

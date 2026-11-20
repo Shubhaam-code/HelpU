@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   ChevronDown,
   Trash2,
   BookOpen,
@@ -589,15 +588,7 @@ export function AddCourseScreen() {
         <main className="w-full px-3 min-[360px]:px-4 pt-1 space-y-1.5 min-[360px]:space-y-2 sm:space-y-3 relative z-10 flex-1">
           
           {/* Top Minimal Navigation Bar */}
-          <header className="flex items-center pt-0.5">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="w-7 h-7 min-[360px]:w-8 min-[360px]:h-8 rounded-xl bg-white hover:bg-blue-50 border border-[#BFDBFE] flex items-center justify-center text-[#1E3A8A] transition-colors cursor-pointer shadow-xs active:scale-95"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-            </button>
+          <header className="flex items-center pt-0.5 h-8">
           </header>
 
           {/* Title & Subtitle on Top matching user request */}

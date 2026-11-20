@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   ChevronRight,
   Plus,
   CheckCircle2,
@@ -86,14 +85,6 @@ export function AddedCoursesScreen() {
       <div className="w-full max-w-md mx-auto px-4 pt-3 space-y-4 relative z-10">
         <header className="flex items-center justify-between py-1">
           <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="w-8 h-8 rounded-xl bg-white hover:bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#1D4ED8] transition-colors cursor-pointer shadow-xs active:scale-95"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-            </button>
             <h1 className="font-black text-lg text-[#0F172A] tracking-tight">
               Your Added Courses
             </h1>
