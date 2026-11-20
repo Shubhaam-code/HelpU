@@ -18,7 +18,6 @@ import { SlotMateBottomNav } from '../components/SlotMateBottomNav';
 import { getSlotMateDraft, clearSlotMateDraft } from '../../../utils/guestDraft';
 import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 import { useScrollRestoration } from '../../../hooks/useScrollRestoration';
-import { TeacherClassroomIcon } from '../../../components/icons/TeacherClassroomIcon';
 
 export default function SlotFriendHomePage() {
   const navigate = useNavigate();
@@ -88,11 +87,17 @@ export default function SlotFriendHomePage() {
   }, [myPosts]);
 
   return (
-    <div className="min-h-screen bg-[#FFFDF9] text-[#17233C] flex flex-col justify-between">
+    <div className="min-h-screen bg-[#FFFDF0] text-[#17233C] flex flex-col justify-between selection:bg-[#FDE047]">
+      {/* Decorative Ambient Top Glows (Warm Light Yellowish for SlotMate) */}
+      <div className="fixed top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#FEF08A]/35 via-[#FFFBEB]/20 to-transparent pointer-events-none" />
+      <div className="fixed -top-12 -right-12 w-56 h-56 bg-[#FDE047]/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-24 -left-12 w-48 h-48 bg-[#FEF08A]/20 rounded-full blur-2xl pointer-events-none" />
+
       {/* ========================================================================= */}
-      {/* 1. APP HEADER: ORIGINAL HELPU LOGO + NOTIFICATION BELL + AVATAR           */}
+      {/* 1. APP HEADER: ORIGINAL HELPU LOGO + NOTIFICATION BELL + AVATAR (SLOTMATE THEME) */}
       {/* ========================================================================= */}
       <AppHeader
+        theme="slotmate"
         avatarId={profile?.avatarId}
         onBell={() => {
           if (!user) {
@@ -108,7 +113,7 @@ export default function SlotFriendHomePage() {
       {/* ========================================================================= */}
       {/* MAIN CONTENT CONTAINER                                                    */}
       {/* ========================================================================= */}
-      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-28 sm:pb-32 space-y-4 sm:space-y-5">
+      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-28 sm:pb-32 space-y-4 sm:space-y-5 relative z-10 flex-1">
         
         {/* Welcome Greeting */}
         <div className="flex items-center justify-between px-0.5">
@@ -167,38 +172,6 @@ export default function SlotFriendHomePage() {
                 className="w-full h-auto max-h-[145px] sm:max-h-[185px] md:max-h-[210px] object-contain select-none pointer-events-none drop-shadow-xs"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* ========================================================================= */}
-        {/* FFCS - FACULTY & COURSE SELECTION ENTRY BANNER                            */}
-        {/* ========================================================================= */}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, delay: 0.05 }}
-          onClick={() => navigate('/slotmate/ffcs')}
-          className="relative bg-gradient-to-r from-[#FFFBEB] via-[#FFFDF7] to-[#FEF08A]/30 rounded-[24px] sm:rounded-[28px] border-2 border-[#FDE68A] p-3.5 sm:p-4 overflow-hidden shadow-xs hover:border-[#FACC15] hover:shadow-md transition-all cursor-pointer group active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform p-1.5">
-                <TeacherClassroomIcon className="w-8.5 h-8.5 sm:w-9 sm:h-9" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight group-hover:text-[#D97706] transition-colors">
-                    FFCS - Faculty &amp; Course Selection
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full bg-[#FEF08A] text-[#854D0E] font-black text-[10px] uppercase tracking-wide border border-[#FDE047]">
-                    New
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#854D0E] flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
-              <ChevronRight className="w-4 h-4 stroke-[2.8]" />
             </div>
           </div>
         </motion.div>
