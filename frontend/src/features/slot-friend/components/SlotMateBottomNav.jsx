@@ -21,7 +21,7 @@ export function SlotMateBottomNav({ active = 'home' }) {
   return (
     <nav
       aria-label="SlotMate Navigation"
-      className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#F4E3D8] shadow-[0_-4px_20px_rgba(23,35,60,0.04)] z-40 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-1.5"
+      className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#FDE68A] shadow-[0_-4px_20px_rgba(23,35,60,0.04)] z-40 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-1.5"
     >
       <div className="flex items-center justify-around px-2 py-0.5 max-w-lg mx-auto">
         {navItems.map((item) => {

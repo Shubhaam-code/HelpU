@@ -295,13 +295,14 @@ export function validateTeacherExtraction(payload, context = {}) {
 
 export async function extractTeachersFromImages({ images = [], context = {} }) {
   const prompt = [
-    'Extract FFCS university faculty and timetable slot data from screenshot(s).',
+    'Extract FFCS university faculty and timetable slot data from screenshot(s) or PDF document(s).',
     'Return ONLY valid, compact JSON matching this exact structure:',
     '{"courseCode": string|null, "courseName": string|null, "semester": number|null, "academicYear": string|null, "teachers": [{"name": string, "slot": string|null, "venue": string|null, "courseType": string|null, "schedule": [{"slot": string|null, "day": string|null, "startTime": "HH:MM"|null, "endTime": "HH:MM"|null, "room": string|null}]}]}',
     `Expected course code: ${context.courseCode || 'unknown'}`,
     `Expected course name: ${context.courseName || 'unknown'}`,
     'Rules:',
-    '- Extract every faculty/teacher row visible in the timetable or table.',
+    '- Extract every faculty/teacher row visible in the timetable, table, or PDF pages.',
+    '- For PDF documents, parse the course timetable schedules and classroom venues.',
     '- Never invent teacher names. Deduplicate rows.',
     '- Keep output compact and do not include unnecessary verbose explanation.'
   ].join('\n');

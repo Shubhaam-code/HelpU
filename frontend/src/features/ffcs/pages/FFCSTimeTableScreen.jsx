@@ -21,7 +21,7 @@ export function FFCSTimeTableScreen() {
   const confirmedList = Object.values(confirmedFaculties);
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-28">
+    <div className="min-h-screen bg-[#F0F7FF] text-[#17233C] flex flex-col justify-between pb-28">
       {/* Main Container */}
       <div className="w-full max-w-lg md:max-w-2xl mx-auto px-3.5 sm:px-4 pt-3 space-y-4">
         {/* Header */}
@@ -30,7 +30,7 @@ export function FFCSTimeTableScreen() {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="w-8 h-8 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-[#17233C] transition-colors cursor-pointer shadow-xs active:scale-95"
+              className="w-8 h-8 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] flex items-center justify-center text-[#2563EB] transition-colors cursor-pointer shadow-xs active:scale-95"
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
@@ -42,24 +42,24 @@ export function FFCSTimeTableScreen() {
         </header>
 
         {/* Top Segmented Switch: [ Faculty List ]  [ My Time Table ] */}
-        <div className="bg-white p-1 rounded-2xl border border-[#F4E3D8] flex items-center shadow-2xs">
+        <div className="bg-white p-1 rounded-2xl border border-[#DBEAFE] flex items-center shadow-2xs">
           <button
             type="button"
             onClick={() => setActiveTab('faculties')}
             className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'faculties'
-                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                ? 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] shadow-2xs'
                 : 'text-[#64748B] hover:text-[#17233C]'
             }`}
           >
-            <UserCheck className={`w-4 h-4 stroke-[2.2] ${activeTab === 'faculties' ? 'text-[#78350F]' : 'text-[#64748B]'}`} />
+            <UserCheck className={`w-4 h-4 stroke-[2.2] ${activeTab === 'faculties' ? 'text-[#2563EB]' : 'text-[#64748B]'}`} />
             <span>Faculty List</span>
             {confirmedList.length > 0 && (
               <span
                 className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ml-1 transition-colors ${
                   activeTab === 'faculties'
-                    ? 'bg-[#FACC15] text-[#78350F]'
-                    : 'bg-[#F1F5F9] text-[#64748B]'
+                    ? 'bg-[#2563EB] text-white'
+                    : 'bg-[#EFF6FF] text-[#2563EB]'
                 }`}
               >
                 {confirmedList.length}
@@ -72,11 +72,11 @@ export function FFCSTimeTableScreen() {
             onClick={() => setActiveTab('timetable')}
             className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'timetable'
-                ? 'bg-[#FEF08A] text-[#78350F] shadow-2xs'
+                ? 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] shadow-2xs'
                 : 'text-[#64748B] hover:text-[#17233C]'
             }`}
           >
-            <CalendarDays className={`w-4 h-4 stroke-[2.2] ${activeTab === 'timetable' ? 'text-[#78350F]' : 'text-[#64748B]'}`} />
+            <CalendarDays className={`w-4 h-4 stroke-[2.2] ${activeTab === 'timetable' ? 'text-[#2563EB]' : 'text-[#64748B]'}`} />
             <span>My Time Table</span>
           </button>
         </div>
@@ -87,7 +87,7 @@ export function FFCSTimeTableScreen() {
             <TimetableGrid confirmedFaculties={confirmedFaculties} />
 
             {/* Quick action card */}
-            <div className="bg-white rounded-2xl border border-[#FEEBA4] p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="bg-white rounded-2xl border border-[#DBEAFE] p-3.5 flex items-center justify-between gap-3 shadow-2xs">
               <div className="min-w-0 flex-1">
                 <h4 className="font-extrabold text-xs text-[#17233C]">
                   Need to change a faculty or slot?
@@ -99,7 +99,7 @@ export function FFCSTimeTableScreen() {
               <button
                 type="button"
                 onClick={() => navigate('/slotmate/ffcs/courses')}
-                className="px-3 py-2 rounded-xl bg-[#FEF08A] hover:bg-[#FDE047] text-[#854D0E] font-bold text-xs border border-[#FACC15] shrink-0 active:scale-95 transition-all cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] font-bold text-xs border border-[#BFDBFE] shrink-0 active:scale-95 transition-all cursor-pointer"
               >
                 Manage Courses
               </button>
@@ -112,8 +112,8 @@ export function FFCSTimeTableScreen() {
           <div className="space-y-3">
             {confirmedList.length === 0 ? (
               /* Empty State */
-              <div className="bg-white rounded-3xl border border-[#FEEBA4] p-8 text-center space-y-3 shadow-xs">
-                <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto shadow-2xs">
+              <div className="bg-white rounded-3xl border border-[#DBEAFE] p-8 text-center space-y-3 shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] flex items-center justify-center mx-auto shadow-2xs">
                   <UserCheck className="w-7 h-7 stroke-[2.2]" />
                 </div>
                 <div>
@@ -127,7 +127,7 @@ export function FFCSTimeTableScreen() {
                 <button
                   type="button"
                   onClick={() => navigate('/slotmate/ffcs/courses')}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FFD426] hover:bg-[#FACC15] text-[#17233C] font-black text-xs shadow-xs border border-[#EAB308] cursor-pointer active:scale-95 transition-all"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-black text-xs shadow-md shadow-blue-500/20 cursor-pointer active:scale-95 transition-all"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
                   <span>Go to Added Courses</span>
@@ -139,17 +139,17 @@ export function FFCSTimeTableScreen() {
                 {confirmedList.map((fac) => (
                   <div
                     key={fac.courseCode || fac.facultyId}
-                    className="p-3.5 sm:p-4 rounded-2xl bg-white border border-[#FEEBA4] hover:border-[#FACC15] shadow-xs transition-all space-y-2"
+                    className="p-3.5 sm:p-4 rounded-2xl bg-white border border-[#DBEAFE] hover:border-[#3B82F6] shadow-xs transition-all space-y-2"
                   >
                     {/* Top Row: Course Code Badge + Change Button */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="px-2 py-0.5 rounded-md bg-[#FEF9C3] border border-[#FEF08A] text-[#78350F] font-black text-[10px] sm:text-[11px] tracking-wider uppercase">
+                      <span className="px-2 py-0.5 rounded-md bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] font-black text-[10px] sm:text-[11px] tracking-wider uppercase">
                         {fac.courseCode}
                       </span>
                       <button
                         type="button"
                         onClick={() => navigate(`/slotmate/ffcs/faculty/${fac.courseCode}`)}
-                        className="px-3 py-1 rounded-xl bg-[#FFFDF7] hover:bg-[#FEF9C3] border border-[#FEEBA4] text-[#854D0E] font-bold text-xs shrink-0 cursor-pointer active:scale-95 transition-all shadow-2xs"
+                        className="px-3 py-1 rounded-xl bg-[#F8FAFC] hover:bg-[#EFF6FF] border border-[#DBEAFE] text-[#2563EB] font-bold text-xs shrink-0 cursor-pointer active:scale-95 transition-all shadow-2xs"
                       >
                         Change
                       </button>
@@ -163,8 +163,8 @@ export function FFCSTimeTableScreen() {
                     {/* Details: Slot & Room No with whitespace-nowrap */}
                     <div className="flex items-center gap-3 pt-0.5 text-xs">
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] font-bold text-[#854D0E] uppercase tracking-wide">Slot:</span>
-                        <span className="px-1.5 py-0.5 rounded-md bg-[#FEF3C7] text-[#17233C] font-black text-[10px] sm:text-[11px] border border-[#FDE68A]">
+                        <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide">Slot:</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-[#EFF6FF] text-[#2563EB] font-black text-[10px] sm:text-[11px] border border-[#BFDBFE]">
                           {fac.slot}
                         </span>
                       </div>
@@ -183,7 +183,7 @@ export function FFCSTimeTableScreen() {
                   <button
                     type="button"
                     onClick={() => navigate('/slotmate/ffcs/courses')}
-                    className="w-full py-3 rounded-2xl bg-[#FFFDF7] hover:bg-[#FEF9C3] border border-[#FEEBA4] text-[#854D0E] font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                    className="w-full py-3 rounded-2xl bg-white hover:bg-[#EFF6FF] border border-[#DBEAFE] text-[#2563EB] font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
                   >
                     <BookOpen className="w-4 h-4" />
                     <span>View All Added Courses ({courses.length})</span>

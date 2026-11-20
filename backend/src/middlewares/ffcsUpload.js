@@ -3,6 +3,12 @@ import path from 'path';
 import crypto from 'crypto';
 import multer from 'multer';
 
+const COURSE_FILE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf'
+]);
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PDF_MIME_TYPES = new Set(['application/pdf']);
 
@@ -43,11 +49,11 @@ function buildStorage(subfolder) {
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: Number(process.env.FFCS_MAX_IMAGE_BYTES) || 10 * 1024 * 1024, files: 3 },
+  limits: { fileSize: Number(process.env.FFCS_MAX_FILE_BYTES) || 20 * 1024 * 1024, files: 3 },
   fileFilter(req, file, cb) {
-    if (!IMAGE_MIME_TYPES.has(file.mimetype)) {
-      const error = new Error('Unsupported image type. Allowed: JPG, JPEG, PNG, WEBP.');
-      error.code = 'UNSUPPORTED_IMAGE_TYPE';
+    if (!COURSE_FILE_MIME_TYPES.has(file.mimetype)) {
+      const error = new Error('Unsupported file type. Allowed: JPG, JPEG, PNG, WEBP, PDF.');
+      error.code = 'UNSUPPORTED_FILE_TYPE';
       return cb(error);
     }
     return cb(null, true);
@@ -90,7 +96,11 @@ function respondWithMulterError(res, error) {
     });
   }
 
-  if (error?.code === 'UNSUPPORTED_IMAGE_TYPE' || error?.code === 'UNSUPPORTED_PDF_TYPE') {
+  if (
+    error?.code === 'UNSUPPORTED_IMAGE_TYPE' ||
+    error?.code === 'UNSUPPORTED_PDF_TYPE' ||
+    error?.code === 'UNSUPPORTED_FILE_TYPE'
+  ) {
     return res.status(400).json({
       success: false,
       code: error.code,
