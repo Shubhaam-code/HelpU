@@ -2,24 +2,23 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Search,
-  UploadCloud,
-  PlusCircle,
+  ChevronDown,
+  Trash2,
+  BookOpen,
+  CalendarDays,
+  GraduationCap,
   Plus,
-  X,
+  Loader2,
   CheckCircle2,
   AlertCircle,
-  Loader2,
-  BookOpen,
-  ChevronDown,
-  CalendarDays,
-  GraduationCap
+  X,
+  Search
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { searchCurriculumCourses } from '../../../lib/api';
 import { compressImage } from '../utils/compressImage';
-import addCourseHeroSrc from '../../../assets/images/ffcs_hero_banner.webp';
+import addCourseHeroSrc from '../../../assets/images/ffcs_add_courses_hero.png';
 
 const SEMESTER_OPTIONS = [
   'Winter Semester 2026-27',
@@ -70,12 +69,26 @@ const DEFAULT_SUGGESTIONS = [
   }
 ];
 
-function ExtractionProgressCard({ addInProgress }) {
-  const [progress, setProgress] = useState(12);
+// Blue Cloud with Up Arrow Icon matching Image 2 mockup
+function BlueCloudUploadIcon({ className = 'w-5 h-5' }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={`${className} text-[#2563EB] drop-shadow-xs`}
+    >
+      <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
+    </svg>
+  );
+}
+
+// Extraction Progress Card (AI Vision extraction feedback)
+function ExtractionProgressCard({ addInProgress, currentCourseIndex, totalCourses }) {
+  const [progress, setProgress] = useState(15);
 
   useEffect(() => {
     if (!addInProgress) {
-      setProgress(12);
+      setProgress(15);
       return;
     }
 
@@ -89,9 +102,9 @@ function ExtractionProgressCard({ addInProgress }) {
       const elapsedSeconds = (Date.now() - startTime) / 1000;
       let nextProgress = 15;
       if (elapsedSeconds <= 1.5) {
-        nextProgress = 15 + (elapsedSeconds / 1.5) * 35; // 15% -> 50%
+        nextProgress = 15 + (elapsedSeconds / 1.5) * 35;
       } else if (elapsedSeconds <= 3.5) {
-        nextProgress = 50 + ((elapsedSeconds - 1.5) / 2) * 35; // 50% -> 85%
+        nextProgress = 50 + ((elapsedSeconds - 1.5) / 2) * 35;
       } else {
         nextProgress = Math.min(96, 85 + (elapsedSeconds - 3.5) * 2);
       }
@@ -103,63 +116,42 @@ function ExtractionProgressCard({ addInProgress }) {
 
   const displayProgress = addInProgress?.state === 'completed' ? 100 : progress;
 
-  let statusText = 'Extracting teacher details...';
-  if (displayProgress >= 100) {
-    statusText = 'Extraction complete!';
-  } else if (displayProgress >= 75) {
-    statusText = 'Finalizing course catalog...';
-  } else if (displayProgress >= 40) {
-    statusText = 'Extracting faculty names & timetable slots...';
-  } else if (displayProgress >= 20) {
-    statusText = 'Scanning screenshots with AI vision...';
-  } else {
-    statusText = 'Preparing screenshots for AI extraction...';
-  }
-
   return (
-    <div className="bg-gradient-to-b from-[#FFFDF7] via-white to-[#FEFCE8] border-2 border-[#FDE047] rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-[0_8px_24px_rgba(234,179,8,0.12)] space-y-3.5 animate-in fade-in duration-200">
-      {/* Top Row: Circular Animated Loader + Heading + Percentage Indicator */}
+    <div className="bg-white border-2 border-[#93C5FD] rounded-2xl p-4 shadow-[0_8px_24px_rgba(37,99,235,0.08)] space-y-3 animate-in fade-in duration-200">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#FEF08A] text-[#854D0E] border border-[#FDE047] flex items-center justify-center shrink-0 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] flex items-center justify-center shrink-0">
             {displayProgress >= 100 ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
             ) : (
-              <Loader2 className="w-5 h-5 animate-spin text-[#D97706] stroke-[2.5]" />
+              <Loader2 className="w-5 h-5 animate-spin text-[#2563EB] stroke-[2.5]" />
             )}
           </div>
           <div className="min-w-0">
-            <h4 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight leading-tight">
-              Extracting Teacher Details...
+            <h4 className="font-black text-sm text-[#0F172A] tracking-tight leading-tight">
+              {totalCourses > 1
+                ? `Adding Course ${currentCourseIndex + 1} of ${totalCourses}...`
+                : 'Extracting Course Details...'}
             </h4>
-            <p className="text-[11px] font-bold text-[#D97706] truncate mt-0.5">
-              {statusText}
+            <p className="text-[11px] font-bold text-[#2563EB] truncate mt-0.5">
+              {addInProgress?.message || 'Scanning timetable with AI vision...'}
             </p>
           </div>
         </div>
 
-        {/* Percentage Indicator Badge */}
-        <div className="shrink-0 px-2.5 py-1 rounded-full bg-[#FEF9C3] border border-[#FDE047] text-[#854D0E] font-black text-xs shadow-2xs">
+        <div className="shrink-0 px-2.5 py-1 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] font-black text-xs">
           {displayProgress}%
         </div>
       </div>
 
-      {/* Horizontal Golden Yellow Progress Bar */}
-      <div className="space-y-1">
-        <div className="w-full h-2.5 sm:h-3 bg-[#FEF3C7] rounded-full overflow-hidden p-0.5 border border-[#FDE68A] shadow-inner">
-          <div
-            className="h-full bg-gradient-to-r from-[#FDE047] via-[#FACC15] to-[#EAB308] rounded-full transition-all duration-300 ease-out shadow-xs relative overflow-hidden"
-            style={{ width: `${displayProgress}%` }}
-          >
-            <div className="absolute inset-0 bg-white/30 animate-pulse" />
-          </div>
+      <div className="w-full h-2.5 bg-[#EFF6FF] rounded-full overflow-hidden p-0.5 border border-[#BFDBFE]">
+        <div
+          className="h-full bg-gradient-to-r from-[#60A5FA] via-[#3B82F6] to-[#2563EB] rounded-full transition-all duration-300 ease-out relative overflow-hidden"
+          style={{ width: `${displayProgress}%` }}
+        >
+          <div className="absolute inset-0 bg-white/30 animate-pulse" />
         </div>
       </div>
-
-      {/* Required English Description */}
-      <p className="text-[11px] sm:text-xs font-medium text-[#475569] leading-relaxed bg-[#FFFDF7] border border-[#FEEBA4] rounded-xl p-2.5 sm:p-3">
-        AI is scanning screenshots and extracting teacher information. This process takes only 7 to 10 seconds. Please wait while we process your schedule.
-      </p>
     </div>
   );
 }
@@ -168,20 +160,35 @@ export function AddCourseScreen() {
   const navigate = useNavigate();
   const { coursesList, addCourse, addInProgress, getAcademicYear, setAcademicYear } = useFFCS();
 
-  // Search & Autocomplete State
-  const [courseSearchQuery, setCourseSearchQuery] = useState('');
+  // Semester State
+  const [semester, setSemester] = useState('');
+  const [semesterDropdownOpen, setSemesterDropdownOpen] = useState(false);
+  const semesterDropdownRef = useRef(null);
+  const [academicYear, setAcademicYearState] = useState(() => getAcademicYear() || '2026-27');
+
+  // Courses Rows State (Initial 3 rows matching Image 2 mockup)
+  const [courseRows, setCourseRows] = useState([
+    { id: 'row-1', searchQuery: '', selectedCourse: null, screenshots: [] },
+    { id: 'row-2', searchQuery: '', selectedCourse: null, screenshots: [] },
+    { id: 'row-3', searchQuery: '', selectedCourse: null, screenshots: [] }
+  ]);
+
+  // Autocomplete suggestions per active row
+  const [activeRowIndex, setActiveRowIndex] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-
-  const searchContainerRef = useRef(null);
   const searchRequestRef = useRef(0);
-  const isSelectingRef = useRef(false);
 
-  // Helper to verify if a course already exists in the user's selected courses list
+  // Submission State
+  const [errorMessage, setErrorMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [currentSubmittingIndex, setCurrentSubmittingIndex] = useState(0);
+
+  // Refs maps
+  const rowFileInputRefs = useRef({});
+  const courseInputRefs = useRef({});
+
+  // Helper: Check if a course is already in the user's permanent list
   const isCourseAlreadyAdded = (course) => {
     if (!course || !Array.isArray(coursesList) || coursesList.length === 0) return false;
     const targetId = String(course._id || course.courseId || '').trim();
@@ -199,73 +206,66 @@ export function AddCourseScreen() {
     });
   };
 
-  // Form State
-  const [semester, setSemester] = useState('');
-  const [semesterDropdownOpen, setSemesterDropdownOpen] = useState(false);
-  const semesterDropdownRef = useRef(null);
-  const [academicYear, setAcademicYearState] = useState(() => getAcademicYear());
-  const [screenshots, setScreenshots] = useState([]);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [maxLimitReached, setMaxLimitReached] = useState(false);
-  const fileInputRef = useRef(null);
-
-  // Close dropdown on click outside
+  // Close semester dropdown & course suggestions dropdown on outside click or Esc
   useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
-        setShowDropdown(false);
+    const handleOutsideClick = (e) => {
+      // Close semester dropdown
+      if (semesterDropdownRef.current && !semesterDropdownRef.current.contains(e.target)) {
+        setSemesterDropdownOpen(false);
       }
-      if (semesterDropdownRef.current && !semesterDropdownRef.current.contains(event.target)) {
+
+      // Close active course suggestions dropdown if click is outside the active input container
+      if (activeRowIndex !== null) {
+        const activeContainer = courseInputRefs.current[activeRowIndex];
+        if (activeContainer && !activeContainer.contains(e.target)) {
+          setActiveRowIndex(null);
+        }
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setActiveRowIndex(null);
         setSemesterDropdownOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleOutsideClick);
     document.addEventListener('touchstart', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [activeRowIndex]);
 
-  // Debounced live search (250ms) with stale response discarding
+  // Live search for the active row
   useEffect(() => {
-    if (isSelectingRef.current) {
-      isSelectingRef.current = false;
-      return;
-    }
+    if (activeRowIndex === null) return;
+    const activeRow = courseRows[activeRowIndex];
+    if (!activeRow) return;
 
-    const trimmed = courseSearchQuery.trim();
-
+    const trimmed = (activeRow.searchQuery || '').trim();
     if (!trimmed) {
       setSuggestions(DEFAULT_SUGGESTIONS);
       setIsSearching(false);
-      setSearchError('');
-      setHighlightedIndex(-1);
       return;
     }
 
     const requestId = ++searchRequestRef.current;
     setIsSearching(true);
-    setSearchError('');
-    setShowDropdown(true);
 
     const timer = setTimeout(async () => {
       try {
-        const response = await searchCurriculumCourses(trimmed, { limit: 10 });
+        const response = await searchCurriculumCourses(trimmed, { limit: 8 });
         if (requestId !== searchRequestRef.current) return;
-
-        const results = Array.isArray(response?.data?.courses)
-          ? response.data.courses
-          : [];
+        const results = Array.isArray(response?.data?.courses) ? response.data.courses : [];
         setSuggestions(results);
-        setShowDropdown(true);
-        setHighlightedIndex(-1);
-      } catch (err) {
+      } catch {
         if (requestId !== searchRequestRef.current) return;
         setSuggestions([]);
-        setSearchError(err?.message || 'Failed to search courses. Please check connection.');
-        setShowDropdown(true);
       } finally {
         if (requestId === searchRequestRef.current) {
           setIsSearching(false);
@@ -274,173 +274,217 @@ export function AddCourseScreen() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [courseSearchQuery]);
+  }, [activeRowIndex, courseRows]);
 
-  const handleSelectSuggestion = (course) => {
+  // Handle row input change
+  const handleRowInputChange = (index, value) => {
+    setErrorMessage('');
+    setCourseRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, searchQuery: value, selectedCourse: null } : r))
+    );
+    setActiveRowIndex(index);
+  };
+
+  // Select suggestion for a row
+  const handleSelectSuggestion = (index, course) => {
     if (isCourseAlreadyAdded(course)) {
-      setErrorMessage('This course has already been added.');
+      setErrorMessage(`"${course.courseCode}" has already been added.`);
       return;
     }
-    isSelectingRef.current = true;
-    setSelectedCourse({
-      _id: course._id || course.courseId,
-      courseId: course.courseId || course._id,
-      courseCode: course.courseCode,
-      courseName: course.courseName,
-      semester: course.semester || null,
-      credits: course.credits || null,
-      category: course.category || null,
-      institution: course.institution || 'VIT',
-      curriculumVersion: course.curriculumVersion || '2024-2025'
-    });
-    setCourseSearchQuery(`${course.courseCode} - ${course.courseName}`);
-    setShowDropdown(false);
+    // Check if duplicate within current rows
+    const duplicateInForm = courseRows.some(
+      (r, i) =>
+        i !== index &&
+        r.selectedCourse &&
+        (r.selectedCourse.courseCode === course.courseCode ||
+          r.selectedCourse._id === (course._id || course.courseId))
+    );
+    if (duplicateInForm) {
+      setErrorMessage(`"${course.courseCode}" is already in your form list.`);
+      return;
+    }
+
+    setCourseRows((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              selectedCourse: {
+                _id: course._id || course.courseId,
+                courseId: course.courseId || course._id,
+                courseCode: course.courseCode,
+                courseName: course.courseName,
+                credits: course.credits || 3,
+                category: course.category || ''
+              },
+              searchQuery: `${course.courseCode} - ${course.courseName}`
+            }
+          : r
+      )
+    );
+    setActiveRowIndex(null);
     setSuggestions([]);
     setErrorMessage('');
   };
 
-  const handleClearSelection = () => {
-    setSelectedCourse(null);
-    setCourseSearchQuery('');
-    setSuggestions([]);
-    setShowDropdown(false);
-    setSemester('');
-    setErrorMessage('');
+  // Clear a row's selected course
+  const handleClearRow = (index) => {
+    setCourseRows((prev) =>
+      prev.map((r, i) =>
+        i === index ? { ...r, searchQuery: '', selectedCourse: null, screenshots: [] } : r
+      )
+    );
+    setActiveRowIndex(null);
   };
 
-  // Keyboard navigation for autocomplete list
-  const handleKeyDown = (e) => {
-    if (!showDropdown || suggestions.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
-    } else if (e.key === 'Enter') {
-      if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
-        e.preventDefault();
-        handleSelectSuggestion(suggestions[highlightedIndex]);
+  // Delete a row
+  const handleDeleteRow = (index) => {
+    setCourseRows((prev) => {
+      if (prev.length <= 1) {
+        // If only 1 row left, reset it rather than removing
+        return [{ id: 'row-1', searchQuery: '', selectedCourse: null, screenshots: [] }];
       }
-    } else if (e.key === 'Escape') {
-      setShowDropdown(false);
+      return prev.filter((_, i) => i !== index);
+    });
+    if (activeRowIndex === index) {
+      setActiveRowIndex(null);
+    } else if (activeRowIndex !== null && activeRowIndex > index) {
+      setActiveRowIndex((curr) => curr - 1);
+    }
+    setErrorMessage('');
+  };
+
+  // Add more courses row (Up to 8 max)
+  const handleAddMoreRow = () => {
+    if (courseRows.length >= 8) {
+      setErrorMessage('You can add up to 8 courses at a time.');
+      return;
+    }
+    const newId = `row-${Date.now()}`;
+    setCourseRows((prev) => [
+      ...prev,
+      { id: newId, searchQuery: '', selectedCourse: null, screenshots: [] }
+    ]);
+    setErrorMessage('');
+  };
+
+  // File Upload trigger for a row
+  const triggerRowUpload = (index) => {
+    const input = rowFileInputRefs.current[index];
+    if (input) {
+      input.value = '';
+      input.click();
     }
   };
 
-  const handleFileChange = async (e) => {
+  // Handle files attached to a row
+  const handleRowFileChange = async (index, e) => {
     const rawFiles = Array.from(e.target.files || []);
     if (!rawFiles.length) return;
 
     setErrorMessage('');
-    const remainingSlots = 3 - screenshots.length;
+    const currentRow = courseRows[index];
+    const existingCount = currentRow.screenshots?.length || 0;
+    const remainingSlots = 3 - existingCount;
 
     if (remainingSlots <= 0) {
-      setMaxLimitReached(true);
-      setErrorMessage('Maximum 3 screenshots allowed for this course.');
+      setErrorMessage(`Row ${index + 1}: Maximum 3 screenshots allowed.`);
       return;
     }
 
-    if (rawFiles.length > remainingSlots) {
-      setErrorMessage(`Only ${remainingSlots} more screenshot(s) allowed (Max 3 total).`);
-    }
+    const filesToCompress = rawFiles.slice(0, remainingSlots);
+    const compressed = await Promise.all(filesToCompress.map((f) => compressImage(f)));
 
-    const selectedFiles = rawFiles.slice(0, remainingSlots);
-    const compressedFiles = await Promise.all(selectedFiles.map((f) => compressImage(f)));
-
-    const filesToAdd = compressedFiles.map((file) => ({
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    const newScreenshots = compressed.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: file.name,
       file,
       url: URL.createObjectURL(file)
     }));
 
-    const updated = [...screenshots, ...filesToAdd];
-    setScreenshots(updated);
-    if (updated.length >= 3) setMaxLimitReached(true);
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setCourseRows((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? { ...r, screenshots: [...(r.screenshots || []), ...newScreenshots] }
+          : r
+      )
+    );
   };
 
-  const handleRemoveScreenshot = (idToRemove) => {
-    setScreenshots((previous) => {
-      const target = previous.find((item) => item.id === idToRemove);
-      if (target?.url) URL.revokeObjectURL(target.url);
-      const remaining = previous.filter((item) => item.id !== idToRemove);
-      if (remaining.length < 3) setMaxLimitReached(false);
-      return remaining;
-    });
-  };
+  // Submit all valid rows when Continue is clicked
+  const handleContinueSubmit = async () => {
+    if (submitting || addInProgress) return;
 
-  const triggerUploadClick = () => {
-    if (maxLimitReached) {
-      setErrorMessage('Maximum 3 screenshots allowed for this course.');
-      return;
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleAddCourseSubmit = async () => {
-    // Prevent duplicate entries even if the user clicks the Add button multiple times quickly
-    if (submitting || busy) return;
-
-    if (coursesList.length >= 8) {
-      setErrorMessage('Maximum 8 courses allowed in FFCS. You cannot add more than 8 courses.');
-      return;
-    }
-    if (!selectedCourse) {
-      setErrorMessage('Please search and select a course from the suggestions.');
-      return;
-    }
-    if (isCourseAlreadyAdded(selectedCourse)) {
-      setErrorMessage('This course has already been added.');
-      return;
-    }
     if (!semester) {
-      setErrorMessage('Please select a semester.');
+      setErrorMessage('Please select a semester first.');
       return;
     }
-    if (!academicYear.trim()) {
-      setErrorMessage('Academic year is required (e.g. 2026-27).');
+
+    // Filter valid rows (must have selectedCourse or typed course name)
+    const validRows = courseRows.filter(
+      (r) => r.selectedCourse || (r.searchQuery && r.searchQuery.trim().length >= 3)
+    );
+
+    if (validRows.length === 0) {
+      setErrorMessage('Please enter at least one course name.');
       return;
     }
-    if (!screenshots.length) {
-      setErrorMessage('Please upload at least 1 screenshot of the faculty timetable.');
+
+    if (coursesList.length + validRows.length > 8) {
+      setErrorMessage(
+        `Total courses cannot exceed 8. You currently have ${coursesList.length} courses and are trying to add ${validRows.length} more.`
+      );
       return;
     }
 
     setSubmitting(true);
     setErrorMessage('');
 
+    let firstAddedCourseId = null;
+
     try {
-      setAcademicYear(academicYear.trim());
-      const res = await addCourse({
-        curriculumCourseId: selectedCourse._id || selectedCourse.courseId,
-        courseCode: selectedCourse.courseCode,
-        courseName: selectedCourse.courseName,
-        semester,
-        academicYear: academicYear.trim(),
-        files: screenshots.map((item) => item.file).filter(Boolean)
-      });
-      const targetCourseId = res?.course?.courseId || res?.courseId;
-      if (targetCourseId) {
-        navigate(`/slotmate/ffcs/faculty/${targetCourseId}`);
+      setAcademicYear(academicYear);
+
+      for (let i = 0; i < validRows.length; i++) {
+        const row = validRows[i];
+        setCurrentSubmittingIndex(i);
+
+        const coursePayload = row.selectedCourse
+          ? {
+              curriculumCourseId: row.selectedCourse._id || row.selectedCourse.courseId,
+              courseCode: row.selectedCourse.courseCode,
+              courseName: row.selectedCourse.courseName,
+              semester,
+              academicYear,
+              files: (row.screenshots || []).map((s) => s.file).filter(Boolean)
+            }
+          : {
+              courseCode: row.searchQuery.trim().split(' ')[0].toUpperCase(),
+              courseName: row.searchQuery.trim(),
+              semester,
+              academicYear,
+              files: (row.screenshots || []).map((s) => s.file).filter(Boolean)
+            };
+
+        const res = await addCourse(coursePayload);
+        const targetId = res?.course?.courseId || res?.courseId;
+        if (!firstAddedCourseId && targetId) {
+          firstAddedCourseId = targetId;
+        }
+      }
+
+      // Success: Navigate to faculty selection if 1 course, else to courses list
+      if (validRows.length === 1 && firstAddedCourseId) {
+        navigate(`/slotmate/ffcs/faculty/${firstAddedCourseId}`);
       } else {
         navigate('/slotmate/ffcs/courses');
       }
-    } catch (error) {
-      const apiMsg = error?.response?.data?.message || error?.message;
+    } catch (err) {
+      const apiMsg = err?.response?.data?.message || err?.message;
       setErrorMessage(
-        error?.status === 401
-          ? 'Please sign in to add a course to your account.'
-          : error?.response?.status === 409 || error?.code === 'COURSE_ALREADY_EXISTS' || apiMsg?.includes('already been added')
-            ? 'This course has already been added.'
-            : error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')
-              ? 'Extraction is taking longer than expected. Please check your internet connection and try again.'
-              : apiMsg || 'Failed to add course.'
+        err?.status === 401
+          ? 'Please sign in to add courses.'
+          : apiMsg || 'Failed to add course. Please try again.'
       );
     } finally {
       setSubmitting(false);
@@ -450,480 +494,351 @@ export function AddCourseScreen() {
   const busy = submitting || Boolean(addInProgress);
 
   return (
-    <div className="min-h-[100dvh] bg-[#F8FAFC] flex justify-center">
-      <div className="w-full max-w-[420px] min-h-[100dvh] bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-28 relative overflow-x-hidden selection:bg-[#FDE047] sm:shadow-xl sm:border-x sm:border-amber-100/70">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          className="hidden"
-        />
+    <div className="min-h-[100dvh] bg-[#F0F6FF] flex justify-center selection:bg-blue-200">
+      <div className="w-full max-w-[440px] min-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F5F9FF] to-[#EBF3FE] text-[#0F172A] flex flex-col justify-between pb-28 relative overflow-x-hidden sm:shadow-xl sm:border-x sm:border-blue-100">
+        
+        {/* Soft Ambient Glows */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[340px] h-[220px] bg-blue-300/20 blur-3xl rounded-full pointer-events-none" />
 
-        {/* Golden Ambient Gradients */}
-        <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#FEF08A]/40 via-[#FFFBEB]/20 to-transparent pointer-events-none" />
-
-        {/* Main Container: Mobile First */}
-        <main className="w-full px-4 pt-2 space-y-3.5 relative z-10 flex-1">
+        <main className="w-full px-4 pt-2 space-y-4 relative z-10 flex-1">
           
           {/* Top Minimal Navigation Bar */}
-          <header className="flex items-center justify-between pt-1 pb-0.5">
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="w-8 h-8 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-[#17233C] transition-colors cursor-pointer shadow-xs active:scale-95"
-                aria-label="Back"
-              >
-                <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-              </button>
-              <h1 className="font-black text-lg text-[#17233C] tracking-tight">
-                Add Course
-              </h1>
-            </div>
-          </header>
-
-          {/* 8 Courses Limit Warning Banner */}
-          {coursesList.length >= 8 && (
-            <div className="bg-amber-50 border-2 border-[#FACC15] text-[#854D0E] px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-xs">
-              <AlertCircle className="w-5 h-5 text-[#D97706] shrink-0" />
-              <div>
-                <p className="font-black text-[#17233C]">Maximum 8 Courses Limit Reached (8/8)</p>
-                <p className="text-[11px] font-medium text-[#854D0E] mt-0.5">
-                  You cannot add more than 8 courses. Please remove an existing course to add a new one.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Hero Section: Full-Bleed Edge-to-Edge (No blank space on left/right) */}
-          <div className="-mx-4 w-[calc(100%+2rem)] flex justify-center items-center select-none pointer-events-none -mt-1 mb-1">
-            <img
-              src={addCourseHeroSrc}
-              alt="Add Your Courses"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              className="w-full h-auto max-h-[220px] object-contain sm:object-cover drop-shadow-sm"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          </div>
-
-          {/* Section Heading: Select Course */}
-          <div className="flex items-center gap-2 px-1 pt-0.5">
-            <span className="w-1.5 h-5 bg-[#FACC15] rounded-full" />
-            <h2 className="font-black text-lg text-[#17233C] tracking-tight">
-              Select Course
-            </h2>
-          </div>
-
-        {/* ========================================================================= */}
-        {/* AUTOCOMPLETE SEARCH FIELD WITH ATTACHED DROPDOWN POPUP                    */}
-        {/* ========================================================================= */}
-        <div ref={searchContainerRef} className="relative z-30 space-y-1.5">
-          <label className="block text-[10px] font-black uppercase tracking-wider text-[#854D0E] px-1">
-            Course Code / Name *
-          </label>
-
-          <div className="w-full bg-white rounded-2xl border border-[#FEEBA4] hover:border-[#FACC15] p-2.5 sm:p-3 flex items-center gap-2.5 shadow-2xs focus-within:border-[#FACC15] focus-within:ring-2 focus-within:ring-[#FEF08A]/70 transition-all">
-            <div className="w-8 h-8 rounded-xl bg-[#FEF08A] text-[#854D0E] flex items-center justify-center shrink-0 shadow-2xs">
-              <Search className="w-4 h-4 stroke-[2.4]" />
-            </div>
-            <input
-              type="text"
-              value={courseSearchQuery}
-              onChange={(e) => {
-                setCourseSearchQuery(e.target.value);
-                if (selectedCourse) setSelectedCourse(null);
-                setErrorMessage('');
-              }}
-              onFocus={() => {
-                setShowDropdown(true);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Search course code or name (e.g. CSE2001)..."
-              className="w-full text-xs sm:text-sm font-bold text-[#17233C] placeholder:text-[#94A3B8] bg-transparent focus:outline-none"
-            />
-            {isSearching && (
-              <Loader2 className="w-4 h-4 animate-spin text-[#D97706] shrink-0" />
-            )}
-            {!isSearching && courseSearchQuery && (
-              <button
-                type="button"
-                onClick={handleClearSelection}
-                className="w-6 h-6 rounded-full bg-slate-100 text-[#64748B] flex items-center justify-center shrink-0 hover:bg-slate-200 cursor-pointer"
-                title="Clear input"
-              >
-                <X className="w-3.5 h-3.5 stroke-[2.8]" />
-              </button>
-            )}
-          </div>
-
-          {/* Autocomplete Suggestions Dropdown */}
-          {showDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-[#FEEBA4] shadow-[0_12px_36px_rgba(23,35,60,0.12)] max-h-72 overflow-y-auto z-50 divide-y divide-slate-100 scrollbar-thin scrollbar-thumb-amber-200">
-              
-              {/* Searching status */}
-              {isSearching && (
-                <div className="px-4 py-3 flex items-center gap-2 text-xs font-bold text-[#854D0E]">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#D97706]" />
-                  <span>Searching curriculum courses...</span>
-                </div>
-              )}
-
-              {/* API error */}
-              {!isSearching && searchError && (
-                <div className="px-4 py-3 text-center text-xs font-bold text-rose-600">
-                  {searchError}
-                </div>
-              )}
-
-              {/* No matches */}
-              {!isSearching && !searchError && courseSearchQuery.trim().length >= 1 && suggestions.length === 0 && (
-                <div className="px-4 py-4 text-center space-y-1">
-                  <p className="text-xs font-black text-[#17233C]">No courses found</p>
-                  <p className="text-[11px] font-semibold text-[#64748B]">
-                    No curriculum match for "{courseSearchQuery.trim()}".
-                  </p>
-                </div>
-              )}
-
-              {/* Course suggestions list */}
-              {!isSearching && (courseSearchQuery.trim().length === 0 ? DEFAULT_SUGGESTIONS : suggestions).map((course, idx) => {
-                const isHighlighted = highlightedIndex === idx;
-                const isChosen = selectedCourse?._id === course._id || selectedCourse?.courseId === course.courseId || selectedCourse?.courseCode === course.courseCode;
-
-                return (
-                  <button
-                    key={course._id || course.courseId || course.courseCode || idx}
-                    type="button"
-                    onClick={() => handleSelectSuggestion(course)}
-                    onMouseEnter={() => setHighlightedIndex(idx)}
-                    className={`w-full text-left px-4 py-3 transition-colors cursor-pointer flex items-center justify-between gap-3 ${
-                      isHighlighted || isChosen
-                        ? 'bg-[#FEFCE8]'
-                        : 'bg-white hover:bg-[#FFFBEB]'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1 space-y-1">
-                      {/* Course Code & Badges matching Image 2 */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[#D97706] font-black text-xs sm:text-sm">
-                          {course.courseCode}
-                        </span>
-                        {course.credits !== null && course.credits !== undefined && (
-                          <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-[10px] font-bold border border-sky-200/60">
-                            {course.credits} Credits
-                          </span>
-                        )}
-                        {course.category && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100/70 text-[#854D0E] text-[10px] font-medium border border-amber-200/60 truncate max-w-[220px]">
-                            {course.category}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Course Name */}
-                      <p className="font-extrabold text-xs sm:text-[13px] text-[#17233C] leading-snug">
-                        {course.courseName}
-                      </p>
-                    </div>
-
-                    {isCourseAlreadyAdded(course) ? (
-                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full shrink-0 border border-amber-300">
-                        Added
-                      </span>
-                    ) : isChosen ? (
-                      <CheckCircle2 className="w-4 h-4 text-[#EAB308] shrink-0" />
-                    ) : (
-                      <span className="text-[10px] font-bold text-[#854D0E] bg-[#FEF08A]/70 px-2 py-0.5 rounded-full shrink-0">
-                        Select
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Selected Course Confirmation Card */}
-        {selectedCourse && (
-          <div className="bg-[#FFFDF7] rounded-2xl border-2 border-[#FACC15] p-3.5 shadow-xs relative space-y-1.5 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-md bg-[#FACC15] text-[#17233C] font-black text-xs">
-                  {selectedCourse.courseCode}
-                </span>
-                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 stroke-[2.8]" /> Selected
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearSelection}
-                className="text-[11px] font-extrabold text-[#854D0E] hover:text-rose-600 transition-colors cursor-pointer"
-              >
-                Change
-              </button>
-            </div>
-
-            <h3 className="font-black text-sm sm:text-base text-[#17233C] leading-snug">
-              {selectedCourse.courseName}
-            </h3>
-
-            <p className="text-[11px] text-[#64748B] font-bold flex items-center gap-2 flex-wrap">
-              <span>{selectedCourse.category || 'Curriculum Course'}</span>
-              <span>•</span>
-              <span>{selectedCourse.credits ?? 4} Credits</span>
-              <span>•</span>
-              <span className="text-[#854D0E]">
-                {semester ? semester : (selectedCourse.semester ? `Curriculum Sem ${selectedCourse.semester}` : 'Select semester below')}
-              </span>
-            </p>
-          </div>
-        )}
-
-        {/* Semester & Academic Year Input with Styled Dropdown */}
-        <div className="space-y-2.5">
-          <div ref={semesterDropdownRef} className="relative z-20 space-y-1.5">
-            <label className="block text-[10px] font-black uppercase tracking-wider text-[#854D0E] px-1">
-              Semester *
-            </label>
-            
+          <header className="flex items-center pt-1">
             <button
               type="button"
-              onClick={() => setSemesterDropdownOpen((prev) => !prev)}
-              className={`w-full bg-white rounded-2xl border p-2.5 sm:p-3 flex items-center justify-between text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
-                semesterDropdownOpen
-                  ? 'border-[#FACC15] ring-2 ring-[#FEF08A]/70'
-                  : 'border-[#FEEBA4] hover:border-[#FACC15]'
-              }`}
+              onClick={() => navigate(-1)}
+              className="w-8 h-8 rounded-xl bg-white hover:bg-blue-50 border border-[#BFDBFE] flex items-center justify-center text-[#1E3A8A] transition-colors cursor-pointer shadow-xs active:scale-95"
+              aria-label="Back"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-[#FEF08A] text-[#854D0E] flex items-center justify-center shrink-0 shadow-2xs">
-                  <GraduationCap className="w-4 h-4 stroke-[2.4]" />
-                </div>
-                <span className={`truncate text-xs sm:text-sm ${semester ? 'text-[#17233C] font-black' : 'text-[#94A3B8] font-bold'}`}>
-                  {semester || 'Select Semester'}
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-[#854D0E] shrink-0 transition-transform duration-200 ${
-                  semesterDropdownOpen ? 'rotate-180' : ''
-                }`}
-              />
+              <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
             </button>
+          </header>
 
-            {/* Custom Styled Dropdown Menu */}
-            {semesterDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-[#FEEBA4] shadow-[0_12px_36px_rgba(23,35,60,0.14)] z-50 overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-amber-200">
-                {SEMESTER_OPTIONS.map((opt) => {
-                  const isSelected = semester === opt;
+          {/* Hero Illustration: Center matching Image 2 */}
+          <div className="w-full flex justify-center items-center select-none pointer-events-none pt-0.5">
+            <img
+              src={addCourseHeroSrc}
+              alt="Add Courses"
+              className="w-full max-w-[340px] h-auto max-h-[190px] object-contain drop-shadow-sm"
+              onError={(e) => {
+                e.currentTarget.src = '/ffcs-add-courses-hero.png';
+              }}
+            />
+          </div>
+
+          {/* Title & Subtitle with Graduation Cap Icon matching Image 2 */}
+          <div className="text-center space-y-1">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[#3B82F6] text-xs font-black tracking-widest">
+                ‹‹
+              </span>
+              <div className="flex items-center gap-2 text-[#0B1E48]">
+                <GraduationCap className="w-6 h-6 text-[#1D4ED8] stroke-[2.5]" />
+                <h1 className="font-black text-2xl tracking-tight text-[#0B1E48]">
+                  Add Courses
+                </h1>
+              </div>
+              <span className="text-[#3B82F6] text-xs font-black tracking-widest">
+                ››
+              </span>
+            </div>
+            <p className="text-xs sm:text-[13px] font-semibold text-[#475569]">
+              Select your semester and add your subjects
+            </p>
+          </div>
+
+          {/* Main White Card Container matching Image 2 mockup */}
+          <div className="bg-white rounded-[28px] border border-[#BFDBFE] shadow-[0_10px_30px_rgba(37,99,235,0.06)] p-4 sm:p-5 space-y-4">
+            
+            {/* Section 1: Select Semester */}
+            <div ref={semesterDropdownRef} className="space-y-2 relative">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-[#2563EB] stroke-[2.4]" />
+                <h3 className="font-black text-sm sm:text-base text-[#0F172A] tracking-tight">
+                  Select Semester
+                </h3>
+              </div>
+
+              {/* Choose Semester Dropdown Button */}
+              <button
+                type="button"
+                onClick={() => setSemesterDropdownOpen((prev) => !prev)}
+                className={`w-full bg-white rounded-2xl border p-3 flex items-center justify-between text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs ${
+                  semesterDropdownOpen
+                    ? 'border-[#2563EB] ring-2 ring-blue-100'
+                    : 'border-[#BFDBFE] hover:border-[#60A5FA]'
+                }`}
+              >
+                <span className={semester ? 'text-[#0F172A] font-bold' : 'text-[#64748B]'}>
+                  {semester || 'Choose Semester'}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-[#1E3A8A] shrink-0 transition-transform duration-200 ${
+                    semesterDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {/* Dropdown Menu */}
+              {semesterDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-[#BFDBFE] shadow-xl z-50 divide-y divide-slate-100 max-h-56 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
+                  {SEMESTER_OPTIONS.map((opt) => {
+                    const isSelected = semester === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          setSemester(opt);
+                          const match = opt.match(/\d{4}-\d{2}/);
+                          if (match) setAcademicYearState(match[0]);
+                          setSemesterDropdownOpen(false);
+                          setErrorMessage('');
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#EFF6FF] text-[#1D4ED8]'
+                            : 'text-[#0F172A] hover:bg-[#F8FAFC]'
+                        }`}
+                      >
+                        <span>{opt}</span>
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-[#2563EB]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Section 2: Courses List */}
+            <div className="space-y-3 pt-1">
+              {/* Courses List Header with Open Book Icon */}
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#2563EB] stroke-[2.4]" />
+                <h3 className="font-black text-sm sm:text-base text-[#0F172A] tracking-tight">
+                  Courses List
+                </h3>
+              </div>
+
+              {/* Rows List */}
+              <div className="space-y-2.5">
+                {courseRows.map((row, index) => {
+                  const isRowActive = activeRowIndex === index;
+                  const hasSelected = Boolean(row.selectedCourse);
+                  const screenshotCount = row.screenshots?.length || 0;
+
                   return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        setSemester(opt);
-                        const match = opt.match(/\d{4}-\d{2}/);
-                        if (match) {
-                          setAcademicYearState(match[0]);
-                        }
-                        setSemesterDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#FEFCE8] text-[#854D0E] font-black'
-                          : 'text-[#17233C] hover:bg-[#FFFBEB] hover:text-[#854D0E]'
-                      }`}
+                    <div
+                      key={row.id}
+                      className="relative flex items-center gap-2 sm:gap-2.5"
                     >
-                      <span>{opt}</span>
-                      {isSelected && (
-                        <CheckCircle2 className="w-4 h-4 text-[#EAB308] shrink-0" />
-                      )}
-                    </button>
+                      {/* Hidden File Input for this row */}
+                      <input
+                        type="file"
+                        ref={(el) => (rowFileInputRefs.current[index] = el)}
+                        onChange={(e) => handleRowFileChange(index, e)}
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                      />
+
+                      {/* 1. Blue Number Badge */}
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#E0EDFF] text-[#1D4ED8] font-black text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                        {index + 1}
+                      </div>
+
+                      {/* 2. Course Name Input Box with Autocomplete */}
+                      <div
+                        ref={(el) => (courseInputRefs.current[index] = el)}
+                        className="flex-1 min-w-0 bg-white rounded-2xl border border-[#BFDBFE] p-2 sm:p-2.5 shadow-2xs relative focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-blue-100 transition-all"
+                      >
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black text-[#1E293B] block leading-none">
+                            Course Name <span className="text-rose-500 font-bold">*</span>
+                          </label>
+                          {hasSelected && (
+                            <button
+                              type="button"
+                              onClick={() => handleClearRow(index)}
+                              className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-0.5 cursor-pointer"
+                              title="Clear course"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        <input
+                          type="text"
+                          value={row.searchQuery}
+                          onChange={(e) => handleRowInputChange(index, e.target.value)}
+                          onFocus={() => setActiveRowIndex(index)}
+                          placeholder="Enter course name"
+                          className="w-full text-xs font-bold text-[#0F172A] placeholder:text-[#94A3B8] bg-transparent focus:outline-none mt-1"
+                        />
+
+                        {/* Autocomplete Dropdown attached to this row */}
+                        {isRowActive && (
+                          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-[#BFDBFE] shadow-2xl z-50 divide-y divide-slate-100 max-h-52 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
+                            {/* Header with Title and Close Button */}
+                            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-100">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Suggestions
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveRowIndex(null);
+                                }}
+                                className="w-5 h-5 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+                                title="Close"
+                              >
+                                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                              </button>
+                            </div>
+
+                            {isSearching && (
+                              <div className="px-3 py-2 flex items-center gap-2 text-xs font-bold text-[#2563EB]">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Searching courses...</span>
+                              </div>
+                            )}
+
+                            {!isSearching && suggestions.length === 0 && (
+                              <div className="px-3 py-2 text-center text-xs text-[#64748B]">
+                                No curriculum match found.
+                              </div>
+                            )}
+
+                            {!isSearching &&
+                              suggestions.map((course) => {
+                                const isAdded = isCourseAlreadyAdded(course);
+                                return (
+                                  <button
+                                    key={course._id || course.courseId || course.courseCode}
+                                    type="button"
+                                    onClick={() => handleSelectSuggestion(index, course)}
+                                    className="w-full text-left px-3 py-2 hover:bg-[#EFF6FF] transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-black text-xs text-[#0F172A] truncate">
+                                        <span className="text-[#2563EB] mr-1.5">
+                                          {course.courseCode}
+                                        </span>
+                                        {course.courseName}
+                                      </p>
+                                      <p className="text-[10px] text-[#64748B] font-semibold truncate">
+                                        {course.credits ?? 3} Credits • {course.category || 'Elective'}
+                                      </p>
+                                    </div>
+                                    {isAdded ? (
+                                      <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
+                                        Added
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
+                                        Select
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 3. Blue Upload Screenshot Button matching Image 2 */}
+                      <button
+                        type="button"
+                        onClick={() => triggerRowUpload(index)}
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-dashed border-[#60A5FA] bg-[#EFF6FF] hover:bg-[#DBEAFE] flex items-center justify-center cursor-pointer transition-colors shrink-0 shadow-2xs relative active:scale-95"
+                        title="Upload timetable screenshot for this course"
+                      >
+                        <BlueCloudUploadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        {screenshotCount > 0 && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
+                            {screenshotCount}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* 4. Delete Trash Button matching Image 2 */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRow(index)}
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FEE2E2]/70 hover:bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center cursor-pointer transition-colors shrink-0 shadow-2xs active:scale-95"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2]" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
-            )}
-          </div>
 
-          {/* Styled Academic Year Card */}
-          <div className="bg-[#FFFDF7] rounded-2xl border border-[#FEEBA4] p-2.5 sm:p-3 flex items-center justify-between shadow-2xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-[#FEF08A] text-[#854D0E] flex items-center justify-center shrink-0 shadow-2xs">
-                <CalendarDays className="w-4 h-4 stroke-[2.4]" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#854D0E] block leading-none">
-                  Academic Year
-                </span>
-                <span className="text-[11px] font-bold text-[#17233C] mt-1 block leading-none truncate">
-                  Session Period
-                </span>
-              </div>
-            </div>
-
-            <div className="relative shrink-0">
-              <input
-                type="text"
-                value={academicYear}
-                onChange={(e) => setAcademicYearState(e.target.value)}
-                placeholder="2026-27"
-                className="w-24 bg-white rounded-xl border border-[#FDE047] focus:border-[#FACC15] focus:ring-2 focus:ring-[#FEF08A]/60 px-2.5 py-1.5 text-xs font-black text-[#17233C] text-center shadow-2xs transition-all outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Screenshot Upload Container (Max 3) */}
-        {screenshots.length === 0 ? (
-          <div
-            onClick={triggerUploadClick}
-            className="w-full relative rounded-[28px] border-2 border-dashed border-[#FDE047] hover:border-[#FACC15] bg-[#FFFDF7] hover:bg-white transition-all py-6 px-4 flex flex-col items-center justify-center text-center overflow-hidden cursor-pointer shadow-[0_4px_20px_rgba(250,204,21,0.08)]"
-          >
-            {/* Left Decorative Floating Photo Card */}
-            <div className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 w-14 h-16 sm:w-16 sm:h-18 rounded-2xl border-2 border-[#FEF08A] bg-white/95 p-1.5 shadow-sm transform -rotate-12 pointer-events-none select-none opacity-85 sm:opacity-90">
-              <div className="w-full h-full rounded-xl bg-gradient-to-br from-[#FEF9C3] via-[#FEF08A]/40 to-[#FDE047]/30 flex flex-col justify-end p-1 overflow-hidden relative">
-                <div className="absolute top-2 left-2 w-3 h-3 rounded-full bg-[#FDE047]/80" />
-                <div className="w-full h-5 bg-[#FACC15]/40 rounded-t-md transform -skew-x-6" />
-              </div>
-            </div>
-
-            {/* Right Decorative Floating Photo Card */}
-            <div className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 w-14 h-16 sm:w-16 sm:h-18 rounded-2xl border-2 border-[#FEF08A] bg-white/95 p-1.5 shadow-sm transform rotate-12 pointer-events-none select-none opacity-85 sm:opacity-90">
-              <div className="w-full h-full rounded-xl bg-gradient-to-br from-[#FEF9C3] via-[#FEF08A]/40 to-[#FDE047]/30 flex flex-col justify-end p-1 overflow-hidden relative">
-                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-[#FDE047]/80" />
-                <div className="w-full h-5 bg-[#FACC15]/40 rounded-t-md transform skew-x-6" />
-              </div>
-            </div>
-
-            {/* Center Upload Icon with Gradient */}
-            <div className="relative mb-1 z-10">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-b from-[#FEF08A] via-[#FDE047] to-[#FACC15] flex items-center justify-center shadow-md shadow-amber-300/40">
-                <UploadCloud className="w-7 h-7 sm:w-8 sm:h-8 text-[#17233C] stroke-[2.3]" />
-              </div>
-            </div>
-
-            {/* Text: Bold Navy Heading + Subtitle */}
-            <h3 className="font-black text-base text-[#17233C] tracking-tight mt-1 z-10">
-              Upload Screenshot
-            </h3>
-            <p className="text-xs font-bold text-[#475569] mt-0.5 z-10">
-              (Max 3 Screenshots)
-            </p>
-          </div>
-        ) : (
-          <div className="w-full rounded-[28px] border-2 border-dashed border-[#FACC15] bg-[#FFFDF7] p-4 space-y-3 shadow-[0_4px_20px_rgba(250,204,21,0.08)]">
-            {/* Header Row: Count & Add More Button */}
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-black text-xs text-[#17233C]">
-                  {screenshots.length} of 3 Screenshots Selected
-                </span>
-              </div>
-              {screenshots.length < 3 && (
+              {/* "+ Add More Courses (Up to 8 Courses)" Dashed Button matching Image 2 */}
+              {courseRows.length < 8 && (
                 <button
                   type="button"
-                  onClick={triggerUploadClick}
-                  className="flex items-center gap-1 text-[11px] font-black text-[#854D0E] hover:text-[#17233C] bg-[#FEF08A] hover:bg-[#FDE047] px-2.5 py-1 rounded-full border border-[#FACC15] active:scale-95 transition-all cursor-pointer shadow-2xs"
+                  onClick={handleAddMoreRow}
+                  className="w-full rounded-2xl border border-dashed border-[#60A5FA] bg-[#EFF6FF]/60 hover:bg-[#EFF6FF] py-3 px-4 flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-2xs active:scale-[0.99] mt-3"
                 >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Add More</span>
-                </button>
-              )}
-            </div>
-
-            {/* 3-Column Slot Grid: Displays uploaded thumbnails and empty dashed slot if < 3 */}
-            <div className="grid grid-cols-3 gap-2.5">
-              {screenshots.map((screenshot) => (
-                <div
-                  key={screenshot.id}
-                  className="relative rounded-2xl overflow-hidden border border-[#FACC15] bg-white shadow-2xs group flex flex-col"
-                >
-                  <img
-                    src={screenshot.url}
-                    alt={screenshot.name}
-                    className="w-full h-20 sm:h-22 object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveScreenshot(screenshot.id);
-                    }}
-                    className="absolute top-1 right-1 w-5 h-5 bg-[#17233C] text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-colors cursor-pointer shadow-xs active:scale-90"
-                    title="Remove screenshot"
-                  >
-                    <X className="w-3 h-3 stroke-[2.8]" />
-                  </button>
-                  <p className="text-[9px] font-bold text-[#17233C] bg-white/95 truncate px-1.5 py-0.5 text-center border-t border-slate-100">
-                    {screenshot.name}
-                  </p>
-                </div>
-              ))}
-
-              {/* Empty '+ Add' slot if less than 3 */}
-              {screenshots.length < 3 && (
-                <button
-                  type="button"
-                  onClick={triggerUploadClick}
-                  className="h-20 sm:h-22 rounded-2xl border-2 border-dashed border-[#FDE047] hover:border-[#FACC15] bg-white/80 hover:bg-white flex flex-col items-center justify-center gap-1 text-[#854D0E] hover:text-[#17233C] transition-all cursor-pointer shadow-2xs active:scale-95"
-                >
-                  <div className="w-7 h-7 rounded-full bg-[#FEF08A] text-[#854D0E] flex items-center justify-center">
-                    <Plus className="w-4 h-4 stroke-[3]" />
+                  <div className="w-5 h-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   </div>
-                  <span className="text-[10px] font-bold">Add Photo</span>
+                  <span className="font-black text-xs sm:text-sm text-[#2563EB]">
+                    + Add More Courses
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#64748B]">
+                    ({courseRows.length}/8 Courses)
+                  </span>
                 </button>
               )}
             </div>
           </div>
-        )}
 
-        {/* Modern Extraction Progress Card */}
-        {addInProgress && (
-          <ExtractionProgressCard addInProgress={addInProgress} />
-        )}
+          {/* AI Vision Extraction Progress Card */}
+          {addInProgress && (
+            <ExtractionProgressCard
+              addInProgress={addInProgress}
+              currentCourseIndex={currentSubmittingIndex}
+              totalCourses={courseRows.filter((r) => r.selectedCourse || r.searchQuery).length}
+            />
+          )}
 
-        {/* Error Alert */}
-        {errorMessage && (
-          <div className="bg-amber-50 border border-amber-300 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>{errorMessage}</span>
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Bottom Gradient Continue Button matching Image 2 mockup */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleContinueSubmit}
+              disabled={busy}
+              className="w-full py-3.5 sm:py-4 px-6 rounded-full bg-gradient-to-r from-[#2563EB] via-[#1D4ED8] to-[#1E40AF] hover:brightness-105 active:scale-[0.98] text-white font-black text-base shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Processing Courses...</span>
+                </>
+              ) : (
+                <span>Continue →</span>
+              )}
+            </button>
           </div>
-        )}
+        </main>
 
-        {/* Submit Button */}
-        <div className="pt-0.5">
-          <button
-            type="button"
-            onClick={handleAddCourseSubmit}
-            disabled={busy || coursesList.length >= 8 || isCourseAlreadyAdded(selectedCourse)}
-            className="w-full py-3.5 px-4 rounded-full bg-gradient-to-r from-[#FDE047] to-[#FACC15] hover:from-[#FACC15] hover:to-[#EAB308] disabled:opacity-60 disabled:cursor-not-allowed text-[#17233C] font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-amber-400/30 border border-[#FACC15] transition-all cursor-pointer active:scale-98"
-          >
-            {busy ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <PlusCircle className="w-4 h-4 stroke-[2.8]" />
-            )}
-            <span>
-              {busy
-                ? 'Processing...'
-                : coursesList.length >= 8
-                  ? 'Limit Reached (8/8 Courses)'
-                  : isCourseAlreadyAdded(selectedCourse)
-                    ? 'Course Already Added'
-                    : 'Add Course'}
-            </span>
-          </button>
-        </div>
-      </main>
-
-      <FFCSBottomNav activeTab="home" />
+        <FFCSBottomNav activeTab="add" />
       </div>
     </div>
   );
 }
+
+export default AddCourseScreen;
