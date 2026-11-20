@@ -78,32 +78,36 @@ export function AddedCoursesScreen() {
   }, [courseToDelete, deletingId]);
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-28">
-      <div className="w-full max-w-md mx-auto px-4 pt-3 space-y-4">
+    <div className="min-h-screen bg-[#F0F6FF] text-[#0F172A] flex flex-col justify-between pb-28 relative overflow-hidden">
+      {/* Decorative Light Blue Ambient Background Orbs */}
+      <div className="absolute top-0 left-0 w-64 h-64 bg-blue-200/30 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute top-20 right-0 w-72 h-72 bg-sky-200/30 rounded-full blur-3xl pointer-events-none translate-x-1/3" />
+
+      <div className="w-full max-w-md mx-auto px-4 pt-3 space-y-4 relative z-10">
         <header className="flex items-center justify-between py-1">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="w-8 h-8 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-[#17233C] transition-colors cursor-pointer shadow-xs active:scale-95"
+              className="w-8 h-8 rounded-xl bg-white hover:bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#1D4ED8] transition-colors cursor-pointer shadow-xs active:scale-95"
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
             </button>
-            <h1 className="font-black text-lg text-[#17233C] tracking-tight">
+            <h1 className="font-black text-lg text-[#0F172A] tracking-tight">
               Your Added Courses
             </h1>
           </div>
         </header>
 
         {coursesList.length > 0 && (
-          <div className="relative bg-gradient-to-r from-[#FFFDF0] via-[#FFFBEB] to-[#FEF9E7] rounded-2xl sm:rounded-3xl border border-[#FDE68A]/80 shadow-2xs overflow-hidden">
+          <div className="relative bg-gradient-to-r from-[#EFF6FF] via-[#DBEAFE]/40 to-[#EFF6FF] rounded-2xl sm:rounded-3xl border border-[#BFDBFE] shadow-2xs overflow-hidden">
             {/* Left Side: Clean Text Information Vertically Centered */}
             <div className="relative z-10 py-3 sm:py-3.5 pl-3.5 sm:pl-4 pr-32 min-[360px]:pr-36 sm:pr-40 flex flex-col justify-center min-h-[76px] sm:min-h-[86px] space-y-0.5">
-              <p className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#17233C] tracking-tight leading-snug">
+              <p className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#0F172A] tracking-tight leading-snug">
                 {confirmedCount} of {coursesList.length} Faculties Selected
               </p>
-              <p className="text-[10.5px] min-[360px]:text-[11px] sm:text-xs text-[#854D0E] font-medium leading-tight">
+              <p className="text-[10.5px] min-[360px]:text-[11px] sm:text-xs text-[#1D4ED8] font-semibold leading-tight">
                 Tap any course to choose or update faculty
               </p>
             </div>
@@ -123,23 +127,23 @@ export function AddedCoursesScreen() {
           <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-3 text-xs font-bold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1">{error}</span>
-            <button type="button" onClick={refreshCourses} className="underline">Retry</button>
+            <button type="button" onClick={refreshCourses} className="underline cursor-pointer">Retry</button>
           </div>
         )}
 
         {coursesList.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-[#FEEBA4]/70 p-8 text-center space-y-3 shadow-xs">
-            <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center mx-auto shadow-xs p-2.5">
-              <TeacherClassroomIcon className="w-8 h-8" />
+          <div className="bg-white rounded-3xl border border-[#BFDBFE] p-8 text-center space-y-3.5 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center mx-auto shadow-xs p-2.5">
+              <TeacherClassroomIcon className="w-8 h-8 text-[#2563EB]" />
             </div>
-            <h3 className="font-black text-base text-[#17233C]">No Courses Added Yet</h3>
+            <h3 className="font-black text-base text-[#0F172A]">No Courses Added Yet</h3>
             <p className="text-xs text-[#64748B] max-w-[240px] mx-auto leading-relaxed">
               You haven't added any courses yet. Tap below to search the curriculum and add your courses.
             </p>
             <button
               type="button"
               onClick={() => navigate('/slotmate/ffcs/add')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#FDE047] to-[#FACC15] text-[#17233C] font-black text-xs shadow-xs border border-[#FACC15] cursor-pointer active:scale-95 transition-all"
+              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1D4ED8] hover:to-[#1E40AF] text-white font-black text-xs sm:text-sm shadow-md shadow-blue-500/25 border border-[#1D4ED8] cursor-pointer active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Add Course</span>
@@ -154,11 +158,11 @@ export function AddedCoursesScreen() {
                 <div
                   key={course.id}
                   onClick={() => navigate(`/slotmate/ffcs/faculty/${course.id}`)}
-                  className="p-3.5 sm:p-4 rounded-2xl bg-white border border-[#FEEBA4] hover:border-[#FACC15] shadow-xs transition-all space-y-2 cursor-pointer group"
+                  className="p-3.5 sm:p-4 rounded-2xl bg-white border border-[#BFDBFE] hover:border-[#60A5FA] shadow-xs transition-all space-y-2 cursor-pointer group"
                 >
                   {/* Top Row: Course Code Badge on left, Trash + Change button on right */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#FEF9C3] border border-[#FEF08A] text-[#78350F] font-black text-[10px] sm:text-[11px] tracking-wider uppercase">
+                    <span className="px-2.5 py-0.5 rounded-md bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] font-black text-[10px] sm:text-[11px] tracking-wider uppercase">
                       {course.code}
                     </span>
 
@@ -183,7 +187,7 @@ export function AddedCoursesScreen() {
                           event.stopPropagation();
                           navigate(`/slotmate/ffcs/faculty/${course.id}`);
                         }}
-                        className="px-3 py-1 rounded-xl bg-[#FFFDF7] hover:bg-[#FEF9C3] border border-[#FEEBA4] text-[#854D0E] font-bold text-xs shrink-0 cursor-pointer active:scale-95 transition-all shadow-2xs"
+                        className="px-3 py-1 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-[#1D4ED8] font-bold text-xs shrink-0 cursor-pointer active:scale-95 transition-all shadow-2xs"
                       >
                         {confirmed ? 'Change' : 'Select'}
                       </button>
@@ -192,7 +196,7 @@ export function AddedCoursesScreen() {
 
                   {/* Middle: Faculty Name (or Course Name if no faculty yet) */}
                   <div>
-                    <h3 className="font-black text-sm text-[#17233C] leading-snug break-words">
+                    <h3 className="font-black text-sm text-[#0F172A] leading-snug break-words">
                       {confirmed ? confirmed.name.split('-')[0].trim() : course.name}
                     </h3>
                     {confirmed && (
@@ -202,25 +206,25 @@ export function AddedCoursesScreen() {
                     )}
                   </div>
 
-                  {/* Bottom Row: SLOT: [A11+A12]  ROOM NO: AB02-415 (matching Image 2) */}
+                  {/* Bottom Row: SLOT: [A11+A12]  ROOM NO: AB02-415 */}
                   {confirmed ? (
                     <div className="flex items-center gap-3 pt-0.5 text-xs">
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] font-bold text-[#854D0E] uppercase tracking-wide">SLOT:</span>
-                        <span className="px-1.5 py-0.5 rounded-md bg-[#FEF3C7] text-[#17233C] font-black text-[10px] sm:text-[11px] border border-[#FDE68A]">
+                        <span className="text-[10px] font-bold text-[#1D4ED8] uppercase tracking-wide">SLOT:</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D4ED8] font-black text-[10px] sm:text-[11px] border border-[#BFDBFE]">
                           {confirmed.slot}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide whitespace-nowrap">ROOM NO:</span>
-                        <span className="font-black text-xs text-[#17233C] whitespace-nowrap">
+                        <span className="font-black text-xs text-[#0F172A] whitespace-nowrap">
                           {confirmed.roomNo}
                         </span>
                       </div>
                     </div>
                   ) : (
                     <div className="pt-0.5">
-                      <span className="text-[11px] font-bold text-amber-600">
+                      <span className="text-[11px] font-bold text-[#2563EB]">
                         No faculty selected yet • Tap to select
                       </span>
                     </div>
@@ -245,7 +249,7 @@ export function AddedCoursesScreen() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl max-w-sm w-full border border-amber-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl max-w-sm w-full border border-blue-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
           >
             {/* Soft Red Trash Icon */}
             <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 flex items-center justify-center mx-auto shadow-xs">
@@ -256,13 +260,13 @@ export function AddedCoursesScreen() {
             <div className="space-y-1.5">
               <h3
                 id="delete-course-dialog-title"
-                className="font-black text-lg text-[#17233C]"
+                className="font-black text-lg text-[#0F172A]"
               >
                 Remove Course?
               </h3>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-[#854D0E] border border-amber-200/90 text-xs font-black max-w-full">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] text-xs font-black max-w-full">
                 <span className="shrink-0">{courseToDelete.code}</span>
-                <span className="text-amber-400">•</span>
+                <span className="text-blue-400">•</span>
                 <span className="truncate">{courseToDelete.name}</span>
               </div>
               <p className="text-xs font-medium text-[#64748B] pt-1 leading-relaxed">
