@@ -872,14 +872,21 @@ export function AddCourseScreen() {
                               className="flex items-center gap-1.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-2 py-1 shadow-2xs hover:border-[#60A5FA] transition-all"
                             >
                               {item.type === 'pdf' ? (
-                                <div className="w-5 h-5 rounded-md bg-rose-500 text-white flex items-center justify-center font-black text-[8px] shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewFile(item)}
+                                  className="w-5 h-5 rounded-md bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 cursor-pointer transition-colors"
+                                  title="Click to preview PDF"
+                                >
                                   PDF
-                                </div>
+                                </button>
                               ) : (
                                 <img
                                   src={item.url}
                                   alt={item.name}
-                                  className="w-5 h-5 rounded-md object-cover border border-[#BFDBFE] shrink-0"
+                                  onClick={() => setPreviewFile(item)}
+                                  className="w-5 h-5 rounded-md object-cover border border-[#BFDBFE] shrink-0 cursor-pointer"
+                                  title="Click to preview Image"
                                 />
                               )}
                               <span
@@ -1069,22 +1076,28 @@ export function AddCourseScreen() {
                   />
                 ) : (
                   <div className="w-full h-[65vh] flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-                    <iframe
-                      src={previewFile.url}
-                      title={previewFile.name}
+                    <object
+                      data={previewFile.url}
+                      type="application/pdf"
                       className="w-full h-full flex-1"
-                    />
+                    >
+                      <iframe
+                        src={previewFile.url}
+                        title={previewFile.name}
+                        className="w-full h-full flex-1"
+                      />
+                    </object>
                     <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-bold truncate pr-2">
-                        PDF Preview ({previewFile.name})
+                      <span className="text-slate-600 font-bold truncate pr-2">
+                        📄 {previewFile.name}
                       </span>
                       <a
                         href={previewFile.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-colors flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer text-xs"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" /> Full Tab
+                        <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" /> Open Full PDF
                       </a>
                     </div>
                   </div>
