@@ -24,7 +24,7 @@ const LOCK_TTL_MS = Number(process.env.FFCS_LOCK_TTL_MS) || 2 * 60 * 1000;
 const WAIT_TIMEOUT_MS = Number(process.env.FFCS_WAIT_TIMEOUT_MS) || 60 * 1000;
 const WAIT_INTERVAL_MS = Number(process.env.FFCS_WAIT_INTERVAL_MS) || 1500;
 const MAX_EXTRACTION_ATTEMPTS = Number(process.env.FFCS_MAX_EXTRACTION_ATTEMPTS) || 2;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 
 export class FfcsError extends Error {
   constructor(message, status = 400, code = 'FFCS_ERROR') {
@@ -93,17 +93,17 @@ export function serializeUserCourse(userCourse, catalog) {
 function validateFiles(files) {
   const list = Array.isArray(files) ? files : [];
   if (list.length < 1) {
-    throw new FfcsError('At least one teacher screenshot is required.', 400, 'MISSING_SCREENSHOTS');
+    throw new FfcsError('At least one timetable screenshot or PDF is required.', 400, 'MISSING_SCREENSHOTS');
   }
   if (list.length > 3) {
-    throw new FfcsError('Maximum 3 screenshots are allowed per course.', 400, 'TOO_MANY_SCREENSHOTS');
+    throw new FfcsError('Maximum 3 files (screenshots or PDFs) are allowed per course.', 400, 'TOO_MANY_SCREENSHOTS');
   }
   for (const file of list) {
     if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
       throw new FfcsError(
-        `Unsupported image type: ${file.mimetype}. Allowed: JPG, JPEG, PNG, WEBP.`,
+        `Unsupported file type: ${file.mimetype}. Allowed: JPG, JPEG, PNG, WEBP, PDF.`,
         400,
-        'UNSUPPORTED_IMAGE_TYPE'
+        'UNSUPPORTED_FILE_TYPE'
       );
     }
   }
