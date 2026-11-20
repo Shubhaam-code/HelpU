@@ -64,7 +64,7 @@ export function FFCSHome() {
       {/* ========================================================================= */}
       {/* MAIN CONTENT CONTAINER (Universal: Phone + Desktop Responsive)           */}
       {/* ========================================================================= */}
-      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-[54px] min-[360px]:pb-[60px] sm:pb-[66px] relative z-10 flex-1 flex flex-col justify-between">
+      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-[54px] min-[360px]:pb-[60px] sm:pb-[66px] relative z-10 flex-1">
 
         <div className="space-y-4 sm:space-y-5">
           {/* 2. WELCOME GREETING */}
@@ -227,11 +227,11 @@ export function FFCSHome() {
 
             {/* Empty State vs Added Courses */}
             {coursesList.length === 0 ? (
-              <div className="py-6 sm:py-8 px-3 text-center flex flex-col items-center justify-center space-y-2.5">
+              <div className="py-3 sm:py-4 px-3 text-center flex flex-col items-center justify-center space-y-2">
                 <img
                   src="/ffcs-book-empty.png"
                   alt="No courses yet"
-                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain select-none pointer-events-none drop-shadow-sm"
+                  className="w-20 h-20 sm:w-24 sm:h-24 object-contain select-none pointer-events-none drop-shadow-sm"
                 />
 
                 <div className="space-y-0.5">
@@ -298,18 +298,18 @@ export function FFCSHome() {
               </div>
             )}
           </div>
-        </div>
+          {/* 7. BOTTOM CAMPUS HERO (EDGE-TO-EDGE, always visible, shifts down with content) */}
+          <div className="pt-2 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] overflow-hidden select-none pointer-events-none flex items-end justify-center">
+            <img
+              src="/ffcs-campus-hero.png"
+              alt="VIT Campus and FFCS Planning"
+              className="w-full h-auto max-h-[160px] sm:max-h-[210px] md:max-h-[260px] object-cover sm:object-contain object-bottom block"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
 
-        {/* 7. BOTTOM CAMPUS HERO (EDGE-TO-EDGE, NO BOX, ZERO GAP TO BOTTOM NAV) */}
-        <div className="mt-auto pt-3 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] overflow-hidden select-none pointer-events-none flex items-end justify-center">
-          <img
-            src="/ffcs-campus-hero.png"
-            alt="VIT Campus and FFCS Planning"
-            className="w-full h-auto max-h-[175px] sm:max-h-[230px] md:max-h-[280px] object-cover sm:object-contain object-bottom block"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
         </div>
 
       </main>
