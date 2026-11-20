@@ -25,32 +25,32 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
   return (
     <div className="w-full space-y-3">
       {/* Responsive Horizontal Scroll Container */}
-      <div className="bg-white rounded-2xl border border-[#FEEBA4] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-amber-200">
+      <div className="bg-white rounded-2xl border border-[#DBEAFE] shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-blue-200">
           <table className="min-w-[760px] w-full border-collapse text-center">
             {/* Table Header - Light Blue Theme */}
             <thead>
-              <tr className="bg-[#E0F2FE] text-[#0369A1]">
-                <th className="py-2.5 px-3 text-[11px] font-black tracking-wider uppercase border-r border-[#BAE6FD] w-16 text-[#0369A1]">
+              <tr className="bg-[#EFF6FF] text-[#1D4ED8]">
+                <th className="py-2.5 px-3 text-[11px] font-black tracking-wider uppercase border-r border-[#DBEAFE] w-16 text-[#1D4ED8]">
                   Day
                 </th>
                 {VIT_TIME_COLUMNS.map((col) => (
                   <th
                     key={col.id}
-                    className={`py-2 px-1 text-[10px] font-bold border-r border-[#BAE6FD] last:border-r-0 ${
-                      col.isLunch ? 'w-14 bg-[#BAE6FD]' : 'w-24'
+                    className={`py-2 px-1 text-[10px] font-bold border-r border-[#DBEAFE] last:border-r-0 ${
+                      col.isLunch ? 'w-14 bg-[#DBEAFE]/70' : 'w-24'
                     }`}
                   >
                     {col.isLunch ? (
-                      <span className="text-[#0369A1] font-extrabold uppercase tracking-wide">
+                      <span className="text-[#1D4ED8] font-extrabold uppercase tracking-wide">
                         Lunch
                       </span>
                     ) : (
                       <>
-                        <div className="font-extrabold text-[10px] text-[#0284C7]">
+                        <div className="font-extrabold text-[10px] text-[#2563EB]">
                           {col.start}
                         </div>
-                        <div className="text-[9px] text-[#0369A1]/80 font-medium">{col.end}</div>
+                        <div className="text-[9px] text-[#3B82F6] font-medium">{col.end}</div>
                       </>
                     )}
                   </th>
@@ -66,12 +66,12 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
                 return (
                   <tr
                     key={row.day}
-                    className={`border-b border-[#FEEBA4]/70 last:border-b-0 ${
-                      isEven ? 'bg-[#FFFDF7]' : 'bg-[#FFF9EA]/60'
+                    className={`border-b border-[#DBEAFE] last:border-b-0 ${
+                      isEven ? 'bg-white' : 'bg-[#F8FAFC]'
                     }`}
                   >
                     {/* Day Column */}
-                    <td className="py-2 px-2 font-black text-xs text-[#17233C] border-r border-[#FEEBA4] bg-[#FEF3C7]/40">
+                    <td className="py-2 px-2 font-black text-xs text-[#17233C] border-r border-[#DBEAFE] bg-[#EFF6FF]">
                       {row.day}
                     </td>
 
@@ -81,7 +81,7 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
                         return (
                           <td
                             key={col.id}
-                            className="py-1 px-1 border-r border-[#FEEBA4] bg-[#F1F5F9]/80 text-[#94A3B8] text-[10px] font-bold select-none"
+                            className="py-1 px-1 border-r border-[#DBEAFE] bg-[#F1F5F9]/80 text-[#94A3B8] text-[10px] font-bold select-none"
                           >
                             <span className="rotate-0 inline-block text-[9px] tracking-wider uppercase opacity-75">
                               Lunch
@@ -97,16 +97,16 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
                         return (
                           <td
                             key={col.id}
-                            className="py-1.5 px-1 border-r border-[#A7F3D0] bg-[#DCFCE7] hover:bg-[#BBF7D0] transition-colors"
+                            className="py-1.5 px-1 border-r border-[#FDE047] bg-[#FEF9C3] hover:bg-[#FEF08A] transition-colors"
                           >
-                            <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-emerald-100/60 border border-emerald-300 shadow-2xs">
-                              <span className="font-black text-[10px] text-[#065F46] leading-none">
+                            <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-[#FEF08A]/90 border border-[#FACC15] shadow-2xs">
+                              <span className="font-black text-[10px] text-[#78350F] leading-none">
                                 {slotCode}
                               </span>
-                              <span className="font-bold text-[9px] text-[#047857] truncate max-w-[80px] mt-0.5 leading-tight">
+                              <span className="font-bold text-[9px] text-[#854D0E] truncate max-w-[80px] mt-0.5 leading-tight">
                                 {matched.courseCode}
                               </span>
-                              <span className="text-[8px] font-medium text-[#059669] truncate max-w-[80px] leading-tight">
+                              <span className="text-[8px] font-medium text-[#92400E] truncate max-w-[80px] leading-tight">
                                 {matched.roomNo}
                               </span>
                             </div>
@@ -117,10 +117,10 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
                       return (
                         <td
                           key={col.id}
-                          className="py-2 px-1 border-r border-[#FEEBA4]/60 text-[#78350F] hover:bg-amber-100/50 transition-colors"
+                          className="py-2 px-1 border-r border-[#DBEAFE] text-[#64748B] hover:bg-[#EFF6FF] transition-colors"
                         >
                           <div className="flex flex-col items-center justify-center min-h-[36px]">
-                            <span className="text-[11px] font-bold text-[#854D0E]/80">
+                            <span className="text-[11px] font-bold text-[#64748B]">
                               {slotCode || '—'}
                             </span>
                           </div>
@@ -138,11 +138,11 @@ export function TimetableGrid({ confirmedFaculties = {} }) {
       {/* Legend */}
       <div className="flex items-center justify-center gap-6 py-1">
         <div className="flex items-center gap-2">
-          <span className="w-3.5 h-3.5 rounded-full bg-[#10B981] ring-2 ring-[#A7F3D0]" />
+          <span className="w-3.5 h-3.5 rounded-full bg-[#FACC15] ring-2 ring-[#FEF08A]" />
           <span className="text-xs font-bold text-[#17233C]">Registered ({totalRegisteredSlots})</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3.5 h-3.5 rounded-full bg-[#FDE68A] ring-2 ring-[#FEF3C7]" />
+          <span className="w-3.5 h-3.5 rounded-full bg-[#BFDBFE] ring-2 ring-[#DBEAFE]" />
           <span className="text-xs font-bold text-[#64748B]">Available</span>
         </div>
       </div>
