@@ -142,6 +142,14 @@ function normalizeCourse(course, index) {
   };
 }
 
+// Eagerly preload FFCS graphics into browser cache to prevent reloading flickers
+if (typeof window !== 'undefined') {
+  ['/ffcs-campus-hero.png', '/ffcs-students-duo.png', '/ffcs-book-empty.png'].forEach((src) => {
+    const img = new Image();
+    img.src = src;
+  });
+}
+
 export function FFCSProvider({ children }) {
   const [coursesList, setCoursesList] = useState(readStoredCourses);
   const [confirmedFaculties, setConfirmedFaculties] = useState(readSelections);
@@ -150,13 +158,14 @@ export function FFCSProvider({ children }) {
   const [error, setError] = useState(null);
   const [addInProgress, setAddInProgress] = useState(null);
   const inFlightCoursesPromiseRef = useRef(null);
+  const coursesListRef = useRef(coursesList);
+  coursesListRef.current = coursesList;
 
   const refreshCourses = useCallback(async (options = {}) => {
     const force = options?.force === true;
     setError(null);
 
     // 1. In-flight Request Deduplication:
-    // If a request is already fetching, reuse it across all concurrent callers
     if (inFlightCoursesPromiseRef.current) {
       return inFlightCoursesPromiseRef.current;
     }
@@ -164,7 +173,7 @@ export function FFCSProvider({ children }) {
     const queryKey = queryKeys.ffcsCourses();
 
     // 2. Cache Check:
-    // If we have fresh cached courses (< 5 minutes) and not forcing, return immediately
+    // If we have fresh cached courses (< 5 minutes) and not forcing, return immediately without network call
     if (!force) {
       const cached = queryClient.getQueryData(queryKey);
       const queryState = queryClient.getQueryState(queryKey);
@@ -174,9 +183,15 @@ export function FFCSProvider({ children }) {
         setIsInitialLoading(false);
         return cached;
       }
+      // If we already have coursesList loaded from localStorage or previous state, do not set background fetching visual flicker
+      if (coursesListRef.current && coursesListRef.current.length > 0) {
+        // Silently re-check without triggering UI flicker
+      } else {
+        setIsBackgroundFetching(true);
+      }
+    } else {
+      setIsBackgroundFetching(true);
     }
-
-    setIsBackgroundFetching(true);
 
     const fetchPromise = (async () => {
       try {
@@ -206,7 +221,7 @@ export function FFCSProvider({ children }) {
         } else {
           setError(err?.message || 'Unable to load your FFCS courses.');
         }
-        return coursesList;
+        return coursesListRef.current;
       } finally {
         setIsInitialLoading(false);
         setIsBackgroundFetching(false);
@@ -216,7 +231,7 @@ export function FFCSProvider({ children }) {
 
     inFlightCoursesPromiseRef.current = fetchPromise;
     return fetchPromise;
-  }, [coursesList]);
+  }, []);
 
   // Centralized Course Teachers Cache & Fetcher (10-minute cache per course)
   const getCourseTeachers = useCallback(async (courseId, force = false) => {

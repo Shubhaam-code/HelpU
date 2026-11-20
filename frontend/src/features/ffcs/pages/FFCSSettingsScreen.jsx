@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   RotateCcw,
   Info,
   CheckCircle2,
@@ -74,19 +73,9 @@ export function FFCSSettingsScreen() {
           
           {/* Header */}
           <header className="flex items-center justify-between py-1">
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="w-8 h-8 rounded-xl bg-white hover:bg-blue-50 border border-[#BFDBFE] flex items-center justify-center text-[#1E3A8A] transition-colors cursor-pointer shadow-xs active:scale-95"
-                aria-label="Back"
-              >
-                <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-              </button>
-              <h1 className="font-black text-lg text-[#0B1E48] tracking-tight">
-                FFCS Settings
-              </h1>
-            </div>
+            <h1 className="font-black text-lg text-[#0B1E48] tracking-tight">
+              FFCS Settings
+            </h1>
             <div className="text-[11px] font-black text-[#2563EB] bg-[#EFF6FF] px-2.5 py-1 rounded-full border border-[#BFDBFE]">
               Preferences
             </div>
