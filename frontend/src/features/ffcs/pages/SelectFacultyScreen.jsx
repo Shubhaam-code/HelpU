@@ -176,21 +176,21 @@ export function SelectFacultyScreen() {
 
   if (loading && !course) {
     return (
-      <div className="min-h-screen bg-[#FFFDF7] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-[#D97706]" />
+      <div className="min-h-screen bg-[#F0F7FF] flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-[#2563EB]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7] text-[#17233C] flex flex-col justify-between pb-28">
+    <div className="min-h-screen bg-[#F0F7FF] text-[#17233C] flex flex-col justify-between pb-28">
       <div className="w-full max-w-md mx-auto px-4 pt-3 space-y-4">
         <header className="flex items-center justify-between py-1">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="w-8 h-8 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-[#17233C] transition-colors cursor-pointer shadow-xs active:scale-95"
+              className="w-8 h-8 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] flex items-center justify-center text-[#2563EB] transition-colors cursor-pointer shadow-xs active:scale-95"
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
@@ -209,19 +209,19 @@ export function SelectFacultyScreen() {
             <button
               type="button"
               onClick={() => navigate('/slotmate/ffcs/courses')}
-              className="px-4 py-2 bg-[#FFD426] text-[#17233C] font-bold text-xs rounded-xl shadow-xs"
+              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
             >
               Back to Courses
             </button>
           </div>
         ) : (
           <>
-            <div className="bg-[#FFFDF7] rounded-2xl border border-[#FEEBA4] p-4 flex items-center gap-3.5 shadow-xs">
-              <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0 shadow-xs p-1.5">
+            <div className="bg-white rounded-2xl border border-[#DBEAFE] p-4 flex items-center gap-3.5 shadow-2xs">
+              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs p-1.5">
                 <TeacherClassroomIcon className="w-9 h-9" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#854D0E]">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#2563EB]">
                   Course Code
                 </span>
                 <h2 className="font-black text-base text-[#17233C] leading-tight">{course.code}</h2>
@@ -232,7 +232,7 @@ export function SelectFacultyScreen() {
             </div>
 
             {fetching && teachers.length === 0 && (
-              <div className="bg-white rounded-2xl border border-[#FEEBA4] shadow-sm overflow-hidden divide-y divide-[#FEEBA4]/40">
+              <div className="bg-white rounded-2xl border border-[#DBEAFE] shadow-sm overflow-hidden divide-y divide-[#DBEAFE]">
                 <TeacherSkeletonRow />
                 <TeacherSkeletonRow />
                 <TeacherSkeletonRow />
@@ -240,20 +240,20 @@ export function SelectFacultyScreen() {
             )}
 
             {fetchError && (
-              <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl p-3.5 text-xs font-bold flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="bg-[#EFF6FF] border border-[#BFDBFE] text-[#1E40AF] rounded-2xl p-3.5 text-xs font-bold flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#2563EB]" />
                 <div className="flex-1">
                   <p>{fetchError}</p>
                   <div className="flex gap-3 mt-2">
-                    <button type="button" onClick={() => loadTeachers(true)} className="underline cursor-pointer">Retry</button>
+                    <button type="button" onClick={() => loadTeachers(true)} className="underline cursor-pointer text-[#2563EB]">Retry</button>
                   </div>
                 </div>
               </div>
             )}
 
             {!fetching && teachers.length === 0 && !fetchError && (
-              <div className="bg-white rounded-2xl border border-[#FEEBA4] p-8 text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-[#FEF3C7] text-[#92400E] flex items-center justify-center mx-auto mb-2">
+              <div className="bg-white rounded-2xl border border-[#DBEAFE] p-8 text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center mx-auto mb-2 border border-[#BFDBFE]">
                   <AlertCircle className="w-6 h-6" />
                 </div>
                 <h3 className="font-black text-sm text-[#17233C]">No Teacher Data Yet</h3>
@@ -263,7 +263,7 @@ export function SelectFacultyScreen() {
                 <button
                   type="button"
                   onClick={loadTeachers}
-                  className="px-4 py-2 bg-[#FFD426] text-[#17233C] font-bold text-xs rounded-xl shadow-xs"
+                  className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
                 >
                   Check Again
                 </button>
@@ -285,13 +285,13 @@ export function SelectFacultyScreen() {
             )}
 
             {teachers.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#FEEBA4] shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between bg-[#FEF9C3] px-4 py-2.5 border-b border-[#FEEBA4] text-[11px] font-black text-[#854D0E] uppercase tracking-wider">
+              <div className="bg-white rounded-2xl border border-[#DBEAFE] shadow-2xs overflow-hidden">
+                <div className="flex items-center justify-between bg-[#EFF6FF] px-4 py-2.5 border-b border-[#DBEAFE] text-[11px] font-black text-[#1D4ED8] uppercase tracking-wider">
                   <div className="pl-6">Faculty Name</div>
                   <div>Slot & Classroom</div>
                 </div>
 
-                <div className="divide-y divide-[#FEEBA4]/50">
+                <div className="divide-y divide-[#DBEAFE]">
                   {teachers.map((teacher, index) => {
                     const teacherKey = getTeacherKey(teacher, index);
                     const isSelected = selectedKey ? selectedKey === teacherKey : selectedName === teacher.name;
@@ -334,8 +334,8 @@ export function SelectFacultyScreen() {
                           isClashing
                             ? 'bg-rose-50/50 border-l-4 border-l-rose-500 cursor-not-allowed opacity-90'
                             : isSelected
-                            ? 'bg-[#FEFCE8] ring-1.5 ring-inset ring-[#FACC15] cursor-pointer'
-                            : 'hover:bg-[#FFFDF7] cursor-pointer'
+                            ? 'bg-[#EFF6FF] ring-1.5 ring-inset ring-[#3B82F6] cursor-pointer'
+                            : 'hover:bg-[#F8FAFC] cursor-pointer'
                         }`}
                       >
                         {/* Left: Radio / Ban + Faculty Name + Clash or Available Badge */}
@@ -347,10 +347,10 @@ export function SelectFacultyScreen() {
                           ) : (
                             <div
                               className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
-                                isSelected ? 'border-[#17233C] bg-[#FFD426]' : 'border-[#CBD5E1] bg-white'
+                                isSelected ? 'border-[#2563EB] bg-[#2563EB]' : 'border-[#CBD5E1] bg-white'
                               }`}
                             >
-                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#17233C]" />}
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                             </div>
                           )}
 
@@ -428,14 +428,14 @@ export function SelectFacultyScreen() {
                             className={`inline-flex items-center px-2 py-0.5 rounded-md font-black text-[11px] border shadow-2xs ${
                               isClashing
                                 ? 'bg-rose-100/70 text-rose-800 border-rose-200'
-                                : 'bg-[#FEF3C7] text-[#854D0E] border-[#FDE68A]'
+                                : 'bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE]'
                             }`}
                           >
                             {displaySlot}
                           </span>
                           {displayRoom && (
                             <div className="flex items-center gap-1 text-[11px] font-bold text-[#475569]">
-                              <MapPin className="w-3 h-3 text-[#D97706] stroke-[2.5]" />
+                              <MapPin className="w-3 h-3 text-[#2563EB] stroke-[2.5]" />
                               <span>{displayRoom}</span>
                             </div>
                           )}
@@ -453,11 +453,11 @@ export function SelectFacultyScreen() {
                   type="button"
                   onClick={handleConfirm}
                   disabled={!selectedName || selectedClash.hasClash}
-                  className="w-full py-3.5 rounded-2xl bg-[#FFD426] hover:bg-[#FACC15] disabled:opacity-50 disabled:cursor-not-allowed text-[#17233C] font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-amber-400/25 border border-[#EAB308] transition-all cursor-pointer active:scale-98"
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-98"
                 >
                   {savedToast ? (
                     <>
-                      <CheckCircle2 className="w-5 h-5 text-[#17233C]" />
+                      <CheckCircle2 className="w-5 h-5 text-white" />
                       <span>Faculty Confirmed!</span>
                     </>
                   ) : (

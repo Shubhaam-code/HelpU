@@ -232,7 +232,7 @@ export function AddedCoursesScreen() {
         )}
       </div>
 
-      <FFCSBottomNav activeTab="courses" />
+      <FFCSBottomNav activeTab="add" />
 
       {/* Modern Custom Course Delete Confirmation Modal */}
       {courseToDelete && (
