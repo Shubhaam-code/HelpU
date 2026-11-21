@@ -87,38 +87,62 @@ function BlueCloudUploadIcon({ className = 'w-5 h-5' }) {
 }
 
 // Extraction Progress Card (AI Vision extraction feedback)
-function ExtractionProgressCard({ addInProgress, currentCourseIndex, totalCourses }) {
-  const [progress, setProgress] = useState(15);
+function ExtractionProgressCard({ addInProgress, currentCourseIndex = 0, totalCourses = 1 }) {
+  const validTotal = Math.max(1, totalCourses || 1);
+  const currentIdx = Math.min(Math.max(0, currentCourseIndex || 0), validTotal - 1);
+  const sliceSize = 100 / validTotal;
+  const baseProgress = currentIdx * sliceSize;
+
+  const [progress, setProgress] = useState(() => Math.round(baseProgress + (15 / 100) * sliceSize));
+  const maxProgressRef = useRef(progress);
+
+  // Keep maxProgressRef advancing and never falling behind when transitioning to next course
+  useEffect(() => {
+    const currentBase = Math.round(currentIdx * sliceSize);
+    if (currentBase > maxProgressRef.current) {
+      maxProgressRef.current = currentBase;
+      setProgress(currentBase);
+    }
+  }, [currentIdx, sliceSize]);
 
   useEffect(() => {
-    if (!addInProgress) {
-      setProgress(15);
-      return;
-    }
+    if (!addInProgress) return;
 
     if (addInProgress.state === 'completed' || addInProgress.state === 'success') {
-      setProgress(100);
+      const target = currentIdx >= validTotal - 1 ? 100 : Math.round((currentIdx + 1) * sliceSize);
+      maxProgressRef.current = Math.max(maxProgressRef.current, target);
+      setProgress(maxProgressRef.current);
       return;
     }
 
     const startTime = Date.now();
     const interval = setInterval(() => {
       const elapsedSeconds = (Date.now() - startTime) / 1000;
-      let nextProgress = 15;
+      let internalCoursePercent = 15;
       if (elapsedSeconds <= 1.5) {
-        nextProgress = 15 + (elapsedSeconds / 1.5) * 35;
-      } else if (elapsedSeconds <= 3.5) {
-        nextProgress = 50 + ((elapsedSeconds - 1.5) / 2) * 35;
+        internalCoursePercent = 15 + (elapsedSeconds / 1.5) * 35;
+      } else if (elapsedSeconds <= 4.0) {
+        internalCoursePercent = 50 + ((elapsedSeconds - 1.5) / 2.5) * 35;
       } else {
-        nextProgress = Math.min(96, 85 + (elapsedSeconds - 3.5) * 2);
+        internalCoursePercent = Math.min(94, 85 + (elapsedSeconds - 4.0) * 1.5);
       }
-      setProgress(Math.round(nextProgress));
+
+      const calculatedOverall = baseProgress + (internalCoursePercent / 100) * sliceSize;
+      const roundedOverall = Math.round(calculatedOverall);
+
+      // Strict Monotonic Rule: Progress must ALWAYS increase, never jump backwards
+      if (roundedOverall > maxProgressRef.current) {
+        const safeVal = Math.min(98, roundedOverall);
+        maxProgressRef.current = safeVal;
+        setProgress(safeVal);
+      }
     }, 150);
 
     return () => clearInterval(interval);
-  }, [addInProgress]);
+  }, [addInProgress, currentIdx, sliceSize, baseProgress, validTotal]);
 
-  const displayProgress = addInProgress?.state === 'completed' ? 100 : progress;
+  const displayProgress =
+    addInProgress?.state === 'completed' && currentIdx >= validTotal - 1 ? 100 : progress;
 
   return (
     <div className="bg-white border-2 border-[#93C5FD] rounded-2xl p-4 shadow-[0_8px_24px_rgba(37,99,235,0.08)] space-y-3 animate-in fade-in duration-200">
@@ -133,8 +157,8 @@ function ExtractionProgressCard({ addInProgress, currentCourseIndex, totalCourse
           </div>
           <div className="min-w-0">
             <h4 className="font-black text-sm text-[#0F172A] tracking-tight leading-tight">
-              {totalCourses > 1
-                ? `Adding Course ${currentCourseIndex + 1} of ${totalCourses}...`
+              {validTotal > 1
+                ? `Adding Course ${currentIdx + 1} of ${validTotal}...`
                 : 'Extracting Course Details...'}
             </h4>
             <p className="text-[11px] font-bold text-[#2563EB] truncate mt-0.5">
@@ -497,8 +521,14 @@ export function AddCourseScreen() {
     try {
       setAcademicYear(academicYear);
 
-      // Concurrent Parallel Extraction for all valid course rows
-      const extractionPromises = validRows.map((row) => {
+      const successfulIds = [];
+      const errors = [];
+
+      // Process courses sequentially so that each course progress and AI feedback
+      // updates smoothly and strictly increases without backwards jumping or race conditions
+      for (let i = 0; i < validRows.length; i++) {
+        setCurrentSubmittingIndex(i);
+        const row = validRows[i];
         const coursePayload = row.selectedCourse
           ? {
               curriculumCourseId: row.selectedCourse._id || row.selectedCourse.courseId,
@@ -516,23 +546,15 @@ export function AddCourseScreen() {
               files: (row.screenshots || []).map((s) => s.file).filter(Boolean)
             };
 
-        return addCourse(coursePayload);
-      });
-
-      const results = await Promise.allSettled(extractionPromises);
-
-      const successfulIds = [];
-      const errors = [];
-
-      results.forEach((res, i) => {
-        if (res.status === 'fulfilled') {
-          const targetId = res.value?.course?.courseId || res.value?.courseId;
+        try {
+          const res = await addCourse(coursePayload);
+          const targetId = res?.course?.courseId || res?.courseId;
           if (targetId) successfulIds.push(targetId);
-        } else {
-          const msg = res.reason?.response?.data?.message || res.reason?.message;
-          errors.push(`${validRows[i].selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`);
+        } catch (err) {
+          const msg = err?.response?.data?.message || err?.message;
+          errors.push(`${row.selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`);
         }
-      });
+      }
 
       if (successfulIds.length > 0) {
         setAddedCourseIds(successfulIds);
@@ -932,7 +954,7 @@ export function AddCourseScreen() {
             <ExtractionProgressCard
               addInProgress={addInProgress}
               currentCourseIndex={currentSubmittingIndex}
-              totalCourses={courseRows.filter((r) => r.selectedCourse || r.searchQuery).length}
+              totalCourses={courseRows.filter((r) => r.selectedCourse || (r.searchQuery && r.searchQuery.trim().length >= 3)).length || 1}
             />
           )}
 
