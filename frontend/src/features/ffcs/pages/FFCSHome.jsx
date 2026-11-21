@@ -297,18 +297,34 @@ export function FFCSHome() {
               </div>
             )}
           </div>
-          {/* 7. BOTTOM CAMPUS HERO (Full image preserved, boy hair never cut off) */}
-          <div className="pt-1 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] select-none pointer-events-none flex items-end justify-center">
-            <img
-              src="/ffcs-campus-hero.png"
-              alt="VIT Campus and FFCS Planning"
-              className="w-full h-auto max-h-[220px] object-contain object-bottom block"
-              loading="eager"
-              decoding="sync"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
+          {/* 7. BOTTOM CAMPUS HERO CARD (In a styled box with FFCS guide text) */}
+          <div className="bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-[22px] min-[360px]:rounded-[24px] sm:rounded-[28px] border border-[#BFDBFE] p-3.5 sm:p-5 shadow-2xs overflow-hidden relative space-y-2">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] animate-pulse" />
+                <span>Smart FFCS Companion</span>
+              </div>
+              <h3 className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#17233C] tracking-tight">
+                Plan Clash-Free Schedules Effortlessly
+              </h3>
+              <p className="text-[10.5px] min-[360px]:text-[11.5px] sm:text-xs text-[#64748B] font-medium leading-relaxed max-w-md">
+                Select your preferred teachers, compare timetable slots, and verify your weekly schedule with zero clash before registration opens.
+              </p>
+            </div>
+
+            {/* Campus Illustration inside the card */}
+            <div className="w-full pt-1 flex items-end justify-center select-none pointer-events-none -mb-3 sm:-mb-5">
+              <img
+                src="/ffcs-campus-hero.png"
+                alt="VIT Campus and FFCS Planning"
+                className="w-full h-auto max-h-[145px] min-[360px]:max-h-[165px] sm:max-h-[210px] object-contain object-bottom block"
+                loading="eager"
+                decoding="sync"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
           </div>
 
         </div>
