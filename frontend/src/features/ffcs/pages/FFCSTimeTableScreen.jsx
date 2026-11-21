@@ -8,7 +8,11 @@ import {
   Download,
   RotateCcw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  FileText,
+  ExternalLink,
+  X
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { TimetableGrid } from '../components/TimetableGrid';
@@ -24,6 +28,8 @@ export function FFCSTimeTableScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
   const [showResetModal, setShowResetModal] = useState(false);
+  const [downloadState, setDownloadState] = useState('idle'); // 'idle' | 'downloading' | 'ready'
+  const [downloadedPdfInfo, setDownloadedPdfInfo] = useState(null);
 
   const confirmedList = Object.values(confirmedFaculties || {});
   const selectedCount = confirmedList.length;
@@ -48,19 +54,25 @@ export function FFCSTimeTableScreen() {
     showToast('All selected teachers and timetable entries have been removed.');
   };
 
-  const handleExportPdf = () => {
-    try {
-      if (selectedCount === 0) {
-        showToast(
-          'No selected teachers or timetable available to export. Please select at least one teacher first.',
-          'error'
-        );
-        return;
-      }
+  const handleExportPdf = async () => {
+    if (selectedCount === 0) {
+      showToast(
+        'No selected teachers or timetable available to export. Please select at least one teacher first.',
+        'error'
+      );
+      return;
+    }
 
-      downloadTimetablePdf({ confirmedFaculties });
+    setDownloadState('downloading');
+    try {
+      // Small feedback delay so user sees downloading progress in phone UI
+      await new Promise((r) => setTimeout(r, 600));
+      const res = downloadTimetablePdf({ confirmedFaculties });
+      setDownloadedPdfInfo(res);
+      setDownloadState('ready');
       showToast('Timetable PDF downloaded successfully!');
     } catch (err) {
+      setDownloadState('idle');
       showToast(err.message || 'Failed to export timetable PDF.', 'error');
     }
   };
@@ -79,13 +91,29 @@ export function FFCSTimeTableScreen() {
             <button
               type="button"
               onClick={handleExportPdf}
-              disabled={selectedCount === 0}
+              disabled={selectedCount === 0 || downloadState === 'downloading'}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-[#2563EB] font-bold text-xs shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               title="Download Timetable PDF"
             >
-              <Download className="w-3.5 h-3.5 stroke-[2.4]" />
-              <span className="hidden min-[360px]:inline">Download PDF</span>
-              <span className="min-[360px]:hidden">PDF</span>
+              {downloadState === 'downloading' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span className="hidden min-[360px]:inline">Downloading...</span>
+                  <span className="min-[360px]:hidden">...</span>
+                </>
+              ) : downloadState === 'ready' ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden min-[360px]:inline">Downloaded ✓</span>
+                  <span className="min-[360px]:hidden">Done</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5 stroke-[2.4]" />
+                  <span className="hidden min-[360px]:inline">Download PDF</span>
+                  <span className="min-[360px]:hidden">PDF</span>
+                </>
+              )}
             </button>
             <button
               type="button"
@@ -316,6 +344,66 @@ export function FFCSTimeTableScreen() {
                 Yes, Reset All
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phone UI: Floating Downloading Indicator */}
+      {downloadState === 'downloading' && (
+        <div className="fixed bottom-24 inset-x-4 max-w-sm mx-auto z-50 bg-white p-3.5 rounded-2xl shadow-xl border border-blue-200 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shrink-0">
+            <Loader2 className="w-5 h-5 animate-spin text-[#2563EB]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-xs text-[#0F172A] leading-tight">
+              Downloading Timetable PDF...
+            </p>
+            <p className="text-[11px] text-[#2563EB] font-bold mt-0.5 truncate">
+              Generating slot grid and course schedule...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Phone UI: Download Ready with "Open" Action Pill */}
+      {downloadState === 'ready' && downloadedPdfInfo && (
+        <div className="fixed bottom-24 inset-x-4 max-w-sm mx-auto z-50 bg-[#0F172A] text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-black text-xs text-white truncate">
+                {downloadedPdfInfo.filename || 'FFCS_Timetable.pdf'}
+              </p>
+              <p className="text-[10.5px] text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
+                <CheckCircle2 className="w-3 h-3 shrink-0" />
+                Downloaded successfully
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (downloadedPdfInfo?.url) {
+                  window.open(downloadedPdfInfo.url, '_blank');
+                }
+              }}
+              className="px-3 py-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDownloadState('idle')}
+              className="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

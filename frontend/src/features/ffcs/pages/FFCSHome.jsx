@@ -97,8 +97,9 @@ export function FFCSHome() {
                   Make Your <br />
                   <span className="text-[#2563EB]">FFCS Smarter</span>
                 </h1>
-                <p className="text-[11.5px] min-[360px]:text-[12.5px] sm:text-sm text-[#334155] font-bold leading-relaxed max-w-[240px] sm:max-w-md">
-                  Explore courses, compare faculty and plan your perfect schedule.
+                <p className="text-[11.5px] min-[360px]:text-[12.5px] sm:text-sm text-[#64748B] font-medium leading-relaxed max-w-[240px] sm:max-w-md">
+                  Explore courses, compare faculty and plan your{' '}
+                  <span className="font-black text-[#17233C]">perfect schedule.</span>
                 </p>
               </div>
 

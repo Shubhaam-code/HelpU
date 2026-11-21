@@ -11,7 +11,8 @@ import {
   Clock,
   MapPin,
   CalendarDays,
-  Star
+  Star,
+  X
 } from 'lucide-react';
 import { useFFCS, teacherToFaculty } from '../context/FFCSContext';
 import { detectSlotClash } from '../utils/slotClashDetector.js';
@@ -19,6 +20,7 @@ import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { TeacherSkeletonRow } from '../components/FFCSSkeleton';
 import { TeacherClassroomIcon } from '../../../components/icons/TeacherClassroomIcon';
 import { FacultyReviewModal } from '../components/FacultyReviewModal';
+import { TimetableGrid } from '../components/TimetableGrid';
 import { getFacultyByName } from '../../../lib/api';
 
 export function SelectFacultyScreen() {
@@ -29,6 +31,7 @@ export function SelectFacultyScreen() {
   // Review Modal State
   const [reviewModalTeacher, setReviewModalTeacher] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [showTimetableModal, setShowTimetableModal] = useState(false);
 
   const handleOpenReview = (teacher) => {
     setReviewModalTeacher(teacher);
@@ -216,19 +219,32 @@ export function SelectFacultyScreen() {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl border border-[#DBEAFE] p-4 flex items-center gap-3.5 shadow-2xs">
-              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs p-1.5">
-                <TeacherClassroomIcon className="w-9 h-9" />
+            <div className="bg-white rounded-2xl border border-[#DBEAFE] p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs p-1.5">
+                  <TeacherClassroomIcon className="w-8 h-8 sm:w-9 sm:h-9" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#2563EB]">
+                    Course Code
+                  </span>
+                  <h2 className="font-black text-base text-[#17233C] leading-tight">{course.code}</h2>
+                  <p className="text-xs font-semibold text-[#64748B] leading-tight mt-0.5 truncate">
+                    {course.name}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#2563EB]">
-                  Course Code
-                </span>
-                <h2 className="font-black text-base text-[#17233C] leading-tight">{course.code}</h2>
-                <p className="text-xs font-semibold text-[#64748B] leading-tight mt-0.5 truncate">
-                  {course.name}
-                </p>
-              </div>
+
+              {/* Timetable Quick Preview Button on the Right */}
+              <button
+                type="button"
+                onClick={() => setShowTimetableModal(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-[#2563EB] font-bold text-xs shadow-2xs active:scale-95 transition-all cursor-pointer"
+                title="View Current Timetable"
+              >
+                <CalendarDays className="w-4 h-4 stroke-[2.4]" />
+                <span className="hidden min-[360px]:inline font-black text-xs">Timetable</span>
+              </button>
             </div>
 
             {fetching && teachers.length === 0 && (
@@ -481,6 +497,99 @@ export function SelectFacultyScreen() {
         onClose={handleCloseReview}
         teacher={reviewModalTeacher}
       />
+
+      {/* Live Current Timetable Preview Modal */}
+      {showTimetableModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setShowTimetableModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full border border-blue-100 shadow-2xl p-4 sm:p-5 flex flex-col max-h-[90vh] space-y-3.5 animate-in zoom-in-95 duration-200"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB] flex items-center justify-center shrink-0">
+                  <CalendarDays className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
+                    Current Timetable Preview
+                  </h3>
+                  <p className="text-[11px] text-[#64748B] font-semibold">
+                    {Object.keys(confirmedFaculties || {}).length} Course(s) Scheduled So Far
+                  </p>
+                </div>
+              </div>
+
+              {/* Close (Cut) Button */}
+              <button
+                type="button"
+                onClick={() => setShowTimetableModal(false)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#64748B] hover:text-[#0F172A] flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Close timetable preview"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Modal Body: Timetable Grid */}
+            <div className="overflow-y-auto pr-1 flex-1 min-h-0 space-y-3 scrollbar-thin">
+              <div className="p-1 rounded-2xl bg-[#F8FAFC] border border-slate-100">
+                <TimetableGrid confirmedFaculties={confirmedFaculties} />
+              </div>
+
+              {/* Scheduled Faculties Summary Chips */}
+              <div className="space-y-1.5 pt-1">
+                <h4 className="font-black text-xs text-[#17233C] uppercase tracking-wide">
+                  Scheduled Courses &amp; Slots
+                </h4>
+                {Object.values(confirmedFaculties || {}).length === 0 ? (
+                  <p className="text-xs text-[#64748B] italic bg-[#EFF6FF] p-3 rounded-xl border border-[#BFDBFE]">
+                    No faculties selected yet. Select a teacher from the list below to schedule your first slot!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {Object.values(confirmedFaculties).map((fac) => (
+                      <div
+                        key={fac.id || fac.code}
+                        className="p-2.5 rounded-xl bg-[#F0F7FF] border border-[#BFDBFE] flex items-center justify-between text-xs"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <span className="font-black text-[11px] text-[#1D4ED8] block">
+                            {fac.courseCode || fac.code}
+                          </span>
+                          <span className="font-bold text-[#17233C] truncate block text-[11px]">
+                            {fac.name}
+                          </span>
+                        </div>
+                        <span className="shrink-0 px-2 py-0.5 rounded-md bg-white border border-[#BFDBFE] text-[#1D4ED8] font-black text-[10px]">
+                          {fac.slot}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowTimetableModal(false)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs sm:text-sm shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                Done / Back to Faculty
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
