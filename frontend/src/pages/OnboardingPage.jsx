@@ -287,12 +287,9 @@ export default function OnboardingPage() {
               {/* Pills */}
               <div className="flex flex-wrap items-center gap-0.5 min-[360px]:gap-1 pt-1 sm:pt-1.5">
                 <span className="px-1 min-[360px]:px-1.5 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[7.5px] min-[360px]:text-[8.5px] sm:text-[9.5px] font-black border border-[#BFDBFE]">
-                  AI Vision
-                </span>
-                <span className="px-1 min-[360px]:px-1.5 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[7.5px] min-[360px]:text-[8.5px] sm:text-[9.5px] font-black border border-[#BFDBFE]">
                   Zero Clash
                 </span>
-                <span className="hidden sm:inline-block px-1.5 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[9.5px] font-black border border-[#BFDBFE]">
+                <span className="px-1 min-[360px]:px-1.5 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[7.5px] min-[360px]:text-[8.5px] sm:text-[9.5px] font-black border border-[#BFDBFE]">
                   Faculty
                 </span>
               </div>
