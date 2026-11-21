@@ -44,10 +44,10 @@ export default function StartupVideoIntro({ onComplete }) {
       hideNativeSplashScreen(180);
     }, 80);
 
-    // Safety fallback timer: 8000ms (video is 6.29s — gives buffer for slow decode)
+    // Safety fallback timer: 15000ms (new video — gives buffer for slow decode on Android)
     const fallbackTimer = setTimeout(() => {
       finish();
-    }, 8000);
+    }, 15000);
 
     // Reveal video if playing event is delayed but video has loaded data
     const revealFallbackTimer = setTimeout(() => {
@@ -80,7 +80,7 @@ export default function StartupVideoIntro({ onComplete }) {
       className={`fixed inset-0 z-[99999] select-none transition-opacity duration-300 ease-out ${
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
-      style={{ backgroundColor: '#EFD7A2' /* matches video background corner color */ }}
+      style={{ backgroundColor: '#000000' /* full-bleed black behind video */ }}
     >
       {/* 1. Static high-resolution poster of frame 0: displays instantly with 0ms delay */}
       <img

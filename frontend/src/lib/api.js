@@ -170,12 +170,27 @@ apiClient.interceptors.response.use(
         if (freshToken) {
           originalRequest.headers.Authorization = `Bearer ${freshToken}`;
           processQueue(null, freshToken);
+          isRefreshing = false;
           return apiClient(originalRequest);
+        } else {
+          // Could not refresh token — session truly expired
+          const sessionErr = new Error('Session expired. Please sign in again.');
+          sessionErr.status = 401;
+          sessionErr.code = 'SESSION_EXPIRED';
+          processQueue(sessionErr, null);
+          isRefreshing = false;
+          return Promise.reject(sessionErr);
         }
       } catch (refreshErr) {
-        processQueue(refreshErr, null);
-      } finally {
+        const sessionErr = new Error('Session expired. Please sign in again.');
+        sessionErr.status = 401;
+        sessionErr.code = 'SESSION_EXPIRED';
+        sessionErr.originalError = refreshErr;
+        processQueue(sessionErr, null);
         isRefreshing = false;
+        return Promise.reject(sessionErr);
+      } finally {
+        // isRefreshing already reset above in both branches
       }
     }
 

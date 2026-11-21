@@ -563,12 +563,16 @@ export function AddCourseScreen() {
           return { success: true, targetId, index: i, code: row.selectedCourse?.courseCode || `Course ${i + 1}` };
         } catch (err) {
           const status = err?.status || err?.response?.status;
-          const msg = err?.response?.data?.message || err?.message;
+          const msg = err?.response?.data?.message || err?.message || String(err || '');
+          const allText = `${msg} ${String(err?.code || '')}`.toLowerCase();
           const isUnauthorized =
             status === 401 ||
-            String(msg || '').toLowerCase().includes('unauthorized') ||
-            String(msg || '').toLowerCase().includes('authentication token') ||
-            String(msg || '').toLowerCase().includes('token');
+            allText.includes('unauthorized') ||
+            allText.includes('authentication token') ||
+            allText.includes('missing or invalid') ||
+            allText.includes('invalid token') ||
+            allText.includes('token expired') ||
+            allText.includes('unauthenticated');
 
           return {
             success: false,
@@ -609,12 +613,16 @@ export function AddCourseScreen() {
       }
     } catch (err) {
       const status = err?.status || err?.response?.status;
-      const apiMsg = err?.response?.data?.message || err?.message;
+      const apiMsg = err?.response?.data?.message || err?.message || String(err || '');
+      const allErrText = `${apiMsg} ${String(err?.code || '')}`.toLowerCase();
       if (
         status === 401 ||
-        String(apiMsg || '').toLowerCase().includes('unauthorized') ||
-        String(apiMsg || '').toLowerCase().includes('authentication token') ||
-        String(apiMsg || '').toLowerCase().includes('token')
+        allErrText.includes('unauthorized') ||
+        allErrText.includes('authentication token') ||
+        allErrText.includes('missing or invalid') ||
+        allErrText.includes('invalid token') ||
+        allErrText.includes('token expired') ||
+        allErrText.includes('unauthenticated')
       ) {
         setShowAuthModal(true);
       } else {
