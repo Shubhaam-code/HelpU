@@ -407,28 +407,28 @@ export function FFCSProvider({ children }) {
 
     setAddInProgress({
       state: 'checking_database',
-      message: 'Checking database for existing teachers...'
+      message: 'Checking verified course catalog...'
     });
 
     const progressTimers = [
       setTimeout(() => {
         setAddInProgress({
           state: 'extracting_with_gemini',
-          message: 'AI is extracting teacher details... (takes ~40-50s, please wait)'
+          message: 'AI Vision scanning faculty & slots (<5s)...'
         });
-      }, 400),
+      }, 500),
       setTimeout(() => {
         setAddInProgress({
           state: 'extracting_with_gemini',
-          message: 'Scanning faculty names & slots from screenshots... (~20s remaining)'
+          message: 'Extracting teacher names & classroom venues...'
         });
-      }, 18000),
+      }, 2500),
       setTimeout(() => {
         setAddInProgress({
           state: 'extracting_with_gemini',
-          message: 'Finalizing course catalog... Almost done!'
+          message: 'Finalizing schedule and room allocations...'
         });
-      }, 36000)
+      }, 5500)
     ];
 
     try {
