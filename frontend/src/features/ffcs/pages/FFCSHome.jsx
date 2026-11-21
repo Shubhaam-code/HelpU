@@ -92,12 +92,12 @@ export function FFCSHome() {
 
             <div className="relative z-10 flex items-end justify-between gap-3 sm:gap-6">
               {/* Left Content */}
-              <div className="flex-1 min-w-0 pr-1 sm:pr-2 space-y-1.5 sm:space-y-2.5 pb-5 min-[360px]:pb-6 sm:pb-7">
-                <h1 className="font-black text-[#17233C] text-[21px] min-[360px]:text-[23px] sm:text-3xl md:text-4xl leading-[1.15] tracking-tight">
+              <div className="flex-1 min-w-0 pr-1 sm:pr-2 space-y-1.5 sm:space-y-2 pb-5 min-[360px]:pb-6 sm:pb-7">
+                <h1 className="font-black text-[#17233C] text-[22px] min-[360px]:text-[24px] sm:text-3xl md:text-4xl leading-[1.12] tracking-tight">
                   Make Your <br />
                   <span className="text-[#2563EB]">FFCS Smarter</span>
                 </h1>
-                <p className="text-[11px] min-[360px]:text-xs sm:text-sm text-[#475569] font-medium leading-relaxed max-w-[240px] sm:max-w-md">
+                <p className="text-[11.5px] min-[360px]:text-[12.5px] sm:text-sm text-[#334155] font-bold leading-relaxed max-w-[240px] sm:max-w-md">
                   Explore courses, compare faculty and plan your perfect schedule.
                 </p>
               </div>
@@ -297,10 +297,20 @@ export function FFCSHome() {
               </div>
             )}
           </div>
-          {/* 7. BOTTOM HIGHLIGHT CARD (Image 3 Style: Left Illustration + Right Text with Sparkle) */}
-          <div className="bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-[22px] min-[360px]:rounded-[26px] sm:rounded-[28px] border border-[#BFDBFE] p-3.5 min-[360px]:p-4 sm:p-5 shadow-2xs overflow-hidden relative flex items-center gap-3 min-[360px]:gap-3.5 sm:gap-5">
-            {/* Left Character Illustration */}
-            <div className="shrink-0 w-[110px] min-[360px]:w-[125px] sm:w-[155px] flex items-center justify-center select-none pointer-events-none">
+          {/* 7. BOTTOM HIGHLIGHT CARD (Text Left, Illustration Right, Star Removed) */}
+          <div className="bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-[22px] min-[360px]:rounded-[26px] sm:rounded-[28px] border border-[#BFDBFE] p-3.5 min-[360px]:p-4 sm:p-5 shadow-2xs overflow-hidden relative flex items-center justify-between gap-3 min-[360px]:gap-3.5 sm:gap-5">
+            {/* Left Information */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <h3 className="font-black text-sm min-[360px]:text-[15px] sm:text-lg text-[#17233C] tracking-tight leading-snug">
+                Plan Better Together
+              </h3>
+              <p className="text-[10px] min-[360px]:text-[11px] sm:text-xs text-[#64748B] font-medium leading-relaxed">
+                Choose top faculties, compare slots and build your clash-free timetable effortlessly.
+              </p>
+            </div>
+
+            {/* Right Character Illustration */}
+            <div className="shrink-0 w-[115px] min-[360px]:w-[130px] sm:w-[160px] flex items-center justify-end select-none pointer-events-none">
               <img
                 src="/ffcs-study-duo.png"
                 alt="Plan Better Together"
@@ -311,19 +321,6 @@ export function FFCSHome() {
                   e.currentTarget.src = '/ffcs-campus-hero.png';
                 }}
               />
-            </div>
-
-            {/* Right Information & Sparkle */}
-            <div className="flex-1 min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-1">
-                <h3 className="font-black text-sm min-[360px]:text-[15px] sm:text-lg text-[#17233C] tracking-tight leading-snug">
-                  Plan Better <br />Together
-                </h3>
-                <span className="text-amber-400 text-base sm:text-xl shrink-0 -mt-2">✨</span>
-              </div>
-              <p className="text-[10px] min-[360px]:text-[11px] sm:text-xs text-[#64748B] font-medium leading-relaxed">
-                Choose top faculties, compare slots and build your clash-free timetable effortlessly.
-              </p>
             </div>
           </div>
 
