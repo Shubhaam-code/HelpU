@@ -144,7 +144,7 @@ function normalizeCourse(course, index) {
 
 // Eagerly preload FFCS graphics into browser cache to prevent reloading flickers
 if (typeof window !== 'undefined') {
-  ['/ffcs-campus-hero.png', '/ffcs-students-duo.png', '/ffcs-book-empty.png'].forEach((src) => {
+  ['/ffcs-campus-hero.png', '/ffcs-students-duo.png', '/ffcs-book-empty.png', '/ffcs-study-duo.png'].forEach((src) => {
     const img = new Image();
     img.src = src;
   });
