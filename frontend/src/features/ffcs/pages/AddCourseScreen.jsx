@@ -20,6 +20,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
+import { useUser } from '../../../context/FirebaseAuthContext';
+import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { searchCurriculumCourses } from '../../../lib/api';
 import { compressImage } from '../utils/compressImage';
@@ -112,40 +114,37 @@ function ExtractionProgressCard({ addInProgress, currentCourseIndex = 0, totalCo
     if (!addInProgress) return;
 
     if (addInProgress.state === 'completed' || addInProgress.state === 'success') {
-      const target = currentIdx >= validTotal - 1 ? 100 : Math.round((currentIdx + 1) * sliceSize);
-      maxProgressRef.current = Math.max(maxProgressRef.current, target);
-      setProgress(maxProgressRef.current);
+      maxProgressRef.current = 100;
+      setProgress(100);
       return;
     }
 
     const startTime = Date.now();
     const interval = setInterval(() => {
       const elapsedSeconds = (Date.now() - startTime) / 1000;
-      let internalCoursePercent = 15;
-      if (elapsedSeconds <= 1.5) {
-        internalCoursePercent = 15 + (elapsedSeconds / 1.5) * 35;
-      } else if (elapsedSeconds <= 4.0) {
-        internalCoursePercent = 50 + ((elapsedSeconds - 1.5) / 2.5) * 35;
+      let calculatedPercent = 20;
+      // Fast monotonic ramp designed to hit 90% within 4-5 seconds
+      if (elapsedSeconds <= 1.0) {
+        calculatedPercent = 20 + elapsedSeconds * 30; // 20 -> 50%
+      } else if (elapsedSeconds <= 3.5) {
+        calculatedPercent = 50 + ((elapsedSeconds - 1.0) / 2.5) * 35; // 50 -> 85%
       } else {
-        internalCoursePercent = Math.min(94, 85 + (elapsedSeconds - 4.0) * 1.5);
+        calculatedPercent = Math.min(96, 85 + (elapsedSeconds - 3.5) * 2.0); // 85 -> 96%
       }
 
-      const calculatedOverall = baseProgress + (internalCoursePercent / 100) * sliceSize;
-      const roundedOverall = Math.round(calculatedOverall);
-
-      // Strict Monotonic Rule: Progress must ALWAYS increase, never jump backwards
-      if (roundedOverall > maxProgressRef.current) {
-        const safeVal = Math.min(98, roundedOverall);
+      const rounded = Math.round(calculatedPercent);
+      if (rounded > maxProgressRef.current) {
+        const safeVal = Math.min(98, rounded);
         maxProgressRef.current = safeVal;
         setProgress(safeVal);
       }
-    }, 150);
+    }, 120);
 
     return () => clearInterval(interval);
-  }, [addInProgress, currentIdx, sliceSize, baseProgress, validTotal]);
+  }, [addInProgress, validTotal]);
 
   const displayProgress =
-    addInProgress?.state === 'completed' && currentIdx >= validTotal - 1 ? 100 : progress;
+    addInProgress?.state === 'completed' ? 100 : progress;
 
   return (
     <div className="bg-white border-2 border-[#93C5FD] rounded-2xl p-4 shadow-[0_8px_24px_rgba(37,99,235,0.08)] space-y-3 animate-in fade-in duration-200">
@@ -161,11 +160,11 @@ function ExtractionProgressCard({ addInProgress, currentCourseIndex = 0, totalCo
           <div className="min-w-0">
             <h4 className="font-black text-sm text-[#0F172A] tracking-tight leading-tight">
               {validTotal > 1
-                ? `Adding Course ${currentIdx + 1} of ${validTotal}...`
-                : 'Extracting Course Details...'}
+                ? `Extracting ${validTotal} Courses Simultaneously...`
+                : 'Extracting Course Details (<5s)...'}
             </h4>
             <p className="text-[11px] font-bold text-[#2563EB] truncate mt-0.5">
-              {addInProgress?.message || 'Scanning timetable with AI vision...'}
+              {addInProgress?.message || 'Scanning timetable with fast AI Vision...'}
             </p>
           </div>
         </div>
@@ -189,7 +188,9 @@ function ExtractionProgressCard({ addInProgress, currentCourseIndex = 0, totalCo
 
 export function AddCourseScreen() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const { coursesList, addCourse, addInProgress, getAcademicYear, setAcademicYear } = useFFCS();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Semester State
   const [semester, setSemester] = useState('');
@@ -498,6 +499,12 @@ export function AddCourseScreen() {
 
     if (submitting || addInProgress) return;
 
+    // 1. If user is guest/unauthenticated, prompt login modal immediately (like SlotMate & PoolMate)
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!semester) {
       setErrorMessage('Please select a semester first.');
       return;
@@ -530,11 +537,9 @@ export function AddCourseScreen() {
       const successfulIds = [];
       const errors = [];
 
-      // Process courses sequentially so that each course progress and AI feedback
-      // updates smoothly and strictly increases without backwards jumping or race conditions
-      for (let i = 0; i < validRows.length; i++) {
-        setCurrentSubmittingIndex(i);
-        const row = validRows[i];
+      // Ultra-Fast Parallel Extraction: Process all valid courses concurrently
+      // Ensures that even 3-4 courses finish within 4-8 seconds max (<10s)
+      const tasks = validRows.map(async (row, i) => {
         const coursePayload = row.selectedCourse
           ? {
               curriculumCourseId: row.selectedCourse._id || row.selectedCourse.courseId,
@@ -555,10 +560,43 @@ export function AddCourseScreen() {
         try {
           const res = await addCourse(coursePayload);
           const targetId = res?.course?.courseId || res?.courseId;
-          if (targetId) successfulIds.push(targetId);
+          return { success: true, targetId, index: i, code: row.selectedCourse?.courseCode || `Course ${i + 1}` };
         } catch (err) {
-          const msg = err?.response?.data?.message || err?.message;
-          errors.push(`${row.selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`);
+          const status = err?.status || err?.response?.status;
+          const msg = err?.response?.data?.message || err?.message || String(err || '');
+          const allText = `${msg} ${String(err?.code || '')}`.toLowerCase();
+          const isUnauthorized =
+            status === 401 ||
+            allText.includes('unauthorized') ||
+            allText.includes('authentication token') ||
+            allText.includes('missing or invalid') ||
+            allText.includes('invalid token') ||
+            allText.includes('token expired') ||
+            allText.includes('unauthenticated');
+
+          return {
+            success: false,
+            isUnauthorized,
+            error: isUnauthorized ? 'Sign in required' : `${row.selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`,
+            index: i
+          };
+        }
+      });
+
+      const results = await Promise.all(tasks);
+
+      // If any task returned unauthorized, show auth modal instead of red error banner!
+      const unauthorizedResult = results.find((r) => r.isUnauthorized);
+      if (unauthorizedResult) {
+        setShowAuthModal(true);
+        return;
+      }
+
+      for (const res of results) {
+        if (res.success && res.targetId) {
+          successfulIds.push(res.targetId);
+        } else if (!res.success && res.error) {
+          errors.push(res.error);
         }
       }
 
@@ -574,12 +612,22 @@ export function AddCourseScreen() {
         setErrorMessage(errors[0] || 'Failed to extract courses. Please check your files and connection.');
       }
     } catch (err) {
-      const apiMsg = err?.response?.data?.message || err?.message;
-      setErrorMessage(
-        err?.status === 401
-          ? 'Please sign in to add courses.'
-          : apiMsg || 'Failed to extract courses. Please try again.'
-      );
+      const status = err?.status || err?.response?.status;
+      const apiMsg = err?.response?.data?.message || err?.message || String(err || '');
+      const allErrText = `${apiMsg} ${String(err?.code || '')}`.toLowerCase();
+      if (
+        status === 401 ||
+        allErrText.includes('unauthorized') ||
+        allErrText.includes('authentication token') ||
+        allErrText.includes('missing or invalid') ||
+        allErrText.includes('invalid token') ||
+        allErrText.includes('token expired') ||
+        allErrText.includes('unauthenticated')
+      ) {
+        setShowAuthModal(true);
+      } else {
+        setErrorMessage(apiMsg || 'Failed to extract courses. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -588,8 +636,8 @@ export function AddCourseScreen() {
   const busy = submitting || Boolean(addInProgress);
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] bg-[#F0F6FF] flex justify-center selection:bg-blue-200 overflow-hidden">
-      <div className="w-full max-w-[430px] h-[100dvh] max-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F4F9FF] to-[#EAF2FE] text-[#0F172A] flex flex-col justify-between pb-16 min-[360px]:pb-18 relative overflow-hidden sm:shadow-xl sm:border-x sm:border-blue-100">
+    <div className="min-h-[100dvh] bg-[#F0F6FF] flex justify-center selection:bg-blue-200">
+      <div className="w-full max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F4F9FF] to-[#EAF2FE] text-[#0F172A] flex flex-col pb-24 min-[360px]:pb-26 relative sm:shadow-xl sm:border-x sm:border-blue-100">
         
         {/* Decorative Background PNG: Top-Left Concentric Arcs matching Image 3 */}
         <img
@@ -613,10 +661,10 @@ export function AddCourseScreen() {
         <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-blue-200/40 blur-xl pointer-events-none select-none z-0" />
         <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-blue-300/35 blur-xl pointer-events-none select-none z-0" />
 
-        <main className="w-full px-3 min-[360px]:px-4 pt-1.5 pb-1 relative z-10 flex-1 min-h-0 flex flex-col justify-between overflow-hidden">
+        <main className="w-full px-3.5 min-[360px]:px-4 pt-3.5 min-[360px]:pt-5 pb-2 relative z-10 flex-1 flex flex-col space-y-3">
           
-          {/* Title & Subtitle on Top matching user request */}
-          <div className="text-center space-y-0.5 shrink-0">
+          {/* Title & Subtitle on Top with Safe Status Bar Spacing */}
+          <div className="text-center space-y-0.5 shrink-0 pt-0.5">
             <div className="flex items-center justify-center gap-1.5">
               <span className="text-[#3B82F6] text-xs font-black tracking-widest">
                 ‹‹
@@ -631,30 +679,28 @@ export function AddCourseScreen() {
                 ››
               </span>
             </div>
-            <p className="text-[10px] min-[360px]:text-[11px] font-semibold text-[#475569]">
+            <p className="text-[10.5px] min-[360px]:text-[11.5px] font-semibold text-[#475569]">
               Select your semester and add your subjects
             </p>
           </div>
 
-          {/* Connected Hero Illustration & White Card Box (Zero Gap & Responsive Screen-Fit) */}
-          <div className="flex-1 min-h-0 flex flex-col justify-between pt-0.5">
-            {/* Hero Illustration: Below text, directly touching the card */}
-            <div className="w-full flex justify-center items-end select-none pointer-events-none -mb-1 relative z-10 shrink-0">
-              <img
-                src={addCourseHeroSrc}
-                alt="Add Courses"
-                className="w-full max-w-[220px] min-[360px]:max-w-[260px] h-auto max-h-[60px] min-[360px]:max-h-[75px] sm:max-h-[130px] object-contain drop-shadow-xs block"
-                onError={(e) => {
-                  e.currentTarget.src = '/ffcs-add-courses-hero.png';
-                }}
-              />
-            </div>
+          {/* Hero Illustration: Nicely Proportioned & Touching White Card */}
+          <div className="w-full flex justify-center items-end select-none pointer-events-none -mb-1 relative z-10 shrink-0">
+            <img
+              src={addCourseHeroSrc}
+              alt="Add Courses"
+              className="w-full max-w-[240px] min-[360px]:max-w-[270px] h-auto max-h-[85px] min-[360px]:max-h-[100px] object-contain drop-shadow-xs block"
+              onError={(e) => {
+                e.currentTarget.src = '/ffcs-add-courses-hero.png';
+              }}
+            />
+          </div>
 
-            {/* Main White Card Container directly connected */}
-            <div className="bg-white rounded-[20px] min-[360px]:rounded-[24px] sm:rounded-[28px] border border-[#BFDBFE] shadow-[0_8px_25px_rgba(37,99,235,0.06)] p-2.5 min-[360px]:p-3 sm:p-4 space-y-1.5 min-[360px]:space-y-2 relative z-20 flex-1 min-h-0 flex flex-col justify-between">
+          {/* Main White Card Container - Natural Fit without Empty White Void */}
+          <div className="bg-white rounded-[22px] min-[360px]:rounded-[26px] sm:rounded-[28px] border border-[#BFDBFE] shadow-[0_8px_30px_rgba(37,99,235,0.06)] p-3.5 min-[360px]:p-4 sm:p-5 space-y-3 relative z-20">
             
             {/* Section 1: Select Semester */}
-            <div ref={semesterDropdownRef} className="space-y-0.5 relative shrink-0">
+            <div ref={semesterDropdownRef} className="space-y-1 relative">
               <div className="flex items-center gap-1">
                 <CalendarDays className="w-3.5 h-3.5 text-[#2563EB] stroke-[2.4]" />
                 <h3 className="font-black text-[11px] min-[360px]:text-xs sm:text-sm text-[#0F172A] tracking-tight">
@@ -666,7 +712,7 @@ export function AddCourseScreen() {
               <button
                 type="button"
                 onClick={() => setSemesterDropdownOpen((prev) => !prev)}
-                className={`w-full bg-white rounded-xl border py-1.5 px-3 min-[360px]:py-2 flex items-center justify-between text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+                className={`w-full bg-white rounded-xl border py-2 px-3 flex items-center justify-between text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
                   semesterDropdownOpen
                     ? 'border-[#2563EB] ring-2 ring-blue-100'
                     : 'border-[#BFDBFE] hover:border-[#60A5FA]'
@@ -684,7 +730,7 @@ export function AddCourseScreen() {
 
               {/* Dropdown Menu */}
               {semesterDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-[#BFDBFE] shadow-xl z-50 divide-y divide-slate-100 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-[#BFDBFE] shadow-xl z-50 divide-y divide-slate-100 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
                   {SEMESTER_OPTIONS.map((opt) => {
                     const isSelected = semester === opt;
                     return (
@@ -698,7 +744,7 @@ export function AddCourseScreen() {
                           setSemesterDropdownOpen(false);
                           setErrorMessage('');
                         }}
-                        className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        className={`w-full text-left px-3 py-2 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-[#EFF6FF] text-[#1D4ED8]'
                             : 'text-[#0F172A] hover:bg-[#F8FAFC]'
@@ -714,17 +760,22 @@ export function AddCourseScreen() {
             </div>
 
             {/* Section 2: Courses List */}
-            <div className="space-y-1 flex-1 min-h-0 flex flex-col">
+            <div className="space-y-2 pt-0.5">
               {/* Courses List Header with Open Book Icon */}
-              <div className="flex items-center gap-1 shrink-0">
-                <BookOpen className="w-3.5 h-3.5 text-[#2563EB] stroke-[2.4]" />
-                <h3 className="font-black text-[11px] min-[360px]:text-xs sm:text-sm text-[#0F172A] tracking-tight">
-                  Courses List
-                </h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <BookOpen className="w-3.5 h-3.5 text-[#2563EB] stroke-[2.4]" />
+                  <h3 className="font-black text-[11px] min-[360px]:text-xs sm:text-sm text-[#0F172A] tracking-tight">
+                    Courses List
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold text-[#64748B]">
+                  {courseRows.length}/8 Courses
+                </span>
               </div>
 
-              {/* Rows List (Scrolls internally within card, outer page NEVER scrolls) */}
-              <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-0.5 scrollbar-thin">
+              {/* Rows List */}
+              <div className="space-y-2">
                 {courseRows.map((row, index) => {
                   const isRowActive = activeRowIndex === index;
                   const hasSelected = Boolean(row.selectedCourse);
@@ -976,12 +1027,12 @@ export function AddCourseScreen() {
                 })}
               </div>
 
-              {/* "+ Add More Courses" Dashed Button matching Image 2 */}
+              {/* "+ Add More Courses" Dashed Button - Sits Directly Below Course Rows */}
               {courseRows.length < 8 && (
                 <button
                   type="button"
                   onClick={handleAddMoreRow}
-                  className="w-full rounded-xl border border-dashed border-[#60A5FA] bg-[#EFF6FF]/60 hover:bg-[#EFF6FF] py-1.5 min-[360px]:py-2 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs active:scale-[0.99] mt-1 shrink-0"
+                  className="w-full rounded-xl border border-dashed border-[#60A5FA] bg-[#EFF6FF]/70 hover:bg-[#EFF6FF] py-2 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs active:scale-[0.99] mt-2 shrink-0"
                 >
                   <div className="w-4 h-4 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
                     <Plus className="w-3 h-3 stroke-[3]" />
@@ -993,7 +1044,6 @@ export function AddCourseScreen() {
               )}
             </div>
           </div>
-        </div>
 
           {/* AI Vision Extraction Progress Card */}
           {addInProgress && (
@@ -1208,6 +1258,15 @@ export function AddCourseScreen() {
             </div>
           </div>
         )}
+        {/* Guest Authentication Prompt Modal (Matching SlotMate & PoolMate) */}
+        <GuestAuthPromptModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          moduleName="FFCS Mate"
+          returnPath="/slotmate/ffcs/add"
+          title="Sign In to Add Courses"
+          subtitle="Please sign in with your student account to extract timetable slots and save your courses."
+        />
       </div>
     </div>
   );

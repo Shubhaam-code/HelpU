@@ -67,18 +67,10 @@ export default function OnboardingPage() {
             onClick={() => window.scrollTo({ top: 0 })}
             className="flex items-center cursor-pointer select-none touch-manipulation"
           >
-            {/* Phone UI: Only 'H' Logo */}
-            <img 
-              src="/logo-h.png" 
-              alt="HelpU" 
-              className="h-8 sm:hidden w-auto object-contain pointer-events-none select-none"
-              draggable={false}
-            />
-            {/* Desktop UI: Full logo */}
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="hidden sm:block h-8 sm:h-9 w-auto object-contain pointer-events-none select-none"
+              className="h-8 sm:h-9 w-auto object-contain pointer-events-none select-none"
               loading="eager"
               decoding="async"
               draggable={false}
@@ -151,12 +143,13 @@ export default function OnboardingPage() {
         </section>
 
         {/* ======================================================================= */}
-        {/* C. MAIN FEATURES (TWO ATTRACTIVE 2-COL CARDS) - STATIC PRESENTATION    */}
+        {/* C. MAIN FEATURES (POOLMATE, SLOTMATE & FFCS MATE)                       */}
         {/* ======================================================================= */}
-        <section className="grid grid-cols-2 gap-3 sm:gap-3.5 w-full select-none touch-pan-y">
+        <section className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3.5 w-full select-none touch-pan-y">
           {/* Card 1: PoolMate */}
           <div 
-            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FFF5ED] via-[#FFF9F5] to-white border border-[#FFE4D6] p-3 sm:p-4 flex flex-col justify-between shadow-2xs touch-pan-y"
+            onClick={() => navigate('/home')}
+            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FFF5ED] via-[#FFF9F5] to-white border border-[#FFE4D6] p-3 sm:p-4 flex flex-col justify-between shadow-2xs touch-pan-y cursor-pointer active:scale-[0.98] transition-all"
           >
             {/* Top Car Illustration — lazy load below fold, pointer-events-none */}
             <div className="w-full flex items-center justify-center py-1 sm:py-2 pointer-events-none select-none">
@@ -205,7 +198,8 @@ export default function OnboardingPage() {
 
           {/* Card 2: SlotMate */}
           <div 
-            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FEFCE8] via-[#FFFDF5] to-white border border-[#FEF08A] p-3 sm:p-4 flex flex-col justify-between shadow-2xs touch-pan-y"
+            onClick={() => navigate('/slotmate')}
+            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#FEFCE8] via-[#FFFDF5] to-white border border-[#FEF08A] p-3 sm:p-4 flex flex-col justify-between shadow-2xs touch-pan-y cursor-pointer active:scale-[0.98] transition-all"
           >
             {/* Top Books & Graduation Cap Illustration — lazy load below fold, pointer-events-none */}
             <div className="w-full flex items-center justify-center py-1 sm:py-2 pointer-events-none select-none">
@@ -247,6 +241,59 @@ export default function OnboardingPage() {
                 </span>
                 <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#FDE68A]">
                   Study
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: FFCS Mate */}
+          <div 
+            onClick={() => navigate('/slotmate/ffcs')}
+            className="group relative rounded-[22px] sm:rounded-[26px] bg-gradient-to-b from-[#EFF6FF] via-[#F8FAFF] to-white border border-[#BFDBFE] p-3 sm:p-4 flex flex-col justify-between shadow-2xs touch-pan-y cursor-pointer active:scale-[0.98] transition-all col-span-2 sm:col-span-1"
+          >
+            {/* Top 3D Book / Curriculum Illustration */}
+            <div className="w-full flex items-center justify-center py-1 sm:py-2 pointer-events-none select-none">
+              <img
+                src="/course-3d-book.png"
+                alt="FFCS Mate Timetable & Courses"
+                className="landing-img h-14 sm:h-18 w-auto object-contain pointer-events-none select-none"
+                loading="lazy"
+                decoding="async"
+                width="120"
+                height="80"
+                draggable={false}
+                onError={(e) => {
+                  e.currentTarget.src = '/ffcs-add-courses-hero.png';
+                }}
+              />
+            </div>
+
+            <div className="space-y-1 mt-1 pointer-events-none select-none">
+              {/* Title & Arrow */}
+              <div className="flex items-center justify-between gap-1">
+                <h3 className="font-black text-sm sm:text-base text-[#17233C] tracking-tight">
+                  FFCS Mate
+                </h3>
+                <div className="w-5.5 h-5.5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-2xs pointer-events-none">
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.8]" />
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-[10px] min-[360px]:text-[11px] text-[#6E7587] font-medium leading-tight">
+                Build clash-free timetables & compare top faculty with AI.
+              </p>
+
+              {/* 3 Pills: AI Vision | Top Faculty | Zero Clash */}
+              <div className="flex flex-wrap items-center gap-1 pt-1.5">
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#BFDBFE]">
+                  AI Vision
+                </span>
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#BFDBFE]">
+                  Top Faculty
+                </span>
+                <span className="px-1.5 min-[360px]:px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[9px] min-[360px]:text-[9.5px] font-black border border-[#BFDBFE]">
+                  Zero Clash
                 </span>
               </div>
             </div>
@@ -339,7 +386,7 @@ export default function OnboardingPage() {
                 <LayoutGrid className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.4]" />
               </div>
               <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-black text-[#17233C] leading-tight pointer-events-none">
-                Choose<br />PoolMate or<br />SlotMate
+                Choose<br />Pool, Slot or<br />FFCS Mate
               </span>
             </div>
 
@@ -351,7 +398,7 @@ export default function OnboardingPage() {
                 <Plus className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[3]" />
               </div>
               <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-black text-[#17233C] leading-tight pointer-events-none">
-                Post Your<br />Ride or<br />Course
+                Post Ride,<br />Course or<br />Timetable
               </span>
             </div>
 
