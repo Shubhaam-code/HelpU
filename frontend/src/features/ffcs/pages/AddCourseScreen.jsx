@@ -14,7 +14,10 @@ import {
   Search,
   FileText,
   Eye,
-  ExternalLink
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
@@ -209,6 +212,11 @@ export function AddCourseScreen() {
 
   // File Preview Modal State (for both Images and PDFs)
   const [previewFile, setPreviewFile] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(3.5, +(z + 0.25).toFixed(2)));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.5, +(z - 0.25).toFixed(2)));
+  const handleResetZoom = () => setZoomLevel(1);
 
   // Submission State
   const [errorMessage, setErrorMessage] = useState('');
@@ -324,7 +332,6 @@ export function AddCourseScreen() {
   // Select suggestion for a row
   const handleSelectSuggestion = (index, course) => {
     if (isCourseAlreadyAdded(course)) {
-      setErrorMessage(`"${course.courseCode}" has already been added.`);
       return;
     }
     // Check if duplicate within current rows
@@ -336,7 +343,6 @@ export function AddCourseScreen() {
           r.selectedCourse._id === (course._id || course.courseId))
     );
     if (duplicateInForm) {
-      setErrorMessage(`"${course.courseCode}" is already in your form list.`);
       return;
     }
 
@@ -812,12 +818,26 @@ export function AddCourseScreen() {
                               {!isSearching &&
                                 suggestions.map((course) => {
                                   const isAdded = isCourseAlreadyAdded(course);
+                                  const isDuplicateInForm = courseRows.some(
+                                    (r, i) =>
+                                      i !== index &&
+                                      r.selectedCourse &&
+                                      (r.selectedCourse.courseCode === course.courseCode ||
+                                        r.selectedCourse._id === (course._id || course.courseId))
+                                  );
+                                  const isDisabled = isAdded || isDuplicateInForm;
+
                                   return (
                                     <button
                                       key={course._id || course.courseId || course.courseCode}
                                       type="button"
-                                      onClick={() => handleSelectSuggestion(index, course)}
-                                      className="w-full text-left px-3 py-2 hover:bg-[#EFF6FF] transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                      disabled={isDisabled}
+                                      onClick={() => !isDisabled && handleSelectSuggestion(index, course)}
+                                      className={`w-full text-left px-3 py-2 transition-colors flex items-center justify-between gap-2 ${
+                                        isDisabled
+                                          ? 'opacity-50 bg-slate-50 cursor-not-allowed select-none'
+                                          : 'hover:bg-[#EFF6FF] cursor-pointer'
+                                      }`}
                                     >
                                       <div className="min-w-0">
                                         <p className="font-black text-xs text-[#0F172A] truncate">
@@ -831,11 +851,15 @@ export function AddCourseScreen() {
                                         </p>
                                       </div>
                                       {isAdded ? (
-                                        <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
-                                          Added
+                                        <span className="text-[9.5px] font-bold text-slate-500 bg-slate-200/90 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                          ✓ Already Added
+                                        </span>
+                                      ) : isDuplicateInForm ? (
+                                        <span className="text-[9.5px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
+                                          In Form
                                         </span>
                                       ) : (
-                                        <span className="text-[9px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
+                                        <span className="text-[9.5px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
                                           Select
                                         </span>
                                       )}
@@ -872,19 +896,22 @@ export function AddCourseScreen() {
                         </button>
                       </div>
 
-                      {/* Attached Files Preview Chips (Images & PDFs) */}
+                      {/* Attached Files Preview Chips (Images & PDFs) - Enhanced & Spacious */}
                       {row.screenshots && row.screenshots.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap pl-8 min-[360px]:pl-9 pr-1">
+                        <div className="flex items-center gap-2 flex-wrap pl-8 min-[360px]:pl-9 pr-1 pt-0.5">
                           {row.screenshots.map((item) => (
                             <div
                               key={item.id}
-                              className="flex items-center gap-1.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg px-1.5 py-0.5 shadow-2xs hover:border-[#60A5FA] transition-all"
+                              className="group flex items-center gap-2 bg-white border border-[#BFDBFE] hover:border-[#3B82F6] rounded-xl py-1.5 px-2.5 shadow-xs transition-all"
                             >
                               {item.type === 'pdf' ? (
                                 <button
                                   type="button"
-                                  onClick={() => setPreviewFile(item)}
-                                  className="w-4.5 h-4.5 rounded-md bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center font-black text-[7.5px] shrink-0 cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setPreviewFile(item);
+                                  }}
+                                  className="w-7 h-7 rounded-lg bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center font-black text-[9px] shrink-0 cursor-pointer transition-colors shadow-2xs"
                                   title="Click to preview PDF"
                                 >
                                   PDF
@@ -893,34 +920,53 @@ export function AddCourseScreen() {
                                 <img
                                   src={item.url}
                                   alt={item.name}
-                                  onClick={() => setPreviewFile(item)}
-                                  className="w-4.5 h-4.5 rounded-md object-cover border border-[#BFDBFE] shrink-0 cursor-pointer"
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setPreviewFile(item);
+                                  }}
+                                  className="w-7 h-7 rounded-lg object-cover border border-blue-100 shrink-0 cursor-pointer shadow-2xs hover:opacity-90 transition-opacity"
                                   title="Click to preview Image"
                                 />
                               )}
-                              <span
-                                onClick={() => setPreviewFile(item)}
-                                className="text-[9.5px] font-bold text-[#1E293B] max-w-[80px] sm:max-w-[120px] truncate cursor-pointer hover:text-[#2563EB]"
-                                title={`Click to preview: ${item.name}`}
+                              <div
+                                onClick={() => {
+                                  setZoomLevel(1);
+                                  setPreviewFile(item);
+                                }}
+                                className="min-w-0 cursor-pointer pr-0.5"
                               >
-                                {item.name}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setPreviewFile(item)}
-                                className="w-3.5 h-3.5 rounded-full text-[#2563EB] hover:bg-blue-100 flex items-center justify-center cursor-pointer"
-                                title="Preview file"
-                              >
-                                <Eye className="w-2.5 h-2.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveRowFile(index, item.id)}
-                                className="w-3.5 h-3.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-100 flex items-center justify-center cursor-pointer"
-                                title="Remove file"
-                              >
-                                <X className="w-2.5 h-2.5" />
-                              </button>
+                                <p
+                                  className="text-[11px] font-bold text-[#0F172A] max-w-[100px] min-[360px]:max-w-[130px] sm:max-w-[170px] truncate leading-tight group-hover:text-[#2563EB] transition-colors"
+                                  title={`Click to preview: ${item.name}`}
+                                >
+                                  {item.name}
+                                </p>
+                                <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  {item.type === 'pdf' ? 'PDF File' : 'Screenshot'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0 ml-1 pl-1 border-l border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setPreviewFile(item);
+                                  }}
+                                  className="w-6 h-6 rounded-lg text-[#2563EB] hover:bg-[#EFF6FF] flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Preview file"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRowFile(index, item.id)}
+                                  className="w-6 h-6 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Remove file"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1055,6 +1101,38 @@ export function AddCourseScreen() {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Zoom Controls for Images */}
+                  {previewFile.type === 'image' && (
+                    <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={handleZoomOut}
+                        disabled={zoomLevel <= 0.5}
+                        className="w-6 h-6 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+                        title="Zoom Out (-)"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetZoom}
+                        className="px-1.5 text-[10px] font-black text-slate-700 hover:text-blue-600 cursor-pointer select-none"
+                        title="Reset Zoom (100%)"
+                      >
+                        {Math.round(zoomLevel * 100)}%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleZoomIn}
+                        disabled={zoomLevel >= 3.5}
+                        className="w-6 h-6 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+                        title="Zoom In (+)"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   <a
                     href={previewFile.url}
                     target="_blank"
@@ -1066,7 +1144,10 @@ export function AddCourseScreen() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setPreviewFile(null)}
+                    onClick={() => {
+                      setPreviewFile(null);
+                      setZoomLevel(1);
+                    }}
                     className="w-7 h-7 rounded-xl hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
                     title="Close preview"
                   >
@@ -1076,13 +1157,25 @@ export function AddCourseScreen() {
               </div>
 
               {/* Modal Body */}
-              <div className="p-3 sm:p-4 overflow-y-auto flex-1 flex items-center justify-center bg-slate-100/50">
+              <div className="p-3 sm:p-4 overflow-hidden flex-1 flex flex-col items-center justify-center bg-slate-100/50 relative">
                 {previewFile.type === 'image' ? (
-                  <img
-                    src={previewFile.url}
-                    alt={previewFile.name}
-                    className="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-sm border border-slate-200"
-                  />
+                  <div className="w-full h-full min-h-[50vh] max-h-[72vh] overflow-auto flex items-center justify-center p-2 scrollbar-thin">
+                    <div
+                      className="inline-block transition-transform duration-150 ease-out select-none cursor-zoom-in"
+                      style={{
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'center center'
+                      }}
+                      onDoubleClick={() => setZoomLevel((z) => (z > 1 ? 1 : 2))}
+                      title="Double click to toggle 2x zoom"
+                    >
+                      <img
+                        src={previewFile.url}
+                        alt={previewFile.name}
+                        className="max-w-full max-h-[68vh] object-contain rounded-2xl shadow-sm border border-slate-200"
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <div className="w-full h-[65vh] flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
                     <object
