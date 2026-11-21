@@ -64,7 +64,7 @@ export function FFCSHome() {
       {/* ========================================================================= */}
       {/* MAIN CONTENT CONTAINER (Universal: Phone + Desktop Responsive)           */}
       {/* ========================================================================= */}
-      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-[54px] min-[360px]:pb-[60px] sm:pb-[66px] relative z-10 flex-1">
+      <main className="w-full max-w-xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-2.5 pb-24 min-[360px]:pb-28 sm:pb-32 relative z-10 flex-1">
 
         <div className="space-y-4 sm:space-y-5">
           {/* 2. WELCOME GREETING */}

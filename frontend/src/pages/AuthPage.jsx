@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseAuth } from '../context/FirebaseAuthContext';
 import { 
   ArrowLeft, ShieldCheck, Mail, Lock, User as UserIcon, 
-  Eye, EyeOff, Car, GraduationCap, CheckCircle2, X
+  Eye, EyeOff, Car, GraduationCap, CalendarDays, CheckCircle2, X
 } from 'lucide-react';
 import { useAuthProfile } from '../context/AuthProfileContext';
 import { getPendingDraftReturnPath } from '../utils/guestDraft';
@@ -270,35 +270,50 @@ export default function AuthPage({ initialMode = 'signIn' }) {
         </div>
 
         {/* ======================================================================= */}
-        {/* 4. FEATURE CARDS (POOLMATE & SLOTMATE)                                  */}
+        {/* 4. FEATURE CARDS (POOLMATE, SLOTMATE & FFCS MATE)                       */}
         {/* ======================================================================= */}
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full">
+        <div className="grid grid-cols-3 gap-1.5 min-[360px]:gap-2 w-full">
           {/* Card 1: PoolMate */}
-          <div className="rounded-2xl bg-[#FFF5ED] border border-[#FFE4D6] p-2.5 sm:p-3 flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-full bg-[#FFEFE6] text-[#FF572E] border border-[#FFD9C7] flex items-center justify-center shrink-0 shadow-2xs">
-              <Car className="w-4 h-4 stroke-[2.4]" />
+          <div className="rounded-2xl bg-[#FFF5ED] border border-[#FFE4D6] p-2 min-[360px]:p-2.5 flex items-center gap-1.5 sm:gap-2 shadow-2xs">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFEFE6] text-[#FF572E] border border-[#FFD9C7] flex items-center justify-center shrink-0 shadow-2xs">
+              <Car className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.4]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-black text-xs sm:text-[13px] text-[#17233C] truncate">
+              <h3 className="font-black text-[11px] sm:text-xs text-[#17233C] truncate">
                 PoolMate
               </h3>
-              <p className="text-[9.5px] min-[360px]:text-[10px] text-[#6E7587] font-medium leading-tight truncate">
-                Share rides & travel together
+              <p className="text-[8.5px] min-[360px]:text-[9.5px] text-[#6E7587] font-medium leading-tight truncate">
+                Share rides
               </p>
             </div>
           </div>
 
           {/* Card 2: SlotMate */}
-          <div className="rounded-2xl bg-[#FEFCE8] border border-[#FEF08A] p-2.5 sm:p-3 flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A] flex items-center justify-center shrink-0 shadow-2xs">
-              <GraduationCap className="w-4 h-4 stroke-[2.4]" />
+          <div className="rounded-2xl bg-[#FEFCE8] border border-[#FEF08A] p-2 min-[360px]:p-2.5 flex items-center gap-1.5 sm:gap-2 shadow-2xs">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A] flex items-center justify-center shrink-0 shadow-2xs">
+              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.4]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-black text-xs sm:text-[13px] text-[#17233C] truncate">
+              <h3 className="font-black text-[11px] sm:text-xs text-[#17233C] truncate">
                 SlotMate
               </h3>
-              <p className="text-[9.5px] min-[360px]:text-[10px] text-[#6E7587] font-medium leading-tight truncate">
-                Find classmates by course & slot
+              <p className="text-[8.5px] min-[360px]:text-[9.5px] text-[#6E7587] font-medium leading-tight truncate">
+                Find classmates
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: FFCS Mate */}
+          <div className="rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] p-2 min-[360px]:p-2.5 flex items-center gap-1.5 sm:gap-2 shadow-2xs">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] flex items-center justify-center shrink-0 shadow-2xs">
+              <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.4]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-black text-[11px] sm:text-xs text-[#17233C] truncate">
+                FFCS Mate
+              </h3>
+              <p className="text-[8.5px] min-[360px]:text-[9.5px] text-[#6E7587] font-medium leading-tight truncate">
+                Timetable & AI
               </p>
             </div>
           </div>
