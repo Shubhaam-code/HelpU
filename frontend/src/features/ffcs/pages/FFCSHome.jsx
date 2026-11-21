@@ -80,24 +80,24 @@ export function FFCSHome() {
           {/* 3. TRIPLE SERVICE SWITCHER (SlotMate | PoolMate | FFCS Mate) */}
           <ServiceSwitcher activeService="ffcs" />
 
-          {/* 4. HERO BANNER: MAKE YOUR FFCS SMARTER (BIGGER & MORE SPACIOUS) */}
+          {/* 4. HERO BANNER: MAKE YOUR FFCS SMARTER (COMPACT & SLEEK) */}
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative bg-gradient-to-br from-[#EFF6FF] via-[#F0F7FF] to-[#DBEAFE]/90 rounded-[24px] min-[360px]:rounded-[28px] sm:rounded-[32px] border border-[#BFDBFE] pt-5 px-4 min-[360px]:pt-6 min-[360px]:px-5 sm:pt-8 sm:px-7 pb-0 overflow-hidden shadow-xs hover:shadow-sm transition-shadow"
+            className="relative bg-gradient-to-br from-[#EFF6FF] via-[#F0F7FF] to-[#DBEAFE]/90 rounded-[20px] min-[360px]:rounded-[24px] sm:rounded-[28px] border border-[#BFDBFE] pt-3.5 px-3.5 min-[360px]:pt-4 min-[360px]:px-4.5 sm:pt-6 sm:px-6 pb-0 overflow-hidden shadow-xs hover:shadow-sm transition-shadow"
           >
             {/* Decorative Glow */}
-            <div className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-bl from-[#93C5FD]/35 to-transparent pointer-events-none rounded-full" />
+            <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-[#93C5FD]/35 to-transparent pointer-events-none rounded-full" />
 
-            <div className="relative z-10 flex items-end justify-between gap-3 sm:gap-6">
+            <div className="relative z-10 flex items-end justify-between gap-2.5 sm:gap-5">
               {/* Left Content */}
-              <div className="flex-1 min-w-0 pr-1 sm:pr-2 space-y-1.5 sm:space-y-2 pb-5 min-[360px]:pb-6 sm:pb-7">
-                <h1 className="font-black text-[#17233C] text-[22px] min-[360px]:text-[24px] sm:text-3xl md:text-4xl leading-[1.12] tracking-tight">
+              <div className="flex-1 min-w-0 pr-1 space-y-1 sm:space-y-1.5 pb-3.5 min-[360px]:pb-4 sm:pb-5">
+                <h1 className="font-black text-[#17233C] text-[18px] min-[360px]:text-[20px] sm:text-2xl md:text-3xl leading-[1.15] tracking-tight">
                   Make Your <br />
                   <span className="text-[#2563EB]">FFCS Smarter</span>
                 </h1>
-                <p className="text-[11.5px] min-[360px]:text-[12.5px] sm:text-sm text-[#64748B] font-medium leading-relaxed max-w-[240px] sm:max-w-md">
+                <p className="text-[10.5px] min-[360px]:text-[11.5px] sm:text-xs text-[#64748B] font-medium leading-relaxed max-w-[210px] sm:max-w-sm">
                   Explore courses, compare faculty and plan your{' '}
                   <span className="font-black text-[#17233C]">perfect schedule.</span>
                 </p>
@@ -105,13 +105,13 @@ export function FFCSHome() {
 
               {/* Right Illustration (Connected flush to bottom edge, zero gap) */}
               <div
-                className="shrink-0 w-[145px] min-[360px]:w-[170px] sm:w-[230px] md:w-[270px] flex justify-end items-end self-end -mr-1 sm:mr-0"
-                style={{ maxWidth: '52%' }}
+                className="shrink-0 w-[120px] min-[360px]:w-[138px] sm:w-[190px] md:w-[220px] flex justify-end items-end self-end -mr-1 sm:mr-0"
+                style={{ maxWidth: '50%' }}
               >
                 <img
                   src="/ffcs-students-duo.png"
                   alt="Smart FFCS Course Planning"
-                  className="w-full h-auto max-h-[160px] min-[360px]:max-h-[180px] sm:max-h-[225px] md:max-h-[255px] object-contain object-bottom select-none pointer-events-none drop-shadow-xs block"
+                  className="w-full h-auto max-h-[125px] min-[360px]:max-h-[142px] sm:max-h-[180px] md:max-h-[210px] object-contain object-bottom select-none pointer-events-none drop-shadow-xs block"
                   onError={(e) => {
                     e.currentTarget.src = '/ffcs-campus-hero.png';
                     e.currentTarget.onerror = null;
