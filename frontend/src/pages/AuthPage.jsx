@@ -228,17 +228,10 @@ export default function AuthPage({ initialMode = 'signIn' }) {
 
           {/* Centered Logo */}
           <div className="flex items-center gap-1.5 select-none">
-            {/* Phone UI: Only 'H' Logo */}
-            <img 
-              src="/logo-h.png" 
-              alt="HelpU" 
-              className="h-8 sm:hidden w-auto object-contain"
-            />
-            {/* Desktop UI: Full logo */}
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="hidden sm:block h-8 sm:h-9 w-auto object-contain"
+              className="h-8 sm:h-9 w-auto object-contain"
             />
           </div>
 
