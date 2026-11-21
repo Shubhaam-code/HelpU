@@ -6,7 +6,7 @@ import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import {
   Calendar, Car, Heart, HelpCircle, ChevronRight, LogOut,
   ShieldCheck, ShieldAlert, Mail, Phone, GraduationCap, BookOpen, Edit3, CheckCircle2,
-  ArrowRight, Sparkles, X, User as UserIcon, Download, MessageCircle, ChevronDown, Crown
+  ArrowRight, Sparkles, X, User as UserIcon, Download, MessageCircle, ChevronDown, Crown, Loader2
 } from 'lucide-react';
 
 import { ResponsiveShell } from '../components/layout/ResponsiveShell';
@@ -89,16 +89,22 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Handle Sign Out
-  const handleSignOut = async () => {
+  // Handle Confirm Sign Out
+  const handleConfirmSignOut = async () => {
     try {
+      setIsSigningOut(true);
       if (signOut) {
         await signOut();
       }
+      setShowSignOutModal(false);
       navigate('/login', { replace: true });
     } catch (err) {
       console.error('Sign Out error:', err);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -322,9 +328,9 @@ export default function ProfilePage() {
                           {isGuest ? 'Student • Unverified' : displayCollege}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 truncate">
+                      <div className="flex items-center gap-1.5">
                         <Mail className="w-3.5 h-3.5 text-[#8C93A4] shrink-0" />
-                        <span className="font-medium text-[10.5px] sm:text-xs truncate max-w-[220px] sm:max-w-xs md:max-w-md">
+                        <span className="font-medium text-[11px] sm:text-xs text-[#6E7587] break-all leading-tight select-all">
                           {isGuest ? 'College Email • Unverified' : displayEmail}
                         </span>
                       </div>
@@ -643,7 +649,7 @@ export default function ProfilePage() {
           <div className="pt-2 pb-6 flex flex-col items-center">
             <button
               type="button"
-              onClick={handleSignOut}
+              onClick={() => setShowSignOutModal(true)}
               className="w-full max-w-sm py-3 px-6 rounded-full bg-white hover:bg-rose-50 active:scale-98 border border-rose-200 text-rose-600 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
             >
               <LogOut className="w-4 h-4 stroke-[2.4]" />
@@ -653,6 +659,53 @@ export default function ProfilePage() {
         )}
 
       </div>
+
+      {/* ========================================================================= */}
+      {/* SIGN OUT CONFIRMATION MODAL                                               */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showSignOutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[26px] p-5 sm:p-6 max-w-sm w-full border border-[#F4E3D8] shadow-2xl space-y-3.5 relative overflow-hidden text-left"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200/70 flex items-center justify-center shadow-2xs">
+                <LogOut className="w-6 h-6 stroke-[2.4]" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-black text-lg text-[#17233C] tracking-tight">Sign Out of Helpu?</h3>
+                <p className="text-xs text-[#6E7587] leading-relaxed">
+                  Are you sure you want to sign out? You will need to sign in again to access your rides and slot matches.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutModal(false)}
+                  disabled={isSigningOut}
+                  className="px-4 py-2.5 rounded-xl border border-[#F4E3D8] text-xs font-bold text-[#6E7587] hover:bg-[#FFFDF9] active:scale-95 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSignOut}
+                  disabled={isSigningOut}
+                  className="px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white text-xs font-black shadow-md shadow-rose-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  {isSigningOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                  <span>{isSigningOut ? 'Signing Out...' : 'Yes, Sign Out'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
 
       {/* ========================================================================= */}

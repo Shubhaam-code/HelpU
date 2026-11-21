@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Pencil, Check, CheckCircle2, 
   FileText, Users, GraduationCap, Layers, ChevronRight, Crown,
-  X, AlertCircle, Plus, Mail, LogOut, ArrowRight, ShieldAlert, User as UserIcon
+  X, AlertCircle, Plus, Mail, LogOut, ArrowRight, ShieldAlert, User as UserIcon, Loader2
 } from 'lucide-react';
 import { useFirebaseAuth } from '../../../context/FirebaseAuthContext';
 import { useUserProfile } from '../../../hooks/useAppData';
@@ -71,15 +72,22 @@ export default function SlotMateProfilePage() {
     }
   }, [profile, user]);
 
-  // Handle Sign Out
-  const handleSignOut = async () => {
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // Handle Confirm Sign Out
+  const handleConfirmSignOut = async () => {
     try {
+      setIsSigningOut(true);
       if (signOut) {
         await signOut();
       }
+      setShowSignOutModal(false);
       navigate('/login', { replace: true });
     } catch (err) {
       console.error('Logout error:', err);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -283,7 +291,7 @@ export default function SlotMateProfilePage() {
                     {/* Row 3: Email */}
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#6E7587]">
                       <Mail className="w-3.5 h-3.5 text-[#8C93A4] stroke-[2] shrink-0" />
-                      <span className="truncate">{isGuest ? 'College Email • Unverified' : displayEmail}</span>
+                      <span className="break-all leading-tight select-all">{isGuest ? 'College Email • Unverified' : displayEmail}</span>
                     </div>
                   </div>
                 </div>
@@ -449,7 +457,7 @@ export default function SlotMateProfilePage() {
           <div className="pt-2 pb-6 flex flex-col items-center gap-2.5">
             <button
               type="button"
-              onClick={handleSignOut}
+              onClick={() => setShowSignOutModal(true)}
               className="w-full max-w-sm py-3 px-6 rounded-full bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
             >
               <LogOut className="w-4 h-4 stroke-[2.4]" />
@@ -459,6 +467,53 @@ export default function SlotMateProfilePage() {
         )}
 
       </main>
+
+      {/* ========================================================================= */}
+      {/* SIGN OUT CONFIRMATION MODAL                                               */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showSignOutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[26px] p-5 sm:p-6 max-w-sm w-full border border-[#F4E3D8] shadow-2xl space-y-3.5 relative overflow-hidden text-left"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200/70 flex items-center justify-center shadow-2xs">
+                <LogOut className="w-6 h-6 stroke-[2.4]" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-black text-lg text-[#17233C] tracking-tight">Sign Out of Helpu?</h3>
+                <p className="text-xs text-[#6E7587] leading-relaxed">
+                  Are you sure you want to sign out? You will need to sign in again to access your rides and slot matches.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutModal(false)}
+                  disabled={isSigningOut}
+                  className="px-4 py-2.5 rounded-xl border border-[#F4E3D8] text-xs font-bold text-[#6E7587] hover:bg-[#FFFDF9] active:scale-95 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSignOut}
+                  disabled={isSigningOut}
+                  className="px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white text-xs font-black shadow-md shadow-rose-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  {isSigningOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                  <span>{isSigningOut ? 'Signing Out...' : 'Yes, Sign Out'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 7. EDIT PROFILE MODAL                                                     */}
