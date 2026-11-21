@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, BookOpen, Users, ChevronRight, Check, 
   Calendar, User, Plus, Loader2, Trash2, Edit3, 
   Bookmark, MoreHorizontal, Building2, GraduationCap, 
-  ArrowRight, CheckCircle2, CheckCircle, CircleSlash, Clock
+  ArrowRight, CheckCircle2, CheckCircle, CircleSlash, Clock, AlertTriangle
 } from 'lucide-react';
 import { useSlotFriend } from '../context/SlotFriendContext';
 import { useSlotPostMatches } from '../../../hooks/useAppData';
@@ -85,6 +86,7 @@ export default function SlotMatchesPage() {
   const isLoadingMatches =
     isMatchesQueryLoading || (isViewingSpecificCourse && isLoadingPosts && !targetPostId);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [postToDelete, setPostToDelete] = useState(null);
   const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const menuRef = useRef(null);
@@ -136,17 +138,23 @@ export default function SlotMatchesPage() {
     navigate(`/slotmate/student/${matchId}`);
   };
 
-  // Delete post handler
-  const handleDeletePost = async (e, postToDelete) => {
-    e.stopPropagation();
+  // Delete post trigger (opens clean confirmation modal)
+  const handleDeletePost = (e, targetPost) => {
+    e?.stopPropagation?.();
     setIsPostMenuOpen(false);
+    setPostToDelete(targetPost);
+  };
+
+  // Confirm delete post handler
+  const handleConfirmDelete = async () => {
+    if (!postToDelete) return;
     const postId = postToDelete?._id || postToDelete?.id;
     if (!postId) return;
-    if (!window.confirm(`Are you sure you want to delete your post for ${getCourseCode(postToDelete)}?`)) return;
 
     try {
       setIsDeleting(true);
       await deletePost(postId);
+      setPostToDelete(null);
       if (isViewingSpecificCourse) {
         navigate('/slotmate/matches');
       }
@@ -166,6 +174,61 @@ export default function SlotMatchesPage() {
       navigate(`/slotmate/create?edit=${postId}`);
     }
   };
+
+  // Reusable Native Delete Confirmation Modal
+  const renderDeleteConfirmModal = () => (
+    <AnimatePresence>
+      {postToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white rounded-[26px] p-5 sm:p-6 max-w-sm w-full border border-[#F4E3D8] shadow-2xl space-y-3.5 relative overflow-hidden text-left"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 border border-red-200/70 flex items-center justify-center shadow-2xs">
+              <AlertTriangle className="w-6 h-6 stroke-[2.4]" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-lg text-[#17233C] tracking-tight">Delete Course Post?</h3>
+              <p className="text-xs text-[#6E7587] leading-relaxed">
+                Are you sure you want to delete{' '}
+                <strong className="text-[#17233C] font-black">
+                  {getCourseCode(postToDelete)}
+                </strong>
+                {getCourseTitle(postToDelete) ? ` (${getCourseTitle(postToDelete)})` : ''}{' '}
+                for <strong className="text-[#17233C]">Slot {postToDelete?.slot}</strong>?
+              </p>
+              <p className="text-[11px] text-[#DC2626] font-semibold pt-1">
+                You will no longer match with classmates for this slot post.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPostToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl border border-[#F4E3D8] text-xs font-bold text-[#6E7587] hover:bg-[#FFFDF9] active:scale-95 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 active:scale-95 text-white text-xs font-black shadow-md shadow-red-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
 
   // ===========================================================================
   // PAGE 2: POST-WISE MATCH DETAILS SCREEN (EXACT MATCH TO REFERENCE IMAGE 1)
@@ -469,6 +532,9 @@ export default function SlotMatchesPage() {
 
         {/* Bottom Navigation */}
         <SlotMateBottomNav active="matches" />
+
+        {/* Delete Confirmation Modal */}
+        {renderDeleteConfirmModal()}
       </div>
     );
   }
@@ -688,19 +754,30 @@ export default function SlotMatchesPage() {
                     </div>
                   </div>
 
-                  {/* Right: Matches Badge + Chevron */}
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  {/* Right: Matches Badge + Delete Button + Chevron */}
+                  <div className="flex items-center gap-1.5 min-[390px]:gap-2 sm:gap-2.5 shrink-0">
                     {matchCount > 0 ? (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0] text-xs font-black shadow-2xs">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 min-[390px]:px-3 py-1.5 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0] text-[11px] min-[390px]:text-xs font-black shadow-2xs">
                         <Users className="w-3.5 h-3.5 stroke-[2.4]" />
                         <span>{matchCount} {matchCount === 1 ? 'Match' : 'Matches'}</span>
                       </div>
                     ) : (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FEF3C7] text-[#78350F] border border-[#FDE68A] text-xs font-black shadow-2xs">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 min-[390px]:px-3 py-1.5 rounded-full bg-[#FEF3C7] text-[#78350F] border border-[#FDE68A] text-[11px] min-[390px]:text-xs font-black shadow-2xs">
                         <Users className="w-3.5 h-3.5 stroke-[2.4]" />
                         <span>0 Matches</span>
                       </div>
                     )}
+
+                    {/* Delete Course Post Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeletePost(e, post)}
+                      className="w-8 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200/80 flex items-center justify-center active:scale-90 transition-all cursor-pointer shadow-2xs shrink-0"
+                      title={`Delete ${courseCode}`}
+                      aria-label={`Delete ${courseCode}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 min-[390px]:w-4 min-[390px]:h-4 stroke-[2.2]" />
+                    </button>
 
                     <ChevronRight className="w-4 h-4 text-[#17233C] stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
                   </div>
@@ -779,6 +856,9 @@ export default function SlotMatchesPage() {
         moduleName="SlotMate"
         returnPath="/slotmate/matches"
       />
+
+      {/* Delete Confirmation Modal */}
+      {renderDeleteConfirmModal()}
     </div>
   );
 }

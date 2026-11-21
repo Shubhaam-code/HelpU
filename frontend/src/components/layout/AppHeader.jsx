@@ -100,7 +100,7 @@ export function AppHeader({
           <img 
             src="/logo.png" 
             alt="HelpU" 
-            className="h-7 sm:h-8 w-auto max-w-[120px] sm:max-w-none object-contain select-none" 
+            className="h-7 sm:h-8 w-auto object-contain select-none" 
             draggable="false"
           />
         </button>
