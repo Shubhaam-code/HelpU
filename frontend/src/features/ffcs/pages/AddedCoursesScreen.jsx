@@ -10,7 +10,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { TeacherClassroomIcon } from '../../../components/icons/TeacherClassroomIcon';
-import celebrationImg from '../../../assets/images/ffcs_celebration_opt.png';
+import blueThumbsUpImg from '../../../assets/images/ffcs_blue_thumbsup.png';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { CourseSkeletonCard } from '../components/FFCSSkeleton';
@@ -106,19 +106,22 @@ export function AddedCoursesScreen() {
             {/* Right Side: Larger Boy-Girl Illustration Anchored Exactly to Bottom-Right */}
             <div className="absolute bottom-0 right-0 h-[76px] sm:h-[86px] w-[130px] min-[360px]:w-[145px] sm:w-[160px] flex items-end justify-end pointer-events-none select-none z-10">
               <img
-                src={celebrationImg}
+                src={blueThumbsUpImg}
                 alt="Faculty Selection Status"
                 className="h-full w-auto object-contain object-bottom drop-shadow-xs"
+                onError={(e) => {
+                  e.currentTarget.src = '/ffcs_blue_thumbsup.png';
+                }}
               />
             </div>
           </div>
         )}
 
-        {error && (
+        {error && coursesList.length === 0 && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-3 text-xs font-bold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1">{error}</span>
-            <button type="button" onClick={refreshCourses} className="underline cursor-pointer">Retry</button>
+            <button type="button" onClick={() => refreshCourses({ force: true })} className="underline cursor-pointer">Retry</button>
           </div>
         )}
 
@@ -227,7 +230,7 @@ export function AddedCoursesScreen() {
         )}
       </div>
 
-      <FFCSBottomNav activeTab="add" />
+      <FFCSBottomNav activeTab="courses" />
 
       {/* Modern Custom Course Delete Confirmation Modal */}
       {courseToDelete && (

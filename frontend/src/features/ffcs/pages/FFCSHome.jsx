@@ -80,37 +80,38 @@ export function FFCSHome() {
           {/* 3. TRIPLE SERVICE SWITCHER (SlotMate | PoolMate | FFCS Mate) */}
           <ServiceSwitcher activeService="ffcs" />
 
-          {/* 4. HERO BANNER: MAKE YOUR FFCS SMARTER (FLUSH BOTTOM CONNECTION) */}
+          {/* 4. HERO BANNER: MAKE YOUR FFCS SMARTER (BIGGER & MORE SPACIOUS) */}
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative bg-gradient-to-br from-[#EFF6FF] via-[#F0F7FF] to-[#DBEAFE]/90 rounded-[22px] min-[360px]:rounded-[26px] sm:rounded-[30px] border border-[#BFDBFE] pt-3.5 px-3.5 min-[360px]:pt-4 min-[360px]:px-4 sm:pt-6 sm:px-6 pb-0 overflow-hidden shadow-xs hover:shadow-sm transition-shadow"
+            className="relative bg-gradient-to-br from-[#EFF6FF] via-[#F0F7FF] to-[#DBEAFE]/90 rounded-[24px] min-[360px]:rounded-[28px] sm:rounded-[32px] border border-[#BFDBFE] pt-5 px-4 min-[360px]:pt-6 min-[360px]:px-5 sm:pt-8 sm:px-7 pb-0 overflow-hidden shadow-xs hover:shadow-sm transition-shadow"
           >
             {/* Decorative Glow */}
-            <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-[#93C5FD]/30 to-transparent pointer-events-none rounded-full" />
+            <div className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-bl from-[#93C5FD]/35 to-transparent pointer-events-none rounded-full" />
 
-            <div className="relative z-10 flex items-end justify-between gap-2 sm:gap-6">
+            <div className="relative z-10 flex items-end justify-between gap-3 sm:gap-6">
               {/* Left Content */}
-              <div className="flex-1 min-w-0 pr-0.5 sm:pr-2 space-y-1 sm:space-y-2 pb-3.5 min-[360px]:pb-4 sm:pb-6">
-                <h1 className="font-black text-[#17233C] text-[19px] min-[360px]:text-[21px] sm:text-2xl md:text-3xl leading-[1.15] tracking-tight">
+              <div className="flex-1 min-w-0 pr-1 sm:pr-2 space-y-1.5 sm:space-y-2 pb-5 min-[360px]:pb-6 sm:pb-7">
+                <h1 className="font-black text-[#17233C] text-[22px] min-[360px]:text-[24px] sm:text-3xl md:text-4xl leading-[1.12] tracking-tight">
                   Make Your <br />
                   <span className="text-[#2563EB]">FFCS Smarter</span>
                 </h1>
-                <p className="text-[10.5px] min-[360px]:text-[11.5px] sm:text-xs md:text-sm text-[#475569] font-medium leading-relaxed max-w-[220px] sm:max-w-md">
-                  Explore courses, compare faculty and plan your perfect schedule.
+                <p className="text-[11.5px] min-[360px]:text-[12.5px] sm:text-sm text-[#64748B] font-medium leading-relaxed max-w-[240px] sm:max-w-md">
+                  Explore courses, compare faculty and plan your{' '}
+                  <span className="font-black text-[#17233C]">perfect schedule.</span>
                 </p>
               </div>
 
               {/* Right Illustration (Connected flush to bottom edge, zero gap) */}
               <div
-                className="shrink-0 w-[130px] min-[360px]:w-[150px] sm:w-[210px] md:w-[250px] flex justify-end items-end self-end -mr-1 sm:mr-0"
-                style={{ maxWidth: '50%' }}
+                className="shrink-0 w-[145px] min-[360px]:w-[170px] sm:w-[230px] md:w-[270px] flex justify-end items-end self-end -mr-1 sm:mr-0"
+                style={{ maxWidth: '52%' }}
               >
                 <img
                   src="/ffcs-students-duo.png"
                   alt="Smart FFCS Course Planning"
-                  className="w-full h-auto max-h-[140px] min-[360px]:max-h-[155px] sm:max-h-[195px] md:max-h-[220px] object-contain object-bottom select-none pointer-events-none drop-shadow-xs block"
+                  className="w-full h-auto max-h-[160px] min-[360px]:max-h-[180px] sm:max-h-[225px] md:max-h-[255px] object-contain object-bottom select-none pointer-events-none drop-shadow-xs block"
                   onError={(e) => {
                     e.currentTarget.src = '/ffcs-campus-hero.png';
                     e.currentTarget.onerror = null;
@@ -297,18 +298,31 @@ export function FFCSHome() {
               </div>
             )}
           </div>
-          {/* 7. BOTTOM CAMPUS HERO (Full image preserved, boy hair never cut off) */}
-          <div className="pt-1 pb-0 -mx-3.5 sm:-mx-6 w-[calc(100%+1.75rem)] sm:w-[calc(100%+3rem)] select-none pointer-events-none flex items-end justify-center">
-            <img
-              src="/ffcs-campus-hero.png"
-              alt="VIT Campus and FFCS Planning"
-              className="w-full h-auto max-h-[220px] object-contain object-bottom block"
-              loading="eager"
-              decoding="sync"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
+          {/* 7. BOTTOM HIGHLIGHT CARD (Text Left, Illustration Right, Star Removed) */}
+          <div className="bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-[22px] min-[360px]:rounded-[26px] sm:rounded-[28px] border border-[#BFDBFE] p-3.5 min-[360px]:p-4 sm:p-5 shadow-2xs overflow-hidden relative flex items-center justify-between gap-3 min-[360px]:gap-3.5 sm:gap-5">
+            {/* Left Information */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <h3 className="font-black text-sm min-[360px]:text-[15px] sm:text-lg text-[#17233C] tracking-tight leading-snug">
+                Plan Better Together
+              </h3>
+              <p className="text-[10px] min-[360px]:text-[11px] sm:text-xs text-[#64748B] font-medium leading-relaxed">
+                Choose top faculties, compare slots and build your clash-free timetable effortlessly.
+              </p>
+            </div>
+
+            {/* Right Character Illustration */}
+            <div className="shrink-0 w-[115px] min-[360px]:w-[130px] sm:w-[160px] flex items-center justify-end select-none pointer-events-none">
+              <img
+                src="/ffcs-study-duo.png"
+                alt="Plan Better Together"
+                className="w-full h-auto object-contain drop-shadow-xs"
+                loading="eager"
+                decoding="sync"
+                onError={(e) => {
+                  e.currentTarget.src = '/ffcs-campus-hero.png';
+                }}
+              />
+            </div>
           </div>
 
         </div>

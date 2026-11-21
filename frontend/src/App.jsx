@@ -411,7 +411,7 @@ function AppShell() {
       <Route path="/slotmate/ffcs/courses" element={<GuestFriendlyRoute><AddedCoursesScreen /></GuestFriendlyRoute>} />
       <Route path="/slotmate/ffcs/faculty/:courseCode" element={<GuestFriendlyRoute><SelectFacultyScreen /></GuestFriendlyRoute>} />
       <Route path="/slotmate/ffcs/timetable" element={<GuestFriendlyRoute><FFCSTimeTableScreen /></GuestFriendlyRoute>} />
-      <Route path="/slotmate/ffcs/settings" element={<GuestFriendlyRoute><FFCSSettingsScreen /></GuestFriendlyRoute>} />
+      <Route path="/slotmate/ffcs/settings" element={<Navigate to="/slotmate/ffcs/timetable" replace />} />
       <Route path="/ffcs" element={<Navigate to="/slotmate/ffcs" replace />} />
       <Route path="/ffcs/*" element={<Navigate to="/slotmate/ffcs" replace />} />
 

@@ -97,10 +97,18 @@ export function AppHeader({
           className="flex items-center shrink-0 focus:outline-none cursor-pointer transition-transform duration-150 active:scale-95 py-0.5"
           aria-label="HelpU Home"
         >
+          {/* Phone UI: Show ONLY the iconic 'H' logo mark without 'Helpu' text */}
+          <img 
+            src="/logo-h.png" 
+            alt="HelpU" 
+            className="h-7 min-[360px]:h-8 sm:hidden w-auto object-contain select-none drop-shadow-xs" 
+            draggable="false"
+          />
+          {/* Desktop/Tablet UI: Show full brand logo with wordmark */}
           <img 
             src="/logo.png" 
             alt="HelpU" 
-            className="h-7 sm:h-8 w-auto max-w-[120px] sm:max-w-none object-contain select-none" 
+            className="hidden sm:block h-8 w-auto object-contain select-none" 
             draggable="false"
           />
         </button>

@@ -1,22 +1,19 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, PlusCircle, CalendarDays, Settings } from 'lucide-react';
+import { Home, PlusCircle, BookOpen, CalendarDays } from 'lucide-react';
 
 export function FFCSBottomNav({ activeTab }) {
   const location = useLocation();
 
-  const normalizedActiveTab = activeTab === 'courses' ? 'add' : activeTab;
-
-  // Infer tab: if on /add or /courses path, activeTab is ALWAYS 'add'
+  // Infer tab based on current pathname
   const currentTab =
-    (location.pathname.includes('/add') || location.pathname.includes('/courses'))
+    location.pathname.includes('/courses')
+      ? 'courses'
+      : location.pathname.includes('/add')
       ? 'add'
-      : normalizedActiveTab ||
-        (location.pathname.includes('/timetable')
-          ? 'timetable'
-          : location.pathname.includes('/settings')
-          ? 'settings'
-          : 'home');
+      : location.pathname.includes('/timetable')
+      ? 'timetable'
+      : activeTab || 'home';
 
   const tabs = [
     {
@@ -32,16 +29,16 @@ export function FFCSBottomNav({ activeTab }) {
       path: '/slotmate/ffcs/add'
     },
     {
+      id: 'courses',
+      label: 'Courses',
+      icon: BookOpen,
+      path: '/slotmate/ffcs/courses'
+    },
+    {
       id: 'timetable',
       label: 'Time Table',
       icon: CalendarDays,
       path: '/slotmate/ffcs/timetable'
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Settings,
-      path: '/slotmate/ffcs/settings'
     }
   ];
 
@@ -62,14 +59,14 @@ export function FFCSBottomNav({ activeTab }) {
               className="flex flex-col items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 no-underline"
             >
               {isActive ? (
-                <div className="flex flex-col items-center justify-center px-4 sm:px-6 py-1.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] shadow-2xs">
+                <div className="flex flex-col items-center justify-center px-3.5 sm:px-5 py-1.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] shadow-2xs">
                   <Icon className="w-5 h-5 stroke-[2.4] text-[#2563EB]" />
                   <span className="text-[10px] sm:text-[11px] font-black text-[#2563EB] mt-0.5 tracking-tight">
                     {tab.label}
                   </span>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center px-3 py-1.5 text-[#64748B] hover:text-[#17233C] transition-colors">
+                <div className="flex flex-col items-center justify-center px-2.5 py-1.5 text-[#64748B] hover:text-[#17233C] transition-colors">
                   <Icon className="w-5 h-5 stroke-[1.9] text-[#64748B]" />
                   <span className="text-[10px] sm:text-[11px] font-bold text-[#64748B] mt-0.5 tracking-tight">
                     {tab.label}

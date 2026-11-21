@@ -210,10 +210,18 @@ export default function WhatsAppOnboardingPage() {
         {/* Top Header: Logo */}
         <header className="flex items-center justify-between py-1">
           <div className="flex items-center select-none">
+            {/* Phone UI: Only 'H' Logo */}
+            <img 
+              src="/logo-h.png" 
+              alt="Helpu" 
+              className="h-8 sm:hidden w-auto object-contain"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            {/* Desktop UI: Full logo */}
             <img 
               src="/logo.png" 
               alt="Helpu" 
-              className="h-8 w-auto object-contain"
+              className="hidden sm:block h-8 w-auto object-contain"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           </div>

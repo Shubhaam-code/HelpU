@@ -35,6 +35,11 @@ const getBaseUrl = () => {
   // 2. Web browser: if on localhost, 127.0.0.1 or local network IP (192.168.x, 10.x, etc.)
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;
+    // If VITE_API_URL is explicitly configured to a remote server, prefer it
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+      return envUrl;
+    }
+
     if (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||

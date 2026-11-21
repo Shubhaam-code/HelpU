@@ -67,14 +67,20 @@ export default function OnboardingPage() {
             onClick={() => window.scrollTo({ top: 0 })}
             className="flex items-center cursor-pointer select-none touch-manipulation"
           >
+            {/* Phone UI: Only 'H' Logo */}
+            <img 
+              src="/logo-h.png" 
+              alt="HelpU" 
+              className="h-8 sm:hidden w-auto object-contain pointer-events-none select-none"
+              draggable={false}
+            />
+            {/* Desktop UI: Full logo */}
             <img 
               src="/logo.png" 
               alt="HelpU" 
-              className="h-8 sm:h-9 w-auto object-contain pointer-events-none select-none"
+              className="hidden sm:block h-8 sm:h-9 w-auto object-contain pointer-events-none select-none"
               loading="eager"
               decoding="async"
-              width="72"
-              height="36"
               draggable={false}
             />
           </div>

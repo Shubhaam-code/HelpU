@@ -14,7 +14,10 @@ import {
   Search,
   FileText,
   Eye,
-  ExternalLink
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
@@ -87,38 +90,62 @@ function BlueCloudUploadIcon({ className = 'w-5 h-5' }) {
 }
 
 // Extraction Progress Card (AI Vision extraction feedback)
-function ExtractionProgressCard({ addInProgress, currentCourseIndex, totalCourses }) {
-  const [progress, setProgress] = useState(15);
+function ExtractionProgressCard({ addInProgress, currentCourseIndex = 0, totalCourses = 1 }) {
+  const validTotal = Math.max(1, totalCourses || 1);
+  const currentIdx = Math.min(Math.max(0, currentCourseIndex || 0), validTotal - 1);
+  const sliceSize = 100 / validTotal;
+  const baseProgress = currentIdx * sliceSize;
+
+  const [progress, setProgress] = useState(() => Math.round(baseProgress + (15 / 100) * sliceSize));
+  const maxProgressRef = useRef(progress);
+
+  // Keep maxProgressRef advancing and never falling behind when transitioning to next course
+  useEffect(() => {
+    const currentBase = Math.round(currentIdx * sliceSize);
+    if (currentBase > maxProgressRef.current) {
+      maxProgressRef.current = currentBase;
+      setProgress(currentBase);
+    }
+  }, [currentIdx, sliceSize]);
 
   useEffect(() => {
-    if (!addInProgress) {
-      setProgress(15);
-      return;
-    }
+    if (!addInProgress) return;
 
     if (addInProgress.state === 'completed' || addInProgress.state === 'success') {
-      setProgress(100);
+      const target = currentIdx >= validTotal - 1 ? 100 : Math.round((currentIdx + 1) * sliceSize);
+      maxProgressRef.current = Math.max(maxProgressRef.current, target);
+      setProgress(maxProgressRef.current);
       return;
     }
 
     const startTime = Date.now();
     const interval = setInterval(() => {
       const elapsedSeconds = (Date.now() - startTime) / 1000;
-      let nextProgress = 15;
+      let internalCoursePercent = 15;
       if (elapsedSeconds <= 1.5) {
-        nextProgress = 15 + (elapsedSeconds / 1.5) * 35;
-      } else if (elapsedSeconds <= 3.5) {
-        nextProgress = 50 + ((elapsedSeconds - 1.5) / 2) * 35;
+        internalCoursePercent = 15 + (elapsedSeconds / 1.5) * 35;
+      } else if (elapsedSeconds <= 4.0) {
+        internalCoursePercent = 50 + ((elapsedSeconds - 1.5) / 2.5) * 35;
       } else {
-        nextProgress = Math.min(96, 85 + (elapsedSeconds - 3.5) * 2);
+        internalCoursePercent = Math.min(94, 85 + (elapsedSeconds - 4.0) * 1.5);
       }
-      setProgress(Math.round(nextProgress));
+
+      const calculatedOverall = baseProgress + (internalCoursePercent / 100) * sliceSize;
+      const roundedOverall = Math.round(calculatedOverall);
+
+      // Strict Monotonic Rule: Progress must ALWAYS increase, never jump backwards
+      if (roundedOverall > maxProgressRef.current) {
+        const safeVal = Math.min(98, roundedOverall);
+        maxProgressRef.current = safeVal;
+        setProgress(safeVal);
+      }
     }, 150);
 
     return () => clearInterval(interval);
-  }, [addInProgress]);
+  }, [addInProgress, currentIdx, sliceSize, baseProgress, validTotal]);
 
-  const displayProgress = addInProgress?.state === 'completed' ? 100 : progress;
+  const displayProgress =
+    addInProgress?.state === 'completed' && currentIdx >= validTotal - 1 ? 100 : progress;
 
   return (
     <div className="bg-white border-2 border-[#93C5FD] rounded-2xl p-4 shadow-[0_8px_24px_rgba(37,99,235,0.08)] space-y-3 animate-in fade-in duration-200">
@@ -133,8 +160,8 @@ function ExtractionProgressCard({ addInProgress, currentCourseIndex, totalCourse
           </div>
           <div className="min-w-0">
             <h4 className="font-black text-sm text-[#0F172A] tracking-tight leading-tight">
-              {totalCourses > 1
-                ? `Adding Course ${currentCourseIndex + 1} of ${totalCourses}...`
+              {validTotal > 1
+                ? `Adding Course ${currentIdx + 1} of ${validTotal}...`
                 : 'Extracting Course Details...'}
             </h4>
             <p className="text-[11px] font-bold text-[#2563EB] truncate mt-0.5">
@@ -185,6 +212,11 @@ export function AddCourseScreen() {
 
   // File Preview Modal State (for both Images and PDFs)
   const [previewFile, setPreviewFile] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(3.5, +(z + 0.25).toFixed(2)));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.5, +(z - 0.25).toFixed(2)));
+  const handleResetZoom = () => setZoomLevel(1);
 
   // Submission State
   const [errorMessage, setErrorMessage] = useState('');
@@ -300,7 +332,6 @@ export function AddCourseScreen() {
   // Select suggestion for a row
   const handleSelectSuggestion = (index, course) => {
     if (isCourseAlreadyAdded(course)) {
-      setErrorMessage(`"${course.courseCode}" has already been added.`);
       return;
     }
     // Check if duplicate within current rows
@@ -312,7 +343,6 @@ export function AddCourseScreen() {
           r.selectedCourse._id === (course._id || course.courseId))
     );
     if (duplicateInForm) {
-      setErrorMessage(`"${course.courseCode}" is already in your form list.`);
       return;
     }
 
@@ -497,8 +527,14 @@ export function AddCourseScreen() {
     try {
       setAcademicYear(academicYear);
 
-      // Concurrent Parallel Extraction for all valid course rows
-      const extractionPromises = validRows.map((row) => {
+      const successfulIds = [];
+      const errors = [];
+
+      // Process courses sequentially so that each course progress and AI feedback
+      // updates smoothly and strictly increases without backwards jumping or race conditions
+      for (let i = 0; i < validRows.length; i++) {
+        setCurrentSubmittingIndex(i);
+        const row = validRows[i];
         const coursePayload = row.selectedCourse
           ? {
               curriculumCourseId: row.selectedCourse._id || row.selectedCourse.courseId,
@@ -516,23 +552,15 @@ export function AddCourseScreen() {
               files: (row.screenshots || []).map((s) => s.file).filter(Boolean)
             };
 
-        return addCourse(coursePayload);
-      });
-
-      const results = await Promise.allSettled(extractionPromises);
-
-      const successfulIds = [];
-      const errors = [];
-
-      results.forEach((res, i) => {
-        if (res.status === 'fulfilled') {
-          const targetId = res.value?.course?.courseId || res.value?.courseId;
+        try {
+          const res = await addCourse(coursePayload);
+          const targetId = res?.course?.courseId || res?.courseId;
           if (targetId) successfulIds.push(targetId);
-        } else {
-          const msg = res.reason?.response?.data?.message || res.reason?.message;
-          errors.push(`${validRows[i].selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`);
+        } catch (err) {
+          const msg = err?.response?.data?.message || err?.message;
+          errors.push(`${row.selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`);
         }
-      });
+      }
 
       if (successfulIds.length > 0) {
         setAddedCourseIds(successfulIds);
@@ -560,8 +588,8 @@ export function AddCourseScreen() {
   const busy = submitting || Boolean(addInProgress);
 
   return (
-    <div className="min-h-[100dvh] bg-[#F0F6FF] flex justify-center selection:bg-blue-200">
-      <div className="w-full max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F4F9FF] to-[#EAF2FE] text-[#0F172A] flex flex-col justify-between pb-16 min-[360px]:pb-20 relative overflow-x-hidden sm:shadow-xl sm:border-x sm:border-blue-100">
+    <div className="h-[100dvh] max-h-[100dvh] bg-[#F0F6FF] flex justify-center selection:bg-blue-200 overflow-hidden">
+      <div className="w-full max-w-[430px] h-[100dvh] max-h-[100dvh] bg-gradient-to-b from-[#EFF6FF] via-[#F4F9FF] to-[#EAF2FE] text-[#0F172A] flex flex-col justify-between pb-16 min-[360px]:pb-18 relative overflow-hidden sm:shadow-xl sm:border-x sm:border-blue-100">
         
         {/* Decorative Background PNG: Top-Left Concentric Arcs matching Image 3 */}
         <img
@@ -585,21 +613,17 @@ export function AddCourseScreen() {
         <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-blue-200/40 blur-xl pointer-events-none select-none z-0" />
         <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-blue-300/35 blur-xl pointer-events-none select-none z-0" />
 
-        <main className="w-full px-3 min-[360px]:px-4 pt-1 space-y-1.5 min-[360px]:space-y-2 sm:space-y-3 relative z-10 flex-1">
+        <main className="w-full px-3 min-[360px]:px-4 pt-1.5 pb-1 relative z-10 flex-1 min-h-0 flex flex-col justify-between overflow-hidden">
           
-          {/* Top Minimal Navigation Bar */}
-          <header className="flex items-center pt-0.5 h-8">
-          </header>
-
           {/* Title & Subtitle on Top matching user request */}
-          <div className="text-center space-y-0.5">
+          <div className="text-center space-y-0.5 shrink-0">
             <div className="flex items-center justify-center gap-1.5">
               <span className="text-[#3B82F6] text-xs font-black tracking-widest">
                 ‹‹
               </span>
               <div className="flex items-center gap-1.5 text-[#0B1E48]">
-                <GraduationCap className="w-5 h-5 min-[360px]:w-5.5 min-[360px]:h-5.5 text-[#1D4ED8] stroke-[2.5]" />
-                <h1 className="font-black text-lg min-[360px]:text-xl sm:text-2xl tracking-tight text-[#0B1E48]">
+                <GraduationCap className="w-4.5 h-4.5 min-[360px]:w-5 min-[360px]:h-5 text-[#1D4ED8] stroke-[2.5]" />
+                <h1 className="font-black text-base min-[360px]:text-lg sm:text-xl tracking-tight text-[#0B1E48]">
                   Add Courses
                 </h1>
               </div>
@@ -607,19 +631,19 @@ export function AddCourseScreen() {
                 ››
               </span>
             </div>
-            <p className="text-[11px] min-[360px]:text-xs font-semibold text-[#475569]">
+            <p className="text-[10px] min-[360px]:text-[11px] font-semibold text-[#475569]">
               Select your semester and add your subjects
             </p>
           </div>
 
           {/* Connected Hero Illustration & White Card Box (Zero Gap & Responsive Screen-Fit) */}
-          <div className="space-y-0 pt-0.5">
+          <div className="flex-1 min-h-0 flex flex-col justify-between pt-0.5">
             {/* Hero Illustration: Below text, directly touching the card */}
-            <div className="w-full flex justify-center items-end select-none pointer-events-none -mb-2 relative z-10">
+            <div className="w-full flex justify-center items-end select-none pointer-events-none -mb-1 relative z-10 shrink-0">
               <img
                 src={addCourseHeroSrc}
                 alt="Add Courses"
-                className="w-full max-w-[280px] min-[360px]:max-w-[320px] min-[400px]:max-w-[360px] h-auto max-h-[105px] min-[360px]:max-h-[115px] min-[400px]:max-h-[130px] sm:max-h-[170px] object-contain drop-shadow-xs block"
+                className="w-full max-w-[220px] min-[360px]:max-w-[260px] h-auto max-h-[60px] min-[360px]:max-h-[75px] sm:max-h-[130px] object-contain drop-shadow-xs block"
                 onError={(e) => {
                   e.currentTarget.src = '/ffcs-add-courses-hero.png';
                 }}
@@ -627,13 +651,13 @@ export function AddCourseScreen() {
             </div>
 
             {/* Main White Card Container directly connected */}
-            <div className="bg-white rounded-[24px] sm:rounded-[28px] border border-[#BFDBFE] shadow-[0_8px_25px_rgba(37,99,235,0.06)] p-3 min-[360px]:p-3.5 sm:p-5 space-y-2.5 sm:space-y-3.5 relative z-20">
+            <div className="bg-white rounded-[20px] min-[360px]:rounded-[24px] sm:rounded-[28px] border border-[#BFDBFE] shadow-[0_8px_25px_rgba(37,99,235,0.06)] p-2.5 min-[360px]:p-3 sm:p-4 space-y-1.5 min-[360px]:space-y-2 relative z-20 flex-1 min-h-0 flex flex-col justify-between">
             
             {/* Section 1: Select Semester */}
-            <div ref={semesterDropdownRef} className="space-y-1 relative">
-              <div className="flex items-center gap-1.5">
-                <CalendarDays className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 text-[#2563EB] stroke-[2.4]" />
-                <h3 className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#0F172A] tracking-tight">
+            <div ref={semesterDropdownRef} className="space-y-0.5 relative shrink-0">
+              <div className="flex items-center gap-1">
+                <CalendarDays className="w-3.5 h-3.5 text-[#2563EB] stroke-[2.4]" />
+                <h3 className="font-black text-[11px] min-[360px]:text-xs sm:text-sm text-[#0F172A] tracking-tight">
                   Select Semester
                 </h3>
               </div>
@@ -642,7 +666,7 @@ export function AddCourseScreen() {
               <button
                 type="button"
                 onClick={() => setSemesterDropdownOpen((prev) => !prev)}
-                className={`w-full bg-white rounded-xl sm:rounded-2xl border py-2 px-3 min-[360px]:py-2.5 flex items-center justify-between text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs ${
+                className={`w-full bg-white rounded-xl border py-1.5 px-3 min-[360px]:py-2 flex items-center justify-between text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
                   semesterDropdownOpen
                     ? 'border-[#2563EB] ring-2 ring-blue-100'
                     : 'border-[#BFDBFE] hover:border-[#60A5FA]'
@@ -652,7 +676,7 @@ export function AddCourseScreen() {
                   {semester || 'Choose Semester'}
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 text-[#1E3A8A] shrink-0 transition-transform duration-200 ${
+                  className={`w-3.5 h-3.5 text-[#1E3A8A] shrink-0 transition-transform duration-200 ${
                     semesterDropdownOpen ? 'rotate-180' : ''
                   }`}
                 />
@@ -660,7 +684,7 @@ export function AddCourseScreen() {
 
               {/* Dropdown Menu */}
               {semesterDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl sm:rounded-2xl border border-[#BFDBFE] shadow-xl z-50 divide-y divide-slate-100 max-h-48 sm:max-h-56 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-[#BFDBFE] shadow-xl z-50 divide-y divide-slate-100 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200">
                   {SEMESTER_OPTIONS.map((opt) => {
                     const isSelected = semester === opt;
                     return (
@@ -674,14 +698,14 @@ export function AddCourseScreen() {
                           setSemesterDropdownOpen(false);
                           setErrorMessage('');
                         }}
-                        className={`w-full text-left px-3.5 py-2 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-[#EFF6FF] text-[#1D4ED8]'
                             : 'text-[#0F172A] hover:bg-[#F8FAFC]'
                         }`}
                       >
                         <span>{opt}</span>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-[#2563EB]" />}
+                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB]" />}
                       </button>
                     );
                   })}
@@ -690,17 +714,17 @@ export function AddCourseScreen() {
             </div>
 
             {/* Section 2: Courses List */}
-            <div className="space-y-1.5 pt-0.5">
+            <div className="space-y-1 flex-1 min-h-0 flex flex-col">
               {/* Courses List Header with Open Book Icon */}
-              <div className="flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 text-[#2563EB] stroke-[2.4]" />
-                <h3 className="font-black text-xs min-[360px]:text-sm sm:text-base text-[#0F172A] tracking-tight">
+              <div className="flex items-center gap-1 shrink-0">
+                <BookOpen className="w-3.5 h-3.5 text-[#2563EB] stroke-[2.4]" />
+                <h3 className="font-black text-[11px] min-[360px]:text-xs sm:text-sm text-[#0F172A] tracking-tight">
                   Courses List
                 </h3>
               </div>
 
-              {/* Rows List (Scrolls internally on mobile if user adds 4+ courses, preventing whole-page scroll) */}
-              <div className="space-y-2 max-h-[175px] min-[360px]:max-h-[200px] min-[400px]:max-h-[225px] sm:max-h-none overflow-y-auto pr-0.5 scrollbar-thin">
+              {/* Rows List (Scrolls internally within card, outer page NEVER scrolls) */}
+              <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-0.5 scrollbar-thin">
                 {courseRows.map((row, index) => {
                   const isRowActive = activeRowIndex === index;
                   const hasSelected = Boolean(row.selectedCourse);
@@ -794,12 +818,26 @@ export function AddCourseScreen() {
                               {!isSearching &&
                                 suggestions.map((course) => {
                                   const isAdded = isCourseAlreadyAdded(course);
+                                  const isDuplicateInForm = courseRows.some(
+                                    (r, i) =>
+                                      i !== index &&
+                                      r.selectedCourse &&
+                                      (r.selectedCourse.courseCode === course.courseCode ||
+                                        r.selectedCourse._id === (course._id || course.courseId))
+                                  );
+                                  const isDisabled = isAdded || isDuplicateInForm;
+
                                   return (
                                     <button
                                       key={course._id || course.courseId || course.courseCode}
                                       type="button"
-                                      onClick={() => handleSelectSuggestion(index, course)}
-                                      className="w-full text-left px-3 py-2 hover:bg-[#EFF6FF] transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                      disabled={isDisabled}
+                                      onClick={() => !isDisabled && handleSelectSuggestion(index, course)}
+                                      className={`w-full text-left px-3 py-2 transition-colors flex items-center justify-between gap-2 ${
+                                        isDisabled
+                                          ? 'opacity-50 bg-slate-50 cursor-not-allowed select-none'
+                                          : 'hover:bg-[#EFF6FF] cursor-pointer'
+                                      }`}
                                     >
                                       <div className="min-w-0">
                                         <p className="font-black text-xs text-[#0F172A] truncate">
@@ -813,11 +851,15 @@ export function AddCourseScreen() {
                                         </p>
                                       </div>
                                       {isAdded ? (
-                                        <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
-                                          Added
+                                        <span className="text-[9.5px] font-bold text-slate-500 bg-slate-200/90 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                          ✓ Already Added
+                                        </span>
+                                      ) : isDuplicateInForm ? (
+                                        <span className="text-[9.5px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
+                                          In Form
                                         </span>
                                       ) : (
-                                        <span className="text-[9px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
+                                        <span className="text-[9.5px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded-full shrink-0">
                                           Select
                                         </span>
                                       )}
@@ -854,19 +896,22 @@ export function AddCourseScreen() {
                         </button>
                       </div>
 
-                      {/* Attached Files Preview Chips (Images & PDFs) */}
+                      {/* Attached Files Preview Chips (Images & PDFs) - Enhanced & Spacious */}
                       {row.screenshots && row.screenshots.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap pl-8 min-[360px]:pl-9 pr-1">
+                        <div className="flex items-center gap-2 flex-wrap pl-8 min-[360px]:pl-9 pr-1 pt-0.5">
                           {row.screenshots.map((item) => (
                             <div
                               key={item.id}
-                              className="flex items-center gap-1.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg px-1.5 py-0.5 shadow-2xs hover:border-[#60A5FA] transition-all"
+                              className="group flex items-center gap-2 bg-white border border-[#BFDBFE] hover:border-[#3B82F6] rounded-xl py-1.5 px-2.5 shadow-xs transition-all"
                             >
                               {item.type === 'pdf' ? (
                                 <button
                                   type="button"
-                                  onClick={() => setPreviewFile(item)}
-                                  className="w-4.5 h-4.5 rounded-md bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center font-black text-[7.5px] shrink-0 cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setPreviewFile(item);
+                                  }}
+                                  className="w-7 h-7 rounded-lg bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center font-black text-[9px] shrink-0 cursor-pointer transition-colors shadow-2xs"
                                   title="Click to preview PDF"
                                 >
                                   PDF
@@ -875,34 +920,53 @@ export function AddCourseScreen() {
                                 <img
                                   src={item.url}
                                   alt={item.name}
-                                  onClick={() => setPreviewFile(item)}
-                                  className="w-4.5 h-4.5 rounded-md object-cover border border-[#BFDBFE] shrink-0 cursor-pointer"
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setPreviewFile(item);
+                                  }}
+                                  className="w-7 h-7 rounded-lg object-cover border border-blue-100 shrink-0 cursor-pointer shadow-2xs hover:opacity-90 transition-opacity"
                                   title="Click to preview Image"
                                 />
                               )}
-                              <span
-                                onClick={() => setPreviewFile(item)}
-                                className="text-[9.5px] font-bold text-[#1E293B] max-w-[80px] sm:max-w-[120px] truncate cursor-pointer hover:text-[#2563EB]"
-                                title={`Click to preview: ${item.name}`}
+                              <div
+                                onClick={() => {
+                                  setZoomLevel(1);
+                                  setPreviewFile(item);
+                                }}
+                                className="min-w-0 cursor-pointer pr-0.5"
                               >
-                                {item.name}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setPreviewFile(item)}
-                                className="w-3.5 h-3.5 rounded-full text-[#2563EB] hover:bg-blue-100 flex items-center justify-center cursor-pointer"
-                                title="Preview file"
-                              >
-                                <Eye className="w-2.5 h-2.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveRowFile(index, item.id)}
-                                className="w-3.5 h-3.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-100 flex items-center justify-center cursor-pointer"
-                                title="Remove file"
-                              >
-                                <X className="w-2.5 h-2.5" />
-                              </button>
+                                <p
+                                  className="text-[11px] font-bold text-[#0F172A] max-w-[100px] min-[360px]:max-w-[130px] sm:max-w-[170px] truncate leading-tight group-hover:text-[#2563EB] transition-colors"
+                                  title={`Click to preview: ${item.name}`}
+                                >
+                                  {item.name}
+                                </p>
+                                <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  {item.type === 'pdf' ? 'PDF File' : 'Screenshot'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0 ml-1 pl-1 border-l border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setPreviewFile(item);
+                                  }}
+                                  className="w-6 h-6 rounded-lg text-[#2563EB] hover:bg-[#EFF6FF] flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Preview file"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRowFile(index, item.id)}
+                                  className="w-6 h-6 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Remove file"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -917,9 +981,9 @@ export function AddCourseScreen() {
                 <button
                   type="button"
                   onClick={handleAddMoreRow}
-                  className="w-full rounded-xl sm:rounded-2xl border border-dashed border-[#60A5FA] bg-[#EFF6FF]/60 hover:bg-[#EFF6FF] py-2 min-[360px]:py-2.5 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs active:scale-[0.99] mt-2"
+                  className="w-full rounded-xl border border-dashed border-[#60A5FA] bg-[#EFF6FF]/60 hover:bg-[#EFF6FF] py-1.5 min-[360px]:py-2 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs active:scale-[0.99] mt-1 shrink-0"
                 >
-                  <div className="w-4.5 h-4.5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                  <div className="w-4 h-4 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0">
                     <Plus className="w-3 h-3 stroke-[3]" />
                   </div>
                   <span className="font-black text-xs text-[#2563EB]">
@@ -936,7 +1000,7 @@ export function AddCourseScreen() {
             <ExtractionProgressCard
               addInProgress={addInProgress}
               currentCourseIndex={currentSubmittingIndex}
-              totalCourses={courseRows.filter((r) => r.selectedCourse || r.searchQuery).length}
+              totalCourses={courseRows.filter((r) => r.selectedCourse || (r.searchQuery && r.searchQuery.trim().length >= 3)).length || 1}
             />
           )}
 
@@ -1037,6 +1101,38 @@ export function AddCourseScreen() {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Zoom Controls for Images */}
+                  {previewFile.type === 'image' && (
+                    <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={handleZoomOut}
+                        disabled={zoomLevel <= 0.5}
+                        className="w-6 h-6 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+                        title="Zoom Out (-)"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetZoom}
+                        className="px-1.5 text-[10px] font-black text-slate-700 hover:text-blue-600 cursor-pointer select-none"
+                        title="Reset Zoom (100%)"
+                      >
+                        {Math.round(zoomLevel * 100)}%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleZoomIn}
+                        disabled={zoomLevel >= 3.5}
+                        className="w-6 h-6 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+                        title="Zoom In (+)"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   <a
                     href={previewFile.url}
                     target="_blank"
@@ -1048,7 +1144,10 @@ export function AddCourseScreen() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setPreviewFile(null)}
+                    onClick={() => {
+                      setPreviewFile(null);
+                      setZoomLevel(1);
+                    }}
                     className="w-7 h-7 rounded-xl hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
                     title="Close preview"
                   >
@@ -1058,13 +1157,25 @@ export function AddCourseScreen() {
               </div>
 
               {/* Modal Body */}
-              <div className="p-3 sm:p-4 overflow-y-auto flex-1 flex items-center justify-center bg-slate-100/50">
+              <div className="p-3 sm:p-4 overflow-hidden flex-1 flex flex-col items-center justify-center bg-slate-100/50 relative">
                 {previewFile.type === 'image' ? (
-                  <img
-                    src={previewFile.url}
-                    alt={previewFile.name}
-                    className="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-sm border border-slate-200"
-                  />
+                  <div className="w-full h-full min-h-[50vh] max-h-[72vh] overflow-auto flex items-center justify-center p-2 scrollbar-thin">
+                    <div
+                      className="inline-block transition-transform duration-150 ease-out select-none cursor-zoom-in"
+                      style={{
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'center center'
+                      }}
+                      onDoubleClick={() => setZoomLevel((z) => (z > 1 ? 1 : 2))}
+                      title="Double click to toggle 2x zoom"
+                    >
+                      <img
+                        src={previewFile.url}
+                        alt={previewFile.name}
+                        className="max-w-full max-h-[68vh] object-contain rounded-2xl shadow-sm border border-slate-200"
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <div className="w-full h-[65vh] flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
                     <object

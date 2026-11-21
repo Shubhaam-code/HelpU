@@ -326,12 +326,13 @@ export function downloadTimetablePdf({ confirmedFaculties = {} }) {
   const pdfContent = buildTimetablePdfContent({ confirmedFaculties });
   const blob = new Blob([pdfContent], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
+  const filename = `FFCS_Timetable_${new Date().toISOString().slice(0, 10)}.pdf`;
   const link = document.createElement('a');
   link.href = url;
-  link.download = `FFCS_Timetable_${new Date().toISOString().slice(0, 10)}.pdf`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return { url, filename, blob };
 }
 
