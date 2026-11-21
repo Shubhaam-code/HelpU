@@ -20,6 +20,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { useFFCS } from '../context/FFCSContext';
+import { useUser } from '../../../context/FirebaseAuthContext';
+import { GuestAuthPromptModal } from '../../../components/auth/GuestAuthPromptModal';
 import { FFCSBottomNav } from '../components/FFCSBottomNav';
 import { searchCurriculumCourses } from '../../../lib/api';
 import { compressImage } from '../utils/compressImage';
@@ -186,7 +188,9 @@ function ExtractionProgressCard({ addInProgress, currentCourseIndex = 0, totalCo
 
 export function AddCourseScreen() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const { coursesList, addCourse, addInProgress, getAcademicYear, setAcademicYear } = useFFCS();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Semester State
   const [semester, setSemester] = useState('');
@@ -495,6 +499,12 @@ export function AddCourseScreen() {
 
     if (submitting || addInProgress) return;
 
+    // 1. If user is guest/unauthenticated, prompt login modal immediately (like SlotMate & PoolMate)
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!semester) {
       setErrorMessage('Please select a semester first.');
       return;
@@ -552,16 +562,32 @@ export function AddCourseScreen() {
           const targetId = res?.course?.courseId || res?.courseId;
           return { success: true, targetId, index: i, code: row.selectedCourse?.courseCode || `Course ${i + 1}` };
         } catch (err) {
+          const status = err?.status || err?.response?.status;
           const msg = err?.response?.data?.message || err?.message;
+          const isUnauthorized =
+            status === 401 ||
+            String(msg || '').toLowerCase().includes('unauthorized') ||
+            String(msg || '').toLowerCase().includes('authentication token') ||
+            String(msg || '').toLowerCase().includes('token');
+
           return {
             success: false,
-            error: `${row.selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`,
+            isUnauthorized,
+            error: isUnauthorized ? 'Sign in required' : `${row.selectedCourse?.courseCode || 'Course ' + (i + 1)}: ${msg}`,
             index: i
           };
         }
       });
 
       const results = await Promise.all(tasks);
+
+      // If any task returned unauthorized, show auth modal instead of red error banner!
+      const unauthorizedResult = results.find((r) => r.isUnauthorized);
+      if (unauthorizedResult) {
+        setShowAuthModal(true);
+        return;
+      }
+
       for (const res of results) {
         if (res.success && res.targetId) {
           successfulIds.push(res.targetId);
@@ -582,12 +608,18 @@ export function AddCourseScreen() {
         setErrorMessage(errors[0] || 'Failed to extract courses. Please check your files and connection.');
       }
     } catch (err) {
+      const status = err?.status || err?.response?.status;
       const apiMsg = err?.response?.data?.message || err?.message;
-      setErrorMessage(
-        err?.status === 401
-          ? 'Please sign in to add courses.'
-          : apiMsg || 'Failed to extract courses. Please try again.'
-      );
+      if (
+        status === 401 ||
+        String(apiMsg || '').toLowerCase().includes('unauthorized') ||
+        String(apiMsg || '').toLowerCase().includes('authentication token') ||
+        String(apiMsg || '').toLowerCase().includes('token')
+      ) {
+        setShowAuthModal(true);
+      } else {
+        setErrorMessage(apiMsg || 'Failed to extract courses. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1218,6 +1250,15 @@ export function AddCourseScreen() {
             </div>
           </div>
         )}
+        {/* Guest Authentication Prompt Modal (Matching SlotMate & PoolMate) */}
+        <GuestAuthPromptModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          moduleName="FFCS Mate"
+          returnPath="/slotmate/ffcs/add"
+          title="Sign In to Add Courses"
+          subtitle="Please sign in with your student account to extract timetable slots and save your courses."
+        />
       </div>
     </div>
   );
