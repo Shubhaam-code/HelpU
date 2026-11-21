@@ -211,13 +211,27 @@ export function FFCSProvider({ children }) {
         }
         const normalizedList = deduplicatedRaw.map(normalizeCourse);
 
+        // If backend returns empty courses but local courses exist in storage, keep local courses
+        if (normalizedList.length === 0 && coursesListRef.current && coursesListRef.current.length > 0) {
+          setError(null);
+          return coursesListRef.current;
+        }
+
         setCoursesList(normalizedList);
         queryClient.setQueryData(queryKey, normalizedList);
+        setError(null);
         return normalizedList;
       } catch (err) {
         const statusCode = err?.response?.status || err?.status;
+        const isNetworkErr = err?.message === 'Network Error' || !err?.response;
+
         if (statusCode === 401 || statusCode === 403) {
           // If not logged in, keep local stored courses and do not show an error
+          setError(null);
+        } else if (isNetworkErr || (coursesListRef.current && coursesListRef.current.length > 0)) {
+          // Silently fallback to locally stored courses without showing an intrusive error banner
+          console.warn('[FFCS] Network sync unavailable, using offline courses:', err?.message);
+          setError(null);
         } else {
           setError(err?.message || 'Unable to load your FFCS courses.');
         }

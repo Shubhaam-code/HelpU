@@ -114,11 +114,11 @@ export function AddedCoursesScreen() {
           </div>
         )}
 
-        {error && (
+        {error && coursesList.length === 0 && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-3 text-xs font-bold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1">{error}</span>
-            <button type="button" onClick={refreshCourses} className="underline cursor-pointer">Retry</button>
+            <button type="button" onClick={() => refreshCourses({ force: true })} className="underline cursor-pointer">Retry</button>
           </div>
         )}
 
