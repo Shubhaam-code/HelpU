@@ -229,76 +229,42 @@ export default function SlotMateProfilePage() {
             <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white/90 via-white/25 to-transparent pointer-events-none" />
           </div>
 
-          {/* Profile Details Area: Avatar on Left + Student Info on Right */}
+          {/* Profile Details Area: Avatar on Left + Student Info Below */}
           <div className="px-4 sm:px-6 pb-4 pt-1">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start sm:items-end justify-between gap-3.5 sm:gap-4">
-                
+            <div className="flex flex-col gap-2.5">
+              
+              {/* Row 1: Avatar on Left (overlapping banner) + Edit Profile Button on Right */}
+              <div className="flex items-end justify-between gap-3 w-full">
                 {/* Circular Avatar on Left with Golden/Amber Border & Crown for Guest */}
-                <div className="flex items-start sm:items-end gap-3.5 sm:gap-4 min-w-0">
-                  <div className="relative -mt-8 min-[380px]:-mt-10 sm:-mt-12 shrink-0 z-10">
-                    <div className="w-20 h-20 min-[380px]:w-24 min-[380px]:h-24 sm:w-28 sm:h-28 rounded-full border-4 border-[#F59E0B] shadow-md overflow-hidden bg-[#FFFBEB] flex items-center justify-center">
-                      {isGuest ? (
-                        <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-[#9CA3AF] stroke-[1.8]" />
-                      ) : (
-                        <Avatar
-                          src={displayAvatar}
-                          name={displayName}
-                          size="full"
-                          className="w-full h-full"
-                        />
-                      )}
-                    </div>
-
-                    {/* Crown icon on bottom-left for guest, checkmark on bottom-right for verified */}
+                <div className="relative -mt-8 min-[380px]:-mt-10 sm:-mt-12 shrink-0 z-10">
+                  <div className="w-20 h-20 min-[380px]:w-24 min-[380px]:h-24 sm:w-28 sm:h-28 rounded-full border-4 border-[#F59E0B] shadow-md overflow-hidden bg-[#FFFBEB] flex items-center justify-center">
                     {isGuest ? (
-                      <div className="absolute -bottom-1.5 -left-1 text-[#F59E0B] pointer-events-none select-none drop-shadow-xs">
-                        <Crown className="w-5 h-5 fill-[#FBBF24] stroke-[#D97706] -rotate-12" />
-                      </div>
+                      <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-[#9CA3AF] stroke-[1.8]" />
                     ) : (
-                      <div className="absolute bottom-0 right-0 w-6 h-6 min-[380px]:w-6.5 min-[380px]:h-6.5 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-xs">
-                        <Check className="w-3.5 h-3.5 stroke-[3] text-white" />
-                      </div>
+                      <Avatar
+                        src={displayAvatar}
+                        name={displayName}
+                        size="full"
+                        className="w-full h-full"
+                      />
                     )}
                   </div>
 
-                  {/* Student Info on Right: Name + Verified Pill, College, Email */}
-                  <div className="flex-1 min-w-0 pt-1 space-y-1">
-                    {/* Row 1: Name + [✓ Verified Student] Green Pill */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-black text-lg min-[380px]:text-xl sm:text-2xl text-[#17233C] tracking-tight leading-tight truncate">
-                        {displayName}
-                      </h2>
-                      {isGuest ? (
-                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFF7ED] text-[#EA580C] text-[11px] font-bold border border-[#FED7AA] whitespace-nowrap">
-                          <ShieldAlert className="w-3.5 h-3.5 text-[#EA580C]" />
-                          <span>Unverified</span>
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#16A34A] text-white text-[11px] min-[380px]:text-xs font-bold shadow-2xs whitespace-nowrap">
-                          <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Verified Student</span>
-                        </div>
-                      )}
+                  {/* Crown icon on bottom-left for guest, checkmark on bottom-right for verified */}
+                  {isGuest ? (
+                    <div className="absolute -bottom-1.5 -left-1 text-[#F59E0B] pointer-events-none select-none drop-shadow-xs">
+                      <Crown className="w-5 h-5 fill-[#FBBF24] stroke-[#D97706] -rotate-12" />
                     </div>
-
-                    {/* Row 2: College */}
-                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6E7587]">
-                      <GraduationCap className="w-4 h-4 text-[#EAB308] stroke-[2.2] shrink-0" />
-                      <span className="truncate">{isGuest ? 'Student • Unverified' : displayCollege}</span>
+                  ) : (
+                    <div className="absolute bottom-0 right-0 w-6 h-6 min-[380px]:w-6.5 min-[380px]:h-6.5 rounded-full bg-[#16A34A] border-2 border-white flex items-center justify-center shadow-xs">
+                      <Check className="w-3.5 h-3.5 stroke-[3] text-white" />
                     </div>
-
-                    {/* Row 3: Email */}
-                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#6E7587]">
-                      <Mail className="w-3.5 h-3.5 text-[#8C93A4] stroke-[2] shrink-0" />
-                      <span className="break-all leading-tight select-all">{isGuest ? 'College Email • Unverified' : displayEmail}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Edit Profile button for verified user */}
                 {!isGuest && (
-                  <div className="shrink-0 flex justify-end pt-1">
+                  <div className="shrink-0 pb-1">
                     <button
                       type="button"
                       onClick={handleOpenEdit}
@@ -309,6 +275,43 @@ export default function SlotMateProfilePage() {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Row 2: Full-Width Student Information (Spacious on Phone) */}
+              <div className="w-full space-y-1.5 text-left pt-0.5">
+                {/* Name + Verified Pill */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-black text-lg min-[380px]:text-xl sm:text-2xl text-[#17233C] tracking-tight leading-tight">
+                    {displayName}
+                  </h2>
+                  {isGuest ? (
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFF7ED] text-[#EA580C] text-[11px] font-bold border border-[#FED7AA] whitespace-nowrap">
+                      <ShieldAlert className="w-3.5 h-3.5 text-[#EA580C]" />
+                      <span>Unverified</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#16A34A] text-white text-[11px] min-[380px]:text-xs font-bold shadow-2xs whitespace-nowrap">
+                      <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Verified Student</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* College & Full Email across full screen width */}
+                <div className="space-y-1 text-xs text-[#6E7587]">
+                  <div className="flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#EAB308] stroke-[2.2] shrink-0" />
+                    <span className="font-bold text-[#17233C] text-xs sm:text-sm">
+                      {isGuest ? 'Student • Unverified' : displayCollege}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#8C93A4] stroke-[2] shrink-0" />
+                    <span className="font-medium text-xs sm:text-sm text-[#475569] select-all break-all sm:break-normal">
+                      {isGuest ? 'College Email • Unverified' : displayEmail}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Guest Mode: Full Width "Sign In to Complete Your Profile" Pill Button */}
