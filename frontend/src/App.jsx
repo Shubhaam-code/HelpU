@@ -33,6 +33,7 @@ import CommunityPage from './pages/CommunityPage';
 import GetHelpPage from './pages/GetHelpPage';
 import AboutPage from './pages/AboutPage';
 import StaticInfoPage from './pages/StaticInfoPage';
+import InstallAppPage from './pages/InstallAppPage';
 
 // Find Your Slot Friend Feature Module
 import { 
@@ -264,6 +265,20 @@ try {
 }
 
 function AppShell() {
+  const location = useLocation();
+  const isInstallRoute = location.pathname === '/install-app' || location.pathname === '/install';
+
+  // Dedicated minimal standalone installation page: bypasses all splash, intros, and app shells
+  if (isInstallRoute) {
+    return (
+      <Routes>
+        <Route path="/install-app" element={<InstallAppPage />} />
+        <Route path="/install" element={<InstallAppPage />} />
+        <Route path="*" element={<InstallAppPage />} />
+      </Routes>
+    );
+  }
+
   const { isLoaded, isSignedIn } = useUser();
   const [introCompleted, setIntroCompleted] = useState(() => hasIntroPlayedSession);
 
@@ -328,6 +343,10 @@ function AppShell() {
       <InAppNotificationBanner />
       <TokenInjector />
       <Routes>
+      {/* Public Standalone App Installation Route */}
+      <Route path="/install-app" element={<InstallAppPage />} />
+      <Route path="/install" element={<InstallAppPage />} />
+
       {/* Public Landing & Authentication */}
       <Route path="/" element={<OnboardingPage />} />
       <Route path="/auth" element={<AuthPage />} />

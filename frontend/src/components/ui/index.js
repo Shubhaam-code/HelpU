@@ -11,3 +11,5 @@ export { PageContainer } from './PageContainer';
 export { Avatar } from './Avatar';
 export { StatusBadge } from './StatusBadge';
 
+export { default as InfiniteSpiral } from './InfiniteSpiral';
+export { default as spiralImages } from './spiralImages';
